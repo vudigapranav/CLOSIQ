@@ -5,7 +5,8 @@ import { SecondaryButton } from '../ui/SecondaryButton';
 import { EmptyState } from '../ui/EmptyState';
 import { GarmentImage } from '../ui/GarmentImage';
 import { GarmentItem, Outfit, LayeringPreference } from '../../types/wardrobe';
-import { generateAIOutfit, isSameOutfit, formatCategoryList } from '../../services/aiStylist';
+import { isSameOutfit, formatCategoryList } from '../../services/aiStylist';
+import { generateAIOutfitWithGemini } from '../../services/ai';
 
 interface TodayScreenProps {
   wardrobe: GarmentItem[];
@@ -18,8 +19,6 @@ interface TodayScreenProps {
 }
 
 const OCCASIONS = ['College', 'Work', 'Date', 'Party', 'Casual', 'Travel'];
-
-const GENERATE_DELAY_MS = 550;
 
 export const TodayScreen: React.FC<TodayScreenProps> = ({
   wardrobe,
@@ -40,22 +39,24 @@ export const TodayScreen: React.FC<TodayScreenProps> = ({
   const activePrompt = customInput.trim() || selectedOccasion;
   const generationToken = useRef(0);
 
-  const runGeneration = (promptText: string, seed: number) => {
+  const runGeneration = async (promptText: string, seed: number) => {
     if (wardrobe.length === 0) return;
     const token = ++generationToken.current;
     setIsGenerating(true);
     setErrorMessage(null);
     setShowBreakdown(false);
-    window.setTimeout(() => {
+    try {
+      const generated = await generateAIOutfitWithGemini(wardrobe, { prompt: promptText, layeringPreference }, seed);
       if (token !== generationToken.current) return;
-      try {
-        setOutfit(generateAIOutfit(wardrobe, { prompt: promptText, layeringPreference }, seed));
-      } catch {
-        setErrorMessage("We couldn't put together a look just now. Please try again.");
-      } finally {
+      setOutfit(generated);
+    } catch {
+      if (token !== generationToken.current) return;
+      setErrorMessage("We couldn't put together a look just now. Please try again.");
+    } finally {
+      if (token === generationToken.current) {
         setIsGenerating(false);
       }
-    }, GENERATE_DELAY_MS);
+    }
   };
 
   // Cover the case where the wardrobe was empty on first mount (Empty State)

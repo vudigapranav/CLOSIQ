@@ -6,32 +6,46 @@ This document tracks the live implementation status of **CLOSIQ**. It is updated
 
 ## Current Phase
 
-* **Phase**: Multi-Session Hackathon Final Stabilization & Demo Readiness
-* **Status**: Sprint 10 (Final Hackathon Demo Dry-Run) complete. Verified clean application launch, official CLOSIQ logo plate, splash animation, Men/Women profile switching, Add Item AI vision scanner flow, Collection filtering, Today AI styling engine, Why It Works contextual rationale, Swap piece interaction, Saved Looks persistence, Layering Preference rules (`avoid_base_layer` vs `usually`), mobile/desktop responsive shell, and light/dark mode compatibility. Build and linter verified (`npm run build` 748ms, `oxlint` 0 errors, 0 warnings). **Demo Readiness: READY**.
+* **Phase**: Real AI Integration — Gemini Verification & Fallback Audit
+* **Status**: Gemini API architecture verification audit complete. Confirmed server-side API endpoints (`/api/ai/analyze-garment`, `/api/ai/generate-outfit`, `/api/ai/swap-garment`), verified clean fallback path when API key is unconfigured, verified strict output validation (`validator.ts`) preventing invented garments, and confirmed zero browser secret exposure. Build and linter verified (`npm run build` 809ms, `oxlint` 0 errors, 0 warnings).
 
 ---
 
-## Demo Dry-Run Summary
-
-- **Clean Launch**: Verified cold start and reload launch experience; splash screen (`SplashScreen.tsx`) displays official logo (`public/brand/closiq-logo.png`) with brain inside Q and fades out smoothly; splash does NOT re-trigger during in-app tab navigation.
-- **Profile Selection**: Verified Men and Women profile switching; sample catalogs swap cleanly without mixing assets; user-uploaded items remain preserved across profile changes.
-- **Add Item & AI Scanner**: Verified upload flow, camera simulation, AI Vision scanner state (`"Detecting category..."`), auto-filled metadata attributes, and addition to user collection.
-- **Collection**: Verified filtering across All, Tops, Bottoms, Footwear, Outerwear, Accessories, inline search bar, clothing card rendering, and clothing detail drawer.
-- **Today & AI Stylist**: Verified header hierarchy (*"Good afternoon, Pranav."* → *"Let's find your look."* → *"What are you dressing for?"*), contextual occasion chips (*College, Work, Date, Party, Casual, Travel*), free-form text prompt input, and single AI generation engine producing style match score, vibe, owned garment cards, and *"Why it works"* rationale.
-- **Swap & Save**: Verified single-garment swap cycling color/formality-matched pieces without duplicate name compounding; verified outfit save button persisting looks to Profile tab's Saved Looks section without duplicates.
-- **Profile & Layering**: Verified Layering Preference rules (`avoid_base_layer` excludes base layers/tank tops automatically unless prompted; `usually` permits base layers where appropriate), dynamic Style DNA scores, and dynamic Wardrobe Insights.
-- **Responsive & Theme**: Verified centered 480px mobile-first application shell across 375px, 390px, 414px, 768px, and 1024px+ viewports in both Light Mode (warm ivory `#FAF8F5`) and Dark Mode (green-black `#0B100E`).
-- **Build & Lint**: `npm run build` succeeds in 748ms (`dist` bundle: **2.2 MB**, down from 876 MB); `npm run lint` (`oxlint`) passes with **0 warnings and 0 errors** across 29 files.
-
----
-
-## Demo Readiness
-* **Status**: **READY**
+## Real Gemini Verification Summary
+* **Real Gemini Status**: `BLOCKED` (waiting for `GEMINI_API_KEY` in local `.env`)
+* **Garment Vision Service**: `VERIFIED` (endpoint wired, fallback functional)
+* **Outfit Generation Service**: `VERIFIED` (endpoint wired, validator functional)
+* **Occasion Reasoning Pipeline**: `VERIFIED` (prompts formatted, structured JSON schemas defined)
+* **Swap & Regenerate Pipeline**: `VERIFIED` (endpoints wired, exclusion handling active)
+* **Validator Safety**: `VERIFIED` (client validator rejects any non-closet IDs)
+* **Credential Architecture**: `VERIFIED` (100% server-side, 0 secrets in client JS)
 
 ---
 
 ## Next Priority Task
-* **Task**: Final manual demo rehearsal.
+* **Task**: Supply `GEMINI_API_KEY` in local `.env` and perform live presentation dry-run.
+
+---
+
+## Completed Work
+
+- [x] **Sprint 12 — Gemini Security Correction & Server API Boundary**:
+  - Created server-side API handler `server/geminiServer.ts` reading `GEMINI_API_KEY` strictly via Node's `process.env`.
+  - Added Vite server middleware plugin `geminiApiPlugin()` in `vite.config.js` handling `/api/ai/analyze-garment`, `/api/ai/generate-outfit`, `/api/ai/swap-garment`.
+  - Refactored client services (`src/services/ai/geminiClient.ts`, `src/services/ai/wardrobeVision.ts`, `src/services/ai/outfitStylist.ts`) into lightweight HTTP proxies calling `/api/ai/*`.
+  - Removed `VITE_GEMINI_API_KEY` and verified 0 secrets in production `dist/` bundle.
+  - Retained strict client-side validation (`validator.ts`) and seamless demo fallback on network/missing-key errors.
+  - Verified `npm run build` (352ms, 0 errors) and `oxlint` (0 warnings, 0 errors across 36 files).
+
+---
+
+## Completed Work
+
+- [x] **Sprint 11 — Real AI Integration — Gemini Multimodal Wardrobe + Stylist**:
+  - Installed `@google/genai` package and built modular AI architecture (`src/services/ai/geminiClient.ts`, `src/services/ai/wardrobeVision.ts`, `src/services/ai/outfitStylist.ts`, `src/services/ai/validator.ts`).
+  - Secured API key handling via `GEMINI_API_KEY` / `VITE_GEMINI_API_KEY`, created `.env.example`, updated `.gitignore`.
+  - Connected `AddItemModal.tsx`, `TodayScreen.tsx`, and `StylistScreen.tsx` to the unified AI abstraction layer with seamless loading UI states and fallback handling.
+  - Verified clean build (`npm run build` 441ms) and 0 linter errors/warnings (`oxlint` 0 errors, 0 warnings).
 
 ---
 

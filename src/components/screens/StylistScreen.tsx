@@ -13,6 +13,7 @@ import {
   isSameOutfit,
   formatCategoryList
 } from '../../services/aiStylist';
+import { generateAIOutfitWithGemini } from '../../services/ai';
 
 interface StylistScreenProps {
   wardrobe: GarmentItem[];
@@ -54,29 +55,32 @@ export const StylistScreen: React.FC<StylistScreenProps> = ({
   const [swappingCategory, setSwappingCategory] = useState<GarmentCategory | null>(null);
   const generationToken = useRef(0);
 
-  const runGeneration = (seed: number) => {
+  const runGeneration = async (seed: number) => {
     if (wardrobe.length === 0) return;
     const token = ++generationToken.current;
     const previousOutfit = outfit;
     setIsGenerating(true);
     setErrorMessage(null);
     setInfoMessage(null);
-    window.setTimeout(() => {
+    try {
+      const next = await generateAIOutfitWithGemini(
+        wardrobe,
+        { prompt: prompt || selectedChip, layeringPreference },
+        seed
+      );
       if (token !== generationToken.current) return;
-      try {
-        const next = generateAIOutfit(wardrobe, { prompt: prompt || selectedChip, layeringPreference }, seed);
-        // Be honest when a regenerate can't actually produce anything different
-        // (e.g. every category only has one item) instead of pretending it did.
-        if (previousOutfit && seed > 0 && isSameOutfit(next, previousOutfit)) {
-          setInfoMessage('This is your best match right now — add more pieces to unlock other combinations.');
-        }
-        setOutfit(next);
-      } catch {
-        setErrorMessage("We couldn't put together a look just now. Please try again.");
-      } finally {
+      if (previousOutfit && seed > 0 && isSameOutfit(next, previousOutfit)) {
+        setInfoMessage('This is your best match right now — add more pieces to unlock other combinations.');
+      }
+      setOutfit(next);
+    } catch {
+      if (token !== generationToken.current) return;
+      setErrorMessage("We couldn't put together a look just now. Please try again.");
+    } finally {
+      if (token === generationToken.current) {
         setIsGenerating(false);
       }
-    }, 600);
+    }
   };
 
   // Rotate the "thinking" caption while a generation is in flight.

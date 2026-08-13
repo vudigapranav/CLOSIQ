@@ -2,7 +2,8 @@ import React, { useEffect, useState } from 'react';
 import { X, Camera, Upload, Sparkles, Check, AlertTriangle } from 'lucide-react';
 import { GarmentItem, GarmentCategory, FormalityLevel, LayeringRole, WardrobeProfile } from '../../types/wardrobe';
 import { getQuickAddSamples, CatalogEntry } from '../../data/garmentCatalog';
-import { analyzeUploadedPhoto, analyzeCatalogGarment, VisionAnalysisResult } from '../../services/aiVisionScanner';
+import { analyzeCatalogGarment, VisionAnalysisResult } from '../../services/aiVisionScanner';
+import { analyzeGarmentImageWithGemini } from '../../services/ai';
 import { GarmentImage } from '../ui/GarmentImage';
 import { PrimaryButton } from '../ui/PrimaryButton';
 import { CategoryChip } from '../ui/CategoryChip';
@@ -116,7 +117,7 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({ wardrobeProfile, onC
       setCaptionIndex(0);
       setStep('scanning');
 
-      const result = await analyzeUploadedPhoto(dataUrl, category);
+      const result = await analyzeGarmentImageWithGemini(dataUrl, category);
       applyAnalysis(result);
     } catch {
       setErrorMessage("We couldn't process that photo. Please try again with a different image.");
