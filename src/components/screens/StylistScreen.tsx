@@ -58,7 +58,7 @@ export const StylistScreen: React.FC<StylistScreenProps> = ({
   const [swappingCategory, setSwappingCategory] = useState<GarmentCategory | null>(null);
   const generationToken = useRef(0);
 
-  const runGeneration = async (seed: number) => {
+  const runGeneration = async (seed: number, excludeGarmentIds: string[] = []) => {
     if (wardrobe.length === 0) return;
     const token = ++generationToken.current;
     const previousOutfit = outfit;
@@ -70,7 +70,7 @@ export const StylistScreen: React.FC<StylistScreenProps> = ({
       const effectivePrompt = selectedStyle ? `${basePrompt} — ${selectedStyle.toLowerCase()} style` : basePrompt;
       const next = await generateAIOutfitWithGemini(
         wardrobe,
-        { prompt: effectivePrompt, layeringPreference },
+        { prompt: effectivePrompt, layeringPreference, excludeGarmentIds },
         seed
       );
       if (token !== generationToken.current) return;
@@ -125,7 +125,13 @@ export const StylistScreen: React.FC<StylistScreenProps> = ({
   const handleRegenerate = () => {
     const nextSeed = variationSeed + 1;
     setVariationSeed(nextSeed);
-    runGeneration(nextSeed);
+    // Exclude the outfit currently on screen so Gemini has an explicit signal
+    // not to just hand the same combination back. A fresh Generate click
+    // (handleGenerate, seed 0) intentionally does not exclude anything — the
+    // user may have changed the prompt/occasion/style and a stale exclusion
+    // from an unrelated previous outfit would only get in the way.
+    const excludeIds = outfit ? outfit.items.map((item) => item.id) : [];
+    runGeneration(nextSeed, excludeIds);
   };
 
   const handleToggleSwapPicker = (category: GarmentCategory) => {

@@ -55,6 +55,7 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({ wardrobeProfile, onC
   const [hexColor, setHexColor] = useState('#3A3F47');
   const [fabric, setFabric] = useState('');
   const [fit, setFit] = useState('Regular');
+  const [style, setStyle] = useState<string | undefined>(undefined);
   const [layeringRole, setLayeringRole] = useState<LayeringRole | undefined>(undefined);
   const [formality, setFormality] = useState<FormalityLevel>('smart_casual');
   const [tags, setTags] = useState<string[]>([]);
@@ -78,6 +79,7 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({ wardrobeProfile, onC
     setHexColor(result.hexColor);
     setFabric(result.fabric);
     setFit(result.fit);
+    setStyle(result.style);
     setLayeringRole(result.layeringRole);
     setFormality(result.formality);
     setTags(result.tags);
@@ -136,6 +138,7 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({ wardrobeProfile, onC
       hexColor,
       fabric,
       fit,
+      style,
       layeringRole,
       seasons: ['spring', 'autumn'],
       formality,

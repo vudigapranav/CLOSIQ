@@ -35,6 +35,8 @@ export interface GarmentItem {
   pairingNotes?: string;
   /** Cut/silhouette, e.g. "Oversized", "Slim", "Relaxed". */
   fit?: string;
+  /** Short style descriptor, e.g. "Streetwear Essential", "Tailored Modern". Optional — older stored items and demo-fallback-scanned uploads may not have one. */
+  style?: string;
   layeringRole?: LayeringRole;
   /** Set only on items auto-seeded from the men's/women's generated catalog.
    *  Absent for anything the user photographed/uploaded/hand-picked themselves,

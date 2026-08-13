@@ -28,13 +28,21 @@ const GEMINI_MODEL = 'gemini-flash-latest';
 const SYSTEM_PROMPT = `You are CLOSIQ, an expert personal AI stylist.
 Your primary rule: You MUST ONLY style outfits using the user's actual wardrobe items provided in the JSON input.
 
+OCCASION REASONING: Before selecting garments, read the user's own request and derive its real styling context — do not treat it as a flat label or match it only against the example words below. Consider:
+- Social context: professional/academic (credibility, restraint) vs. solo/practical (comfort, ease) vs. social/romantic (personal presentation, intentional styling).
+- Time of day and setting: evening and romantic/social occasions generally call for more deliberately-styled, dressed-up pieces than daytime academic or professional occasions do, even when both sound "polished" on the surface.
+- Practical demands: mobility, weather layering, standing/presenting for long periods, etc.
+- Degree of intentionality: effortless/low-effort (e.g. a casual weekend) vs. deliberate/considered — and, when both are deliberate, WHY: personal attraction and social polish for a date is a different goal than credibility and professionalism for a presentation or interview, even if both draw from the wardrobe's most polished tier.
+Two occasions that sound similarly "polished" (e.g. a romantic dinner and an academic presentation) are not automatically the same styling problem — reason about which of the above dimensions genuinely differ for this specific request.
+
 STRICT STYLING RULES:
 1. NEVER INVENT garments. Only return garmentIds that exist in the provided wardrobe list.
-2. Carefully reason about the user's requested occasion (e.g. "college presentation" vs "casual weekend" vs "airport travel" vs "date night").
-3. Respect layering preferences: If layeringPreference is "avoid", do NOT automatically include base_layer garments (like tank tops) under another shirt/top unless explicitly requested.
-4. Ensure color harmony, fit compatibility, category balance, and appropriate formality for the occasion.
-5. Provide a contextual, genuine explanation in whyItWorks detailing why these specific pieces work together for this exact occasion.
-6. Return structured JSON matching the requested schema.`;
+2. Respect layering preferences: If layeringPreference is "avoid", do NOT automatically include base_layer garments (like tank tops) under another shirt/top unless explicitly requested.
+3. When several wardrobe items in a category are all plausible for the occasion, choose among them in this order: occasion fit (per the reasoning above) → formality → style → color harmony → fabric/fit/silhouette → layering role → overall coherence. Each wardrobe item's style field (e.g. "Streetwear Essential", "Tailored Modern") is a real signal about how that piece actually reads, not just its formality tier — weigh it accordingly. If two distinct occasions land on the same formality tier because the wardrobe has nothing higher, differentiate using style, color, fabric, fit, tags, and pairingNotes rather than defaulting to the identical combination for both.
+4. WARDROBE FEASIBILITY: When a wardrobeSummary is provided, its formalityCoverage tells you, per formality tier, how many items actually exist and a rough tier (none/weak/moderate/strong). Use it honestly. If the occasion calls for a formality tier the wardrobe covers weakly or not at all, do NOT claim or imply the result meets that tier anyway — select the closest formality the wardrobe genuinely has, still produce the best possible outfit from owned items, and say so plainly in whyItWorks (e.g. that the wardrobe doesn't currently have formal or evening pieces, so this is the most polished option available). Never invent the impression of tailoring, formality, or polish the actual garments don't have.
+5. Ensure color harmony, fit compatibility, category balance, and appropriate formality for the occasion.
+6. Provide a contextual, genuine explanation in whyItWorks detailing why these specific pieces work together for this exact occasion — including the honest feasibility note from rule 4 when it applies.
+7. Return structured JSON matching the requested schema.`;
 
 /**
  * Endpoint 1: POST /api/ai/analyze-garment
@@ -64,6 +72,7 @@ Return structured JSON output matching this schema:
   "hexColor": "Hex color code e.g. #1B263B",
   "fabric": "Estimated fabric/material e.g. 100% Cotton Poplin, Heavy Denim",
   "fit": "Fit silhouette e.g. Tailored, Oversized, Relaxed, Slim, Regular",
+  "style": "Short 2-4 word style descriptor e.g. Streetwear Essential, Tailored Modern, Classic Casual, Refined Minimalist",
   "formality": "One of: casual, smart_casual, formal, evening",
   "layeringRole": "One of: base_layer, primary_layer, outer_layer",
   "tags": ["3 to 5 relevant aesthetic or functional tags"],
@@ -117,6 +126,7 @@ export async function handleGenerateOutfitServer(body) {
       layeringPreference: body.layeringPreference || 'avoid',
       excludedGarmentIds: body.excludeGarmentIds || [],
       wardrobeCount: body.wardrobe?.length || 0,
+      wardrobeSummary: body.wardrobeSummary || null,
       wardrobe: body.wardrobe
     };
 

@@ -1,10 +1,11 @@
-import React from 'react';
-import { Sparkles, Heart, Moon, Sun, Lightbulb, Trash2, Shirt, CalendarDays, Bell } from 'lucide-react';
+import React, { useState } from 'react';
+import { Sparkles, Heart, Moon, Sun, Lightbulb, Trash2, Shirt, CalendarDays, Bell, Eye } from 'lucide-react';
 import { SectionHeader } from '../ui/SectionHeader';
 import { GarmentImage } from '../ui/GarmentImage';
 import { SegmentedControl } from '../ui/SegmentedControl';
 import { INITIAL_PROFILE } from '../../data/initialWardrobe';
 import { GarmentItem, Outfit, WardrobeProfile, LayeringPreference } from '../../types/wardrobe';
+import { SavedOutfitDetailModal } from '../modals/SavedOutfitDetailModal';
 
 interface ProfileScreenProps {
   isDarkMode: boolean;
@@ -12,6 +13,7 @@ interface ProfileScreenProps {
   wardrobe?: GarmentItem[];
   savedOutfits?: Outfit[];
   onRemoveSavedOutfit?: (id: string) => void;
+  onWearAgainOutfit?: (outfit: Outfit) => void;
   wardrobeProfile: WardrobeProfile;
   onChangeWardrobeProfile: (profile: WardrobeProfile) => void;
   layeringPreference: LayeringPreference;
@@ -134,6 +136,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
   wardrobe = [],
   savedOutfits = [],
   onRemoveSavedOutfit,
+  onWearAgainOutfit,
   wardrobeProfile,
   onChangeWardrobeProfile,
   layeringPreference,
@@ -141,6 +144,8 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
   onNavigateToCollection,
   onNavigateToPlanner
 }) => {
+  const [selectedSavedOutfit, setSelectedSavedOutfit] = useState<Outfit | null>(null);
+
   const handleRemoveSaved = (id: string) => {
     if (onRemoveSavedOutfit) onRemoveSavedOutfit(id);
   };
@@ -329,8 +334,10 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
       ) : (
         <div className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 24 }}>
           {savedOutfits.map((look) => (
-            <div
+            <button
               key={look.id}
+              onClick={() => setSelectedSavedOutfit(look)}
+              title={`Open ${look.title}`}
               style={{
                 backgroundColor: 'var(--color-surface)',
                 borderRadius: 'var(--radius-md)',
@@ -338,7 +345,12 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                 padding: 16,
                 display: 'flex',
                 flexDirection: 'column',
-                gap: 10
+                gap: 10,
+                cursor: 'pointer',
+                textAlign: 'left',
+                width: '100%',
+                transition: 'all 0.2s ease',
+                boxShadow: 'var(--shadow-sm)'
               }}
             >
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -347,13 +359,36 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                   <h3 className="text-section-heading" style={{ fontSize: '1.05rem', marginTop: 2 }}>{look.title}</h3>
                 </div>
 
-                <button
-                  onClick={() => handleRemoveSaved(look.id)}
-                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-text-muted)' }}
-                  title="Remove Saved Look"
-                >
-                  <Trash2 size={16} />
-                </button>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: 4,
+                      fontSize: '0.72rem',
+                      fontWeight: 600,
+                      color: 'var(--color-primary)',
+                      backgroundColor: 'var(--color-primary-alpha)',
+                      padding: '4px 10px',
+                      borderRadius: 'var(--radius-pill)'
+                    }}
+                  >
+                    <Eye size={12} />
+                    <span>Open</span>
+                  </span>
+
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleRemoveSaved(look.id);
+                    }}
+                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-text-muted)', padding: 4 }}
+                    title="Remove Saved Look"
+                    aria-label={`Remove saved look ${look.title}`}
+                  >
+                    <Trash2 size={16} />
+                  </button>
+                </div>
               </div>
 
               {/* Items Thumbnails */}
@@ -368,10 +403,25 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
               <p className="text-body" style={{ fontSize: '0.8rem', color: 'var(--color-text-secondary)' }}>
                 "{look.explanation.summary}"
               </p>
-            </div>
+            </button>
           ))}
         </div>
       )}
+
+      {/* Saved Outfit Detail Modal */}
+      <SavedOutfitDetailModal
+        outfit={selectedSavedOutfit}
+        wardrobe={wardrobe}
+        onClose={() => setSelectedSavedOutfit(null)}
+        onWearAgain={(outfit) => {
+          if (onWearAgainOutfit) onWearAgainOutfit(outfit);
+          setSelectedSavedOutfit(null);
+        }}
+        onRemoveSaved={(id) => {
+          handleRemoveSaved(id);
+          setSelectedSavedOutfit(null);
+        }}
+      />
 
       {/* 4. Style Preferences — Wardrobe Profile + Layering grouped together */}
       <SectionHeader title="Style Preferences" subtitle="How CLOSIQ tailors recommendations to you" />

@@ -1,6 +1,6 @@
 import { postJsonToApi } from './geminiClient';
 import { validateAIOutfitResponse, RawAIOutfitResponse } from './validator';
-import { GarmentItem, Outfit, LayeringPreference } from '../../types/wardrobe';
+import { GarmentItem, Outfit, LayeringPreference, GarmentCategory, FormalityLevel } from '../../types/wardrobe';
 import { generateAIOutfit as demoGenerateAIOutfit } from '../aiStylist';
 
 export interface OutfitRequestOptions {
@@ -18,12 +18,73 @@ function formatWardrobeContext(wardrobe: GarmentItem[]) {
     category: item.category,
     subcategory: item.subcategory,
     color: item.color,
+    hexColor: item.hexColor,
     fabric: item.fabric,
     fit: item.fit || 'Regular',
+    style: item.style,
     formality: item.formality,
     layeringRole: item.layeringRole || 'primary_layer',
-    tags: item.tags
+    tags: item.tags,
+    pairingNotes: item.pairingNotes
   }));
+}
+
+const CATEGORY_LIST: GarmentCategory[] = ['tops', 'bottoms', 'outerwear', 'shoes', 'accessories'];
+const FORMALITY_LIST: FormalityLevel[] = ['casual', 'smart_casual', 'formal', 'evening'];
+
+type CoverageTier = 'none' | 'weak' | 'moderate' | 'strong';
+
+/** Heuristic bucket for a small, hackathon-scale wardrobe — not a scoring engine. */
+function coverageTier(count: number): CoverageTier {
+  if (count === 0) return 'none';
+  if (count <= 2) return 'weak';
+  if (count <= 5) return 'moderate';
+  return 'strong';
+}
+
+/**
+ * Lightweight aggregate view of the active wardrobe (already profile-filtered
+ * and inclusive of user-uploaded items, since it's derived from whatever
+ * `wardrobe` array the caller passes in — the same array formatWardrobeContext
+ * uses). This is NOT a duplicate of the per-garment list already sent to
+ * Gemini; it's the one thing individual garment rows can't convey on their
+ * own — how deep the closet actually runs in each formality tier — so Gemini
+ * can judge what an occasion's wardrobe can realistically support instead of
+ * inferring it (or not) from scanning dozens of rows itself.
+ */
+function summarizeWardrobeCoverage(wardrobe: GarmentItem[]) {
+  const categoryCounts = Object.fromEntries(
+    CATEGORY_LIST.map((cat) => [cat, wardrobe.filter((item) => item.category === cat).length])
+  ) as Record<GarmentCategory, number>;
+
+  const formalityCoverage = Object.fromEntries(
+    FORMALITY_LIST.map((level) => {
+      const count = wardrobe.filter((item) => item.formality === level).length;
+      return [level, { count, tier: coverageTier(count) }];
+    })
+  ) as Record<FormalityLevel, { count: number; tier: CoverageTier }>;
+
+  const layeringCounts = {
+    base_layer: wardrobe.filter((item) => item.layeringRole === 'base_layer').length,
+    primary_layer: wardrobe.filter((item) => item.layeringRole === 'primary_layer').length,
+    outer_layer: wardrobe.filter((item) => item.layeringRole === 'outer_layer').length,
+    unspecified: wardrobe.filter((item) => !item.layeringRole).length
+  };
+
+  const distinctStyleCount = new Set(
+    wardrobe.map((item) => item.style?.trim().toLowerCase()).filter((s): s is string => Boolean(s))
+  ).size;
+
+  const distinctColorCount = new Set(wardrobe.map((item) => item.color.trim().toLowerCase())).size;
+
+  return {
+    totalItems: wardrobe.length,
+    categoryCounts,
+    formalityCoverage,
+    layeringCounts,
+    distinctStyleCount,
+    distinctColorCount
+  };
 }
 
 /**
@@ -41,13 +102,15 @@ export async function generateAIOutfitWithGemini(
   }
 
   const wardrobeContext = formatWardrobeContext(wardrobe);
+  const wardrobeSummary = summarizeWardrobeCoverage(wardrobe);
 
   const res = await postJsonToApi<RawAIOutfitResponse>('/api/ai/generate-outfit', {
     prompt: options.prompt,
     layeringPreference: options.layeringPreference || 'avoid',
     excludeGarmentIds: options.excludeGarmentIds || [],
     seed,
-    wardrobe: wardrobeContext
+    wardrobe: wardrobeContext,
+    wardrobeSummary
   });
 
   if (!res.ok || !res.data) {

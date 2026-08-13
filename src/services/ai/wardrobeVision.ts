@@ -51,6 +51,7 @@ export async function analyzeGarmentImageWithGemini(
     fabric: json.fabric || 'Cotton Blend',
     formality,
     fit: json.fit || 'Regular',
+    style: typeof json.style === 'string' && json.style.trim() ? json.style.trim() : undefined,
     layeringRole,
     tags: Array.isArray(json.tags) ? json.tags : ['Custom Upload', json.color || 'Garment'],
     aiConfidence: typeof json.aiConfidence === 'number' ? json.aiConfidence : 0.95,

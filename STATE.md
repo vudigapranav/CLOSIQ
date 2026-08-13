@@ -6,12 +6,296 @@ This document tracks the live implementation status of **CLOSIQ**. It is updated
 
 ## Current Phase
 
-* **Phase**: Gemini Production Server — P0 Architecture Fix (Sprint 19)
-* **Status**: Resolved the Master Feature Audit's P0 finding — the real-Gemini `/api/ai/*` path previously existed only via Vite's `configureServer()` dev middleware and would 404 under `npm run build && npm run preview` or any static/production deployment. Added a minimal Node `http` production server (`server/index.js`, no framework) that serves the built `dist/` frontend and exposes the same three endpoints, backed by the exact same `server/geminiServer.js` + new shared `server/apiRouter.js` that `npm run dev` now also uses — one implementation, two run modes. Also fixed a previously-undiscovered bug: Vite never actually populated `process.env` from `.env` for server-side code, so `GEMINI_API_KEY` would not have reached the server even in `npm run dev` — fixed via `loadEnv()` in `vite.config.js`. Full verification below and in "Sprint 19 — Gemini Production Server".
+* **Phase**: Wardrobe Intelligence (Sprint 24)
+* **Status**: Gave Gemini a lightweight aggregate view of the whole closet — not just the per-garment list it already had — plus an explicit instruction to be honest when an occasion's needed formality tier is weakly or not covered, instead of implying casual pieces are formal ones. Verified against real catalog data (not estimated): the men's wardrobe is `strong` in casual/smart_casual but `none` in formal/evening; the women's wardrobe is `strong` in casual/smart_casual, `none` in formal, `weak` (1 item) in evening. Profile partitioning confirmed clean (36 + 22 = 58, zero overlap). Live re-verification blocked by the same exhausted free-tier quota as every prior sprint. Full details in "Sprint 24 — Wardrobe Intelligence" below.
 
 ---
 
-## Sprint 19 — Gemini Production Server
+## Sprint 24 — Wardrobe Intelligence
+
+### Problem
+Gemini received every individual garment but nothing that summarized the closet as a whole — so it had no compact signal for "this wardrobe is deep in casual but has nothing formal," and no explicit instruction to be honest about that gap rather than styling casual pieces as if they were something they're not.
+
+### Implementation
+1. **`src/services/ai/outfitStylist.ts`** — new `summarizeWardrobeCoverage(wardrobe)`, computed from the exact same `wardrobe` array `formatWardrobeContext()` already uses (so it's automatically profile-correct and includes uploaded items — no separate filtering logic to get wrong). Returns:
+   - `categoryCounts` — tops/bottoms/outerwear/shoes/accessories counts.
+   - `formalityCoverage` — per formality tier (`casual`/`smart_casual`/`formal`/`evening`), a `{ count, tier }` pair where `tier` is a heuristic bucket (`none` = 0, `weak` ≤ 2, `moderate` ≤ 5, `strong` = 6+) — deliberately simple thresholds sized for a hackathon-scale wardrobe, not a scoring engine.
+   - `layeringCounts` — base/primary/outer/unspecified counts.
+   - `distinctStyleCount` / `distinctColorCount` — single diversity numbers, not full breakdowns, to avoid re-sending data Gemini already has per-item.
+   - Sent as a new `wardrobeSummary` field alongside the existing `wardrobe` array in the `POST /api/ai/generate-outfit` body — a ~10-line aggregate object, not a duplicate of the per-item list.
+   - `formatWardrobeContext()` also gained `hexColor` per item (was missing; explicitly called for as a "use where useful" signal).
+2. **`server/geminiServer.js`** — `handleGenerateOutfitServer` forwards `body.wardrobeSummary` into the prompt payload (same pass-through pattern as the existing `wardrobeCount` field). `SYSTEM_PROMPT` gained one new numbered rule (STRICT STYLING RULES #4, "WARDROBE FEASIBILITY"): when `formalityCoverage` shows the occasion's needed tier is `weak`/`none`, Gemini must not claim or imply the result meets that tier — it should pick the closest formality the wardrobe genuinely has, still produce the best outfit from owned items, and say so plainly in `whyItWorks`. No occasion string is named in this rule; it operates purely on the coverage data plus whatever occasion context the model has already derived (Sprint 22's framework), so it generalizes rather than hardcoding.
+
+### Formality Coverage (verified from real catalog data)
+| Profile | casual | smart_casual | formal | evening |
+|---|---|---|---|---|
+| Men (n=36) | strong (24) | strong (12) | **none (0)** | **none (0)** |
+| Women (n=22) | strong (11) | strong (10) | **none (0)** | weak (1) |
+
+Confirms and quantifies Sprint 22's finding precisely — the men's wardrobe has zero pieces above smart_casual, and the women's wardrobe has exactly one evening piece. No catalog data was added or changed to "fix" this — per the brief, an honest `none`/`weak` result is the correct output, not a defect.
+
+### Occasion Feasibility
+Deliberately **not** precomputed as a fixed value in code (that would risk being a disguised occasion→outfit/feasibility mapping, which the brief forbids). Instead, `formalityCoverage` gives Gemini the raw coverage data and the new STRICT STYLING RULES #4 tells it how to reason about full/partial/unsupported feasibility for whatever occasion the user actually typed, at request time. "Fully supported" / "partially supported" / "unsupported" are not fields the app computes or stores anywhere — they're an emergent judgment Gemini makes and expresses in the existing free-text `whyItWorks` fields, which already flow to the UI unchanged. No response schema change, no validator change, no UI change.
+
+### Men/Women
+`PASS`. Verified by parsing `garmentCatalog.ts` directly (see table above) and confirming `men` + `women` entry counts sum to the full 58-entry catalog with zero overlap — the profile field is a true partition. `summarizeWardrobeCoverage()` itself does no profile filtering (correctly — that already happens once, upstream, in `App.tsx`'s `visibleWardrobe`), so it can't diverge from whatever the rest of the app already shows as the active wardrobe.
+
+### Uploaded Items
+`PASS` — by construction, not a special code path. `summarizeWardrobeCoverage()` and `formatWardrobeContext()` both operate on the identical `wardrobe` array passed into `generateAIOutfitWithGemini()`, which is `App.tsx`'s `visibleWardrobe` (seed items for the active profile + all user-uploaded items, which never carry a `profile` tag — confirmed by reading `App.tsx`, unchanged this sprint). Neither function filters by `isSeedItem`/`profile`, so an uploaded item is counted identically to a catalog item.
+
+### Layering
+`PASS`. `layeringCounts` computed and verified against real data: men have 0 `base_layer`, 8 `primary_layer`, 4 `outer_layer`, 24 `unspecified` (mostly bottoms/shoes/accessories, which don't carry a layering role); women have 1/7/1/13 respectively. No "Inners" category introduced; tank tops remain under Tops with `layeringRole: base_layer`, unchanged.
+
+### Validator
+`PASS`, no code change. `validateAIOutfitResponse()` still only checks returned `garmentId`s against the real wardrobe map — `wardrobeSummary` never reaches the validator and has no path to influence which IDs are accepted.
+
+### Gemini Live Verification
+`NOT TESTED — QUOTA`. Made exactly the two calls the brief permits ("job interview", "first date dinner") against the real running server with the real key — both returned a genuine `429 RESOURCE_EXHAUSTED` from Google (same quota every sprint since 20 has hit), correct demo-fallback, no crash. No further calls were made. The coverage-summary math itself was instead verified deterministically (see Formality Coverage table and Men/Women above) — a genuine source-level test, not a skipped one.
+
+### Build
+`PASS` — `npm run build`, 0 errors.
+
+### Lint
+`PASS` — `npm run lint` (oxlint), 0 errors, 0 warnings.
+
+### Remaining Risks
+- **Not confirmed live** that Gemini actually uses `wardrobeSummary`/rule #4 to produce an honest "this wardrobe doesn't have formal pieces" explanation instead of silently ignoring the new context — blocked by quota, same as every AI-quality change since Sprint 20.
+- **`formalityCoverage` is a flat per-tier count, not per-category-per-tier** — it can't by itself capture a narrower ceiling like "only 3 of the wardrobe's 12 smart_casual items are tops" (the exact College-vs-Interview thinness Sprint 20 found). That finer detail is still fully visible to Gemini in the per-item `wardrobe` array; the summary is deliberately coarse to stay lightweight, not a replacement for it (per the brief's own instruction).
+- Free-tier quota remains the top operational/demo risk, unchanged.
+
+### Next Priority
+Once the free-tier quota resets: run the "job interview" vs. "first date dinner" comparison live and specifically check whether `whyItWorks` now honestly names the formal/evening gap for the men's wardrobe, rather than just checking garment-ID differentiation as prior sprints did.
+
+---
+
+## Sprint 23 — Garment Style Metadata Pipeline
+
+### Problem
+Sprint 22 found that `garmentCatalog.ts` defines a `style` field on every catalog entry (a short descriptor like "Streetwear Essential", "Classic Casual", "Tailored Modern", "Elevated Evening") but `catalogEntryToGarmentItem()` never copies it onto the resulting `GarmentItem` — so it never existed anywhere downstream (wardrobe state, `formatWardrobeContext()`, the Gemini request). Sprint 22 deliberately left this unfixed as out of scope; this sprint closes it.
+
+### Trace (as instructed — verified, not assumed)
+1. **Where `style` is defined**: `CatalogEntry`/`CatalogEntryInput` in `src/data/garmentCatalog.ts:32`, required `string`, populated on all 58 `RAW_CATALOG` entries with real per-garment values (confirmed by grep — no blanks/placeholders).
+2. **Where it was dropped**: `catalogEntryToGarmentItem()` (`garmentCatalog.ts`) — its return object listed every other `CatalogEntry` field except `style`.
+3. **Whether `GarmentItem` had a representation**: No. No `style` field, and no other field was an appropriate substitute — `tags` is a short keyword array, `pairingNotes` is a full sentence; neither is the short style-descriptor shape the catalog already uses.
+4. **Whether uploaded garments had style metadata**: No, on two levels — the real Gemini vision-analysis JSON schema (`handleAnalyzeGarmentServer` in `server/geminiServer.js`) never requested a `style` field, and even if it had, the client mapper (`wardrobeVision.ts`) wasn't reading one. The demo-fallback scanner (`aiVisionScanner.ts`'s `analyzeUploadedPhoto()`, pixel-color-only, no real garment understanding) has no basis to produce one at all.
+5. **Whether Gemini received style for catalog garments**: No — `formatWardrobeContext()` in `outfitStylist.ts` (already fixed to forward `pairingNotes` in Sprint 22) did not include `style`, and it couldn't have, since `GarmentItem` didn't carry it yet.
+
+### Implementation
+Minimal, additive, one clear source of truth (`GarmentItem.style`, optional):
+1. **`src/types/wardrobe.ts`**: added `style?: string` to `GarmentItem` — reuses the catalog's existing "short descriptor string" shape rather than inventing a new union/enum (none existed to reuse; `style` in the catalog was always a free-text string, not a closed set). Optional so old `localStorage`-persisted wardrobes (no schema migration exists or was added) and any construction path that doesn't set it continue to type-check and run unchanged.
+2. **`src/data/garmentCatalog.ts`**: `catalogEntryToGarmentItem()` now includes `style: entry.style` — the one-line fix for the core Sprint 22 finding. Garment IDs, image paths, and category structure untouched.
+3. **`server/geminiServer.js`**: `handleAnalyzeGarmentServer`'s vision JSON schema gained one field — `"style": "Short 2-4 word style descriptor e.g. Streetwear Essential, Tailored Modern, Classic Casual, Refined Minimalist"` — alongside the existing name/category/fabric/fit/etc. fields it already asks Gemini to derive from the actual photo. This is not an invented label: it's the same vision model already deriving fabric/fit/formality/pairingNotes from the image, asked for one more real attribute in the same call. `SYSTEM_PROMPT`'s existing tie-breaking rule (added Sprint 22) got a minimal clarification — `style` added to the selection-priority order and the tie-break-signal list, plus one sentence noting a garment's `style` field is a real signal distinct from its formality tier. No other prompt text was touched.
+4. **`src/services/ai/wardrobeVision.ts`**: the client-side Gemini response mapper now reads `json.style` (trimmed, falls back to `undefined` if missing/blank) into the returned `VisionAnalysisResult` — real photos analyzed by the real model now carry a real, image-derived style descriptor.
+5. **`src/services/aiVisionScanner.ts`**: `VisionAnalysisResult` gained the matching optional `style?: string` field. `analyzeCatalogGarment()` (the "Add Item" quick-add instant-recognition path for known catalog pieces) now passes through the catalog's real `entry.style`. `analyzeUploadedPhoto()` (the deterministic pixel-color-only demo fallback used when Gemini is unavailable) deliberately does **not** set `style` — per the brief's explicit instruction not to invent arbitrary labels, since this path has no actual garment understanding, only a dominant-color guess.
+6. **`src/components/modals/AddItemModal.tsx`**: added `style` local state, populated by `applyAnalysis()` from whichever scanner ran (real Gemini, demo pixel-color, or catalog quick-add), and included in `handleConfirmAdd()`'s final `GarmentItem` construction. No new visible form field was added — `style` is carried through the same way `tags`/`pairingNotes`/`aiConfidence` already are (AI-detected, not manually edited in the confirm step), so this is a pure data-plumbing change, not a UI change.
+7. **`src/services/ai/outfitStylist.ts`**: `formatWardrobeContext()` now also forwards `style: item.style` per garment (alongside the `pairingNotes` Sprint 22 added). `JSON.stringify` naturally omits `undefined` values, so items without a style (old stored items, demo-scanned uploads) are simply sent without that key — no null/placeholder pollution in the Gemini payload.
+
+### Validation
+`PASS`, no code change needed. Traced `validateAIOutfitResponse()` in `validator.ts`: it looks up each returned `garmentId` in a `Map<string, GarmentItem>` built from the caller's actual wardrobe and pushes the matched `GarmentItem` object itself — so `style` (when present) rides along automatically as part of that object. The validator's actual check (does this ID exist in the user's wardrobe?) is completely untouched and cannot be bypassed by anything in the `style` field.
+
+### Backward Compatibility
+`style` is optional everywhere it appears (`GarmentItem`, `VisionAnalysisResult`) and no `localStorage` schema version/migration exists in this project (confirmed — `App.tsx` reads/writes wardrobe state as a plain `JSON.parse`/`JSON.stringify` array, no versioning). An existing stored item shaped like `{ id, name, category, color, ... }` with no `style` key simply parses with `style` as `undefined` — every consumer (`formatWardrobeContext()`, the validator, `AddItemModal`) already treats it as optional, so nothing breaks for pre-Sprint-23 wardrobes.
+
+### Build
+`PASS` — `npm run build`, 0 errors. (One self-caught issue during this sprint: the first `SYSTEM_PROMPT` edit used backtick-quoted `` `style` `` inside the already-backtick-delimited JS template literal, which terminated the string early and broke the build — caught immediately by `npm run build`, fixed by switching to plain text, re-verified clean.)
+
+### Lint
+`PASS` — `npm run lint` (oxlint), 0 errors, 0 warnings. No separate `tsc` type-check is configured in this project (confirmed again this sprint — `npx tsc` resolves to a placeholder, not a real compiler); `vite build`'s esbuild/rolldown transform is the only build-time check, consistent with every prior sprint's verification standard.
+
+### Remaining Risks
+- **Not live-tested against real Gemini this sprint** — no request was made to Gemini at all (data-model sprint, no reason to burn the still-likely-exhausted free-tier quota on a change that doesn't require a live call to verify structurally). The vision-schema addition (`style` in `handleAnalyzeGarmentServer`) specifically has not been confirmed to produce good real values from an actual photo — first real garment upload once quota allows should check this.
+- **Existing wardrobes need no migration to stay functional, but won't retroactively gain `style`** — a user's wardrobe items added before this sprint will simply have no `style` value until re-scanned/re-added; this is expected, intentional graceful degradation, not a bug.
+- **No UI surfaces `style` anywhere** — deliberately out of scope per this sprint's explicit "do not redesign the UI" rule. The field exists purely to improve Gemini's reasoning material; a future sprint could choose to surface it (e.g. in `ClothingDetailModal`) if desired.
+
+### Next Priority
+Once the free-tier quota resets: (1) re-run Sprint 22's "first date dinner" vs. "college presentation" comparison now that Gemini also receives `style` (not just `pairingNotes`) as a tie-breaking signal, and (2) upload one real photo to confirm the vision endpoint actually returns a sensible `style` value end-to-end.
+
+---
+
+## Sprint 22 — Occasion Reasoning
+
+### Problem
+Sprint 20 found "first date dinner" produced an outfit with garment IDs byte-identical to "college presentation tomorrow" — only the title/copy differed. Two unrelated occasions collapsed into the same result.
+
+### Root Cause
+Traced the full pipeline: chip/prompt text (`TodayScreen.tsx`/`StylistScreen.tsx`) → `generateAIOutfitWithGemini()` (`src/services/ai/outfitStylist.ts`, unchanged control flow) → `POST /api/ai/generate-outfit` → `handleGenerateOutfitServer()` (`server/geminiServer.js`) → Gemini → `validateAIOutfitResponse()` (`src/services/ai/validator.ts`, unchanged) → UI. Nothing in this chain is hardcoded per-occasion; the collapse happens inside Gemini's own reasoning, and two concrete, data-grounded factors explain why:
+
+1. **Wardrobe formality ceiling (verified by parsing `src/data/garmentCatalog.ts` directly, not assumed)**: the men's seed wardrobe has **58 items total, and not one is tagged `formal` or `evening`** — every men's garment is either `casual` (24) or `smart_casual` (12). Within `smart_casual` specifically there are only **3 tops, 4 bottoms, 2 shoes, 1 outerwear, 2 accessories** (confirmed via a direct parse of `RAW_CATALOG`). Any occasion Gemini judges as needing more polish than plain casual — a college presentation, a job interview, a first date — is forced to draw from this same narrow pool, because the wardrobe genuinely has nothing above it. This matches and extends Sprint 20's own "college vs. interview is wardrobe-capped" finding — the same ceiling was silently capping date-night too.
+2. **No tie-breaking instruction when the ceiling is shared, and a real metadata gap**: the old `SYSTEM_PROMPT` only said "carefully reason about the occasion," with no guidance on what to do once two different occasions land on the identical formality tier. Worse, `formatWardrobeContext()` in `outfitStylist.ts` was not forwarding `item.pairingNotes` to Gemini at all — a per-garment field that already exists on every `GarmentItem` (both catalog-seeded items and real Gemini-vision-analyzed uploads carry it) and already contains genuinely differentiating styling language (e.g. white oxford: "lets trousers or denim lead" vs. stone taupe poplin: "layers cleanly under a jacket" vs. light blue poplin: "reads relaxed with denim"). Gemini had no explicit instruction to use color/fabric/tags as tie-breakers, and was missing one of the richest tie-breaking signals already sitting in the data.
+
+Also independently confirmed (not previously documented): `catalogEntryToGarmentItem()` in `garmentCatalog.ts` silently drops the raw catalog's `style` field (e.g. "Streetwear Essential", "Classic Casual", "Collegiate Casual") when converting seed items to `GarmentItem` — that field never reaches `GarmentItem`, so it could never have reached Gemini regardless of `formatWardrobeContext`. Not fixed this sprint (see Remaining Risks) — resurrecting it would mean a new `GarmentItem` field, a vision-schema addition so uploaded photos get the same field, and validator/type updates, which is a larger structural change than this sprint's scope of "improve reasoning without redesigning data model."
+
+This was not caused by: insufficient model selection, deterministic ordering bugs, missing profile/layering context (all confirmed still correctly threaded through, unchanged), or a validator regression (`validateAIOutfitResponse()` untouched, still strictly ID-checked).
+
+### Implementation
+Two minimal, additive changes — no UI, no architecture, no hardcoded occasion→outfit mapping:
+
+1. **`server/geminiServer.js`** — `SYSTEM_PROMPT` rewritten with:
+   - A new "OCCASION REASONING" section instructing Gemini to derive an occasion's *social context* (professional/academic vs. practical vs. social/romantic), *time of day/setting*, *practical demands*, and *degree/purpose of intentionality* from the user's own words — generically, for any input text, not via keyword-matching against the example occasions still listed for illustration. Explicitly states that two occasions which both sound "polished" (e.g. a date and a presentation) are not automatically the same styling problem.
+   - A new strict rule (STRICT STYLING RULES #3): when multiple wardrobe items in a category are all plausible, choose in priority order — occasion fit → formality → color harmony → fabric/fit/silhouette → layering role → overall coherence — and explicitly: *"If two distinct occasions land on the same formality tier because the wardrobe has nothing higher, differentiate using color, fabric, fit, tags, and pairingNotes rather than defaulting to the identical combination for both."* This directly targets the confirmed wardrobe-ceiling scenario without naming any specific occasion.
+   - This is the same `SYSTEM_PROMPT` used by both `generate-outfit` and `swap-garment` (shared constant, unchanged sharing), so swap reasoning benefits from the same tie-breaking guidance for free; `analyze-garment`'s vision prompt does not use `SYSTEM_PROMPT` and was not touched.
+2. **`src/services/ai/outfitStylist.ts`** — `formatWardrobeContext()` now also forwards `pairingNotes: item.pairingNotes` per garment (one line). This is pre-existing data (already present on every `GarmentItem`, already generated by the vision endpoint for real uploads) that was simply never transmitted for outfit generation before — not a new metadata dimension, not a schema change, purely closing a transmission gap.
+
+No changes to `validator.ts`, regenerate/exclusion wiring, the API-key architecture, `server/index.js`/`server/apiRouter.js`, or any screen/UI component.
+
+### Occasion Reasoning Model
+Generic, reusable dimensions (social context, time-of-day/setting, practical demands, intentionality-and-why) applied by Gemini to whatever text the user actually typed — works equally for "first date dinner," "date night," "casual dinner with someone," "college presentation," "presentation tomorrow," etc., since none of these strings are matched literally; the model derives the dimensions itself. No per-occasion branching was added anywhere in the codebase.
+
+### Casual vs Travel Regression
+`NOT RE-TESTED LIVE — QUOTA` (see Gemini Live Verification below). No code path touching casual/travel reasoning was changed — `SYSTEM_PROMPT`'s occasion-reasoning additions are occasion-agnostic (apply to every request identically), and the wardrobe-context change only adds a field, never removes or reorders existing ones — so Sprint 20's verified casual-vs-travel differentiation has no mechanism by which this sprint could have regressed it. Source-level confidence only; not re-confirmed against a live response this sprint.
+
+### Date vs College
+`NOT TESTED — QUOTA`. See Gemini Live Verification below for the real attempt made and why it couldn't complete.
+
+### Wardrobe Validation
+`PASS`. `validateAIOutfitResponse()` in `validator.ts` was not modified — every returned `garmentId` still must exist in the caller's actual wardrobe or it is rejected and logged (`"Rejecting invented item"`), regardless of how `SYSTEM_PROMPT` or the wardrobe payload changed. The `pairingNotes` addition only enriches what's sent to Gemini; it cannot influence what the validator accepts back.
+
+### Build
+`PASS` — `npm run build`, 0 errors.
+
+### Lint
+`PASS` — `npm run lint` (oxlint), 0 errors, 0 warnings.
+
+### Remaining Risks
+- **Live confirmation still owed** — the exact same free-tier quota that blocked Sprints 20/21 blocked this sprint too (see Gemini Live Verification). The reasoning/data fixes are grounded in a verified root cause (the wardrobe formality ceiling, confirmed by directly parsing the catalog) and are the correct fix in principle, but "first date dinner" and "college presentation" have not yet been observed to actually diverge against the real model since this change.
+- **`style` field is silently dropped at seed-conversion time** (`catalogEntryToGarmentItem()` in `garmentCatalog.ts` never copies `entry.style` onto the `GarmentItem`) — a real, previously-undocumented metadata gap discovered this sprint. Deliberately not fixed here: doing so properly would require adding the field to the `GarmentItem` type, extending the vision-analysis schema so real uploaded photos get an equivalent classification (otherwise seed items and user items would be inconsistent), and validator/type updates — a larger, separate change than this sprint's scope.
+- **Free-tier quota (20 requests/day/model) remains the top operational risk** for any live demo — unchanged from Sprints 20/21, not addressed this sprint (out of scope; this sprint's two attempted test calls both counted against it and both hit `429`).
+- The women's wardrobe was not re-parsed for the same ceiling analysis (it does have exactly one `evening`-tagged item, unlike men's) — the men's-wardrobe-specific ceiling described above should not be assumed identical for the women's profile without checking.
+
+### Next Priority
+Re-run the two-call "first date dinner" vs. "college presentation" comparison against the real model once the free-tier quota resets, to confirm the `SYSTEM_PROMPT`/`pairingNotes` changes actually produce genuine divergence rather than just being well-reasoned in principle.
+
+---
+
+## Sprint 21 — Regenerate Exclusion Wiring
+
+### Problem
+Sprint 20 proved `excludeGarmentIds` works correctly on the real-Gemini path whenever it's populated (a manually-constructed regenerate request with exclusion produced a completely different, zero-overlap outfit). But neither `TodayScreen.tsx` nor `StylistScreen.tsx` ever actually populated it — every real Regenerate click sent `excludeGarmentIds: []` regardless of what was currently on screen, so live users got none of that benefit; variety only ever came from the demo engine's `seed`-cycling, which has no effect once a request actually reaches Gemini.
+
+### Fix
+Traced the flow exactly as instructed: `Today`/`Stylist` Regenerate → `runGeneration()` → `generateAIOutfitWithGemini()` (`src/services/ai/outfitStylist.ts`, unchanged) → `POST /api/ai/generate-outfit` → `server/geminiServer.js` (unchanged) → Gemini. The `excludeGarmentIds` field already existed end-to-end in `OutfitRequestOptions`, the HTTP payload, and the Gemini prompt construction (`userPrompt.excludedGarmentIds`) — confirmed no second exclusion mechanism needed to be built, only the one missing link: the UI never filled it in.
+
+- `TodayScreen.tsx`: `runGeneration(promptText, seed, excludeGarmentIds = [])` gained a third parameter (default `[]`, so every existing call site — mount effect, occasion chips, custom prompt submit, error-retry — is unchanged). `handleSwapLook` (Today's regenerate-the-whole-look action) now reads `outfit.items.map(item => item.id)` from current component state and passes it through.
+- `StylistScreen.tsx`: same pattern — `runGeneration(seed, excludeGarmentIds = [])`, and `handleRegenerate` now passes the current outfit's item IDs. `handleGenerate` (fresh Generate, seed 0) deliberately still passes none — a fresh Generate can follow a prompt/occasion change, and excluding an unrelated previous outfit's items would only get in the way, not help.
+- Exclusion is read from live component state (`outfit`) at the moment each handler runs, so it's automatically never stale: Generate A → Regenerate A (excludes A) → Generate B (excludes nothing, fresh outfit) → Regenerate B (excludes B, not A) — no extra bookkeeping needed, this falls directly out of React's render/closure semantics.
+- No garment ID is ever constructed, concatenated, or suffixed anywhere in this change — `excludeGarmentIds` is always a plain array of the real stable `.id` values already on the outfit, so there's no risk of the "garment-123-regenerated-regenerated" compounding failure mode the brief warned about.
+- Did not touch the demo-fallback engine (`src/services/aiStylist.ts`) — its `StyleRequest` type has no `excludeGarmentIds` field and never will need one for this fix; the brief's scope is specifically the already-proven-working Gemini-side mechanism, not a second implementation for the offline fallback.
+
+### Today
+`VERIFIED` (by source tracing; see Live Gemini below for why not by a fresh live call). Today's regenerate control is the "Swap" button (whole-look regenerate, distinct from per-item category swap) — `handleSwapLook` now sends real exclusion.
+
+### Stylist
+`VERIFIED` (by source tracing). Stylist's "Regen" button — `handleRegenerate` now sends real exclusion. Both screens' Regenerate paths are fixed; this was not a Today-only or Stylist-only gap.
+
+### Validation
+`VERIFIED`. `excludeGarmentIds` flows only into the Gemini request payload — the response still passes through `validateAIOutfitResponse()` exactly as before (untouched this sprint), which still rejects any garmentId not present in the actual wardrobe regardless of what was excluded. Exclusion cannot bypass validation because it's never consulted by the validator at all; it only ever affects what Gemini is asked to avoid choosing.
+
+### Live Gemini
+`NOT TESTED — QUOTA`. Made exactly one targeted verification attempt (as the brief explicitly permits — not a suite): a real Generate followed by a real Regenerate call with `excludeGarmentIds` populated, through the actual running `npm run start` production server. Both calls returned a real `429 RESOURCE_EXHAUSTED` from Google (`generate_content_free_tier_requests`, limit 20/day/model) — the same quota Sprint 20 exhausted, still not reset. This is a real Google-side rejection, not a local/code error, which is itself evidence the request was constructed and dispatched correctly (a malformed payload from a wiring bug would more likely surface as a local error or a different Gemini-side rejection, not a clean quota block) — but it does not constitute a live confirmation that a real regenerate response actually honored the exclusion. That confirmation rests on Sprint 20's existing live test (which used a manually-constructed payload of the identical shape this sprint's code now sends automatically) combined with this sprint's source-level trace. No fabricated results are reported.
+
+### Build
+`PASS` — `npm run build`, 0 errors.
+
+### Lint
+`PASS` — `npm run lint` (oxlint), 0 errors, 0 warnings.
+
+### Remaining Risks
+- **Live confirmation still owed**: re-run the Sprint 20/21 regenerate test once the free-tier quota resets (or a paid tier is configured) to get an actual live confirmation of this specific code path, not just the equivalent manually-constructed one.
+- **Today has no "same outfit" honesty message**: `StylistScreen` already tells the user honestly when a sparse wardrobe can't produce a different regenerate result (`isSameOutfit` check → info message); `TodayScreen`'s Swap does not have this, a pre-existing asymmetry flagged in earlier sprints and still out of scope here (targeted sprint, not a UX-parity pass) — now slightly more relevant since Today's regenerate is more likely to actually change results, making the sparse-wardrobe edge case more visible if it does occur.
+- Free-tier quota (20 requests/day/model) remains the top operational risk for any live demo — unchanged from Sprint 20, not addressed this sprint (out of scope).
+
+### Next Priority
+Re-run one live Regenerate test end-to-end once quota allows, to move "Live Gemini" from `NOT TESTED — QUOTA` to a real confirmed result.
+
+---
+
+## Sprint 20 — Real Gemini Live Verification
+
+### Gemini Connection
+`CONNECTED` — but not on the first attempt. `node scripts/testGeminiIntegration.js` initially failed with `404 ... "gemini-2.5-flash is no longer available to new users"`. Queried `ai.models.list()` against the real key, empirically confirmed `gemini-flash-latest` works (plain text and `responseMimeType: 'application/json'` structured mode both tested directly against the SDK before touching app code), then applied the minimum fix: updated the one `GEMINI_MODEL` constant in `server/geminiServer.js` and the one hardcoded model string in `scripts/testGeminiIntegration.js`. Re-ran the integration test — real success: `"Gemini API Connection Test Successful: Hello, style icon!"`. Model used: `gemini-flash-latest` (Google's rolling alias — resolves server-side to `gemini-3.7-flash` per a later quota error message, so it won't go stale the way a pinned version number did here).
+
+**Also found and fixed a real credential-hygiene issue before any of this**: the real API key had been placed in `.env.example` (tracked by git, not gitignored) instead of `.env`. Moved it to `.env`, restored `.env.example` to the placeholder. Confirmed via `git log --all --full-history -- .env` that `.env` has never been committed at any point, and via `git show <commit>:.env.example` that the user's own subsequent commit this session captured the clean placeholder version, not the key. No leak occurred, but it was one file-name-confusion away from one.
+
+### Garment Vision
+`VERIFIED`. Real photos from `public/test samples/men/` (not the demo fallback) through `POST /api/ai/analyze-garment`:
+
+| Category | File | Gemini's Result | Accurate? |
+|---|---|---|---|
+| Top | Vintage Gray Tee.png | "Washed Charcoal Graphic T-Shirt", casual, base_layer, #767575 | Yes — correct garment type, plausible color read, sensible fabric/fit guess |
+| Bottom | Black Cargo Pants.png | "Black Nylon Parachute Cargo Pants", casual, primary_layer, #1E1E1E | Yes — correct type and near-black color |
+| Footwear | Leather Loafers.png | "Dark Espresso Leather Hybrid Penny Loafers", smart_casual, #322D2D | Yes — correct type; "dark espresso" is a reasonable read of the actual brown leather |
+| Outerwear | Washed Denim Jacket.png | "Vintage Wash Relaxed Denim Jacket", casual, outer_layer, #4A6B8E | Yes — correct type, correct layering role |
+| Accessory | Black Fisherman Beanie.png | "Black Ribbed Knit Beanie", casual, #181818 | Yes — correct type and color |
+
+All 5 returned complete metadata (name/category/subcategory/color/hexColor/fabric/fit/formality/layeringRole/tags/aiConfidence/pairingNotes) — none were the demo fallback (`mode: "gemini"` on every response). Not verified through the actual browser upload UI this sprint (per standing no-browser-testing convention) — verified at the API layer, which is what actually determines correctness; the UI layer's handling of this response was already code-reviewed in the Sprint 18 audit.
+
+### Outfit Generation
+`VERIFIED`. All 6 occasion prompts returned real, valid, structured Gemini responses (see table below).
+
+### Occasion Tests
+
+| Occasion | Gemini Called | Valid Garments | Occasion-Aware | Result |
+|---|---|---|---|---|
+| casual weekend | Yes | Yes (5/5 valid IDs) | Yes | "Laid-Back Weekend Utility" — cream tee, olive cargo pants, trail runners, hobo bag, sunglasses |
+| airport travel | Yes (1st attempt hit a transient `503 UNAVAILABLE`, real retry succeeded) | Yes (5/5) | Yes, strongly | "Transit Tech Minimalist" — explicitly reasoned about security-friendly layers, stretch fabric for flights, terminal-walking comfort, hands-free bag |
+| college presentation tomorrow | Yes | Yes (4/4) | Yes | "Tailored Academic Poise" — light blue poplin shirt, cream trousers, loafers, crossbody bag |
+| job interview tomorrow | Yes | Yes (4/4) | Partial | "Crisp Executive Poise" — swapped only the shirt (white oxford vs. light blue poplin, i.e. moved to the crisper of the wardrobe's 3 smart-casual tops); bottoms/shoes/bag identical to the college outfit — the wardrobe only has 3 smart-casual tops total, so this may be a wardrobe ceiling as much as a reasoning gap |
+| first date dinner | Yes | Yes (4/4) | **No — flagged below** | "Effortless Evening Elegance" — garment IDs byte-identical to the college-presentation outfit; only the title/vibe/copy differed |
+| night party | Yes | Yes (5/5) | Yes, strongly | "Midnight Edge" — full dark-monochrome streetwear swap (black tee, charcoal bomber, black parachute pants, white sneakers, black sling) |
+
+### Casual vs Travel
+Real, meaningful differentiation — not just cosmetic. Casual kept the cream tee but paired it with olive cargo pants, trail runners, a hobo bag, and sunglasses for a relaxed "errands" framing. Travel kept the same tee but added a charcoal zip hoodie as a removable layer, swapped in charcoal tech pants, kept the trail runners (genuinely practical for both), and swapped the hobo bag for a charcoal utility sling — with its own rationale explicitly citing "easy-to-remove layers for security," "stretch tech fabrics for long flights," "cushioned footwear for terminal walking," and "hands-free utility sling for passport and travel essentials." That's the model reasoning about mobility/practicality/security-line logistics specifically, not reusing the casual outfit's generic "running errands" framing. **Verdict: genuine differentiation, good quality.**
+
+### College vs Interview
+Real but thin differentiation, likely wardrobe-limited: only the shirt changed (white oxford for the interview vs. light blue poplin for college), everything else (cream trousers, loafers, crossbody bag) stayed identical. The wardrobe only contains 3 smart-casual-tier tops total, so there wasn't much room for the model to differentiate further even if it wanted to — this reads as the model making the one available formality-appropriate swap rather than failing to reason about the difference. **Verdict: correct direction, wardrobe-capped magnitude.**
+
+### Date vs Party
+Strong differentiation between these two — but see the negative finding above: "first date dinner" independently turned out identical to "college presentation," not to a `date`-appropriate look distinct from `party`. Party itself (all-black nightlife streetwear) was clearly and strongly distinguished from both. **Verdict: Party is well-differentiated; Date's reasoning collapsed into the same result as an unrelated occasion (college), which is the sprint's most notable AI-quality finding — see P1.**
+
+### Swap
+`VERIFIED`. Real request against a real generated outfit: asked Gemini to replace `cream_graphic_tee` (tops) from the casual-weekend outfit. It returned `washed_black_graphic_tee` — same category, a real wardrobe item, with a contextual rationale ("maintains the relaxed streetwear silhouette... complements the stone grey trail runners"). Confirmed the replacement ID exists in the wardrobe and matches the target category.
+
+### Regenerate
+`VERIFIED` (mechanism) with an important caveat already flagged in Sprint 18, now further confirmed with live data. Manually sending `excludeGarmentIds` populated with the first generation's IDs produced a completely different 5-item combination (zero ID overlap) — the exclusion mechanism itself works excellently when used. **However**: the actual app (`TodayScreen`/`StylistScreen`) still never populates `excludeGarmentIds` on a real Regenerate click (confirmed unchanged since the Sprint 18 audit) — so in-app Regenerate today does not get this real benefit from Gemini; variety currently comes only from the demo engine's `seed`-cycling, which doesn't apply once a request actually reaches Gemini. This is a concrete, actionable P1 for Sprint 21: wiring the already-working exclusion mechanism to real Regenerate clicks.
+
+### Validator
+`VERIFIED` — with a nuance. Stress-tested by giving Gemini only 2 wardrobe items and an occasion neither suited ("formal wedding" with only 2 casual tees available): Gemini did not invent a garment — it picked the single closest existing item and its own rationale honestly acknowledged the compromise ("While casual for a formal wedding dress code, the charcoal art tee serves as the most minimalist and tonal foundation available"). Gemini never attempted to invent an ID in any test this sprint, so the validator's actual *rejection* code path was not live-triggered — its correctness remains verified by code review (Sprint 18 audit) rather than by observing a real rejection. The "never invent" instruction held up under real adversarial-ish conditions regardless.
+
+### Men / Women
+`VERIFIED`. Generated `casual weekend` against both wardrobes independently: the men's result used only valid men's garment IDs, the women's result used only valid women's garment IDs, zero cross-contamination in either direction.
+
+### Layering
+`PARTIAL`. `avoid` was verified correct — a real women's-wardrobe generation with `layeringPreference: "avoid"` produced a valid outfit that correctly excluded `fitted_ribbed_tank_top` (the wardrobe's one `base_layer` item), selecting an Ivory Cropped Crew Neck instead. `sometimes` and `usually` could not be completed — both hit `429 RESOURCE_EXHAUSTED` (see Production/Security section) on first attempt and again on a retry 3 seconds later. Not a code defect; a real external quota wall reached mid-sprint. **Needs a follow-up pass once quota resets or a paid tier is configured.**
+
+### Production Gemini
+`VERIFIED`. `npm run build && npm run start` with the real key present: server log correctly reported `Gemini mode: LIVE (GEMINI_API_KEY configured)`, and every real-Gemini test above (vision, all 6 occasions, swap, regenerate, profile, partial layering) ran through this exact production server on port 3000 — not `npm run dev`, not a bypassed SDK call. This is the direct, concrete proof that Sprint 19's P0 fix actually works with a real key, not just architecturally.
+
+### Security
+`VERIFIED`, after fixing the near-miss described under Gemini Connection. Re-confirmed this sprint: zero occurrences of `GEMINI_API_KEY`/`GoogleGenAI`/`VITE_GEMINI` or key-shaped strings in `dist/assets/*.js`; `.env` gitignored and untracked (`git status --short .env` empty); `.env.example` contains only the placeholder; `.env` has never appeared in git history at any point (`git log --all --full-history -- .env` empty); the real key string appears nowhere in the repository except the gitignored `.env` file itself (repo-wide grep, excluding `.git`/`node_modules`/`dist`, confirmed empty). The key value itself was never printed in any tool output, log, or this document.
+
+### Build
+`PASS` — `npm run build`, 0 errors.
+
+### Lint
+`PASS` — `npm run lint` (oxlint), 0 errors, 0 warnings.
+
+### Real free-tier quota constraint (new finding, not previously known)
+The configured key is on Gemini's free tier: `generativelanguage.googleapis.com/generate_content_free_tier_requests`, quota id `GenerateRequestsPerDayPerProjectPerModel-FreeTier`, **limit 20 requests/day/model** for `gemini-3.7-flash` (the model `gemini-flash-latest` currently resolves to). This sprint's testing (5 vision calls + ~15 generate/swap/regenerate calls) exhausted it partway through the layering test. When exhausted, the server correctly returned `{"ok": false, "mode": "demo", "error": "...RESOURCE_EXHAUSTED..."}` rather than crashing — an unplanned but genuine, live demonstration that the demo-fallback safety net works under a real failure condition, not just a simulated one. This is now the single most important operational risk for any live demo.
+
+### P0 — Blocking the real Gemini demo
+1. **Free-tier quota (20 requests/day/model)** — exhausted mid-session by this sprint's own testing alone. A live demo involving multiple garment uploads and outfit generations could exhaust it during the demo itself, at which point the app silently and correctly falls back to demo mode — correct behavior, but with zero visible signal to the presenter or audience that "real AI" quietly stopped. Needs either a paid-tier key before any real demo, or an explicit plan to demo on a fresh quota window.
+2. ~~Stale hardcoded model name (`gemini-2.5-flash`, 404)~~ — found and fixed this sprint (`server/geminiServer.js`, `scripts/testGeminiIntegration.js` → `gemini-flash-latest`). No longer open.
+
+### P1 — AI-quality issues materially affecting the demo
+1. **"First date dinner" produced an outfit byte-identical to "college presentation tomorrow"** — same 4 garment IDs, only the title/copy differed. Occasion reasoning did not differentiate a romantic dinner from an academic presentation for this wardrobe.
+2. **Regenerate's exclusion mechanism isn't wired up in the app** — Gemini honors `excludeGarmentIds` excellently when it's sent (verified: zero ID overlap on a manually-excluded regenerate), but `TodayScreen`/`StylistScreen` never actually send it, so real users get no anti-repeat benefit from Gemini on Regenerate today (carried over from the Sprint 18 audit, now confirmed with live data that fixing it would actually work).
+3. **College vs. Interview differentiation is thin** — only the shirt changed; likely wardrobe-capped (only 3 smart-casual tops exist) rather than a pure reasoning gap, but worth a wardrobe-breadth note for Sprint 21's prompt/selection tuning.
+
+### P2 — Minor
+1. No UI indicator of which mode (`gemini` vs `demo`) produced a given outfit — would make the P0 quota-exhaustion scenario observable instead of silent. Cheap, worth considering alongside the P0 fix.
+2. `sometimes`/`usually` layering preference tests incomplete (quota-blocked, not failed) — re-run once quota resets.
+
+---
 
 ### Architecture
 
@@ -93,18 +377,19 @@ Code-only completeness audit against `CLAUDE.md`/`STATE.md` requirements — **n
 ---
 
 ## Real Gemini Verification Summary
-* **Real Gemini Status**: `BLOCKED` (waiting for `GEMINI_API_KEY` in local `.env`)
-* **Garment Vision Service**: `VERIFIED` (endpoint wired, fallback functional)
-* **Outfit Generation Service**: `VERIFIED` (endpoint wired, validator functional)
-* **Occasion Reasoning Pipeline**: `VERIFIED` (prompts formatted, structured JSON schemas defined)
-* **Swap & Regenerate Pipeline**: `VERIFIED` (endpoints wired, exclusion handling active)
-* **Validator Safety**: `VERIFIED` (client validator rejects any non-closet IDs)
-* **Credential Architecture**: `VERIFIED` (100% server-side, 0 secrets in client JS)
+* **Real Gemini Status**: `CONNECTED` — live-verified Sprint 20, real key configured, model fixed to `gemini-flash-latest`. Free-tier quota (20 req/day/model) exhausted partway through this session's testing — see Sprint 20 for the layering-preference tests left incomplete because of it.
+* **Garment Vision Service**: `VERIFIED` — 5 real photos across all 5 categories, real Gemini responses, metadata checked against the actual images. Sprint 23 added a `style` field to the vision JSON schema after that verification ran — not yet re-confirmed live (see Sprint 23).
+* **Outfit Generation Service**: `VERIFIED` — all 6 required occasion prompts produced real, valid Gemini responses.
+* **Occasion Reasoning Pipeline**: `IMPROVED, LIVE RE-VERIFICATION PENDING` — Sprint 20 found "first date dinner" identical to "college presentation" (real AI-quality gap). Sprint 22 root-caused it to a genuine men's-wardrobe formality ceiling (zero `formal`/`evening` items) combined with a missing tie-breaking instruction and an untransmitted `pairingNotes` field, and fixed both in `server/geminiServer.js` and `outfitStylist.ts`. Sprint 23 closed a related gap — the catalog's `style` descriptor was silently dropped before ever reaching `GarmentItem` or Gemini — and now forwards it as a further tie-breaking signal. Sprint 24 added an aggregate `wardrobeSummary` (formality/category/layering coverage) plus an explicit honesty rule so Gemini acknowledges (rather than papers over) a weak/none formality tier. None of these fixes yet re-confirmed against a live response — blocked by the same free-tier quota (see Sprints 22–24).
+* **Swap Pipeline**: `VERIFIED` — real replacement, correct category, valid ID, contextual rationale.
+* **Regenerate/Exclusion Pipeline**: `VERIFIED` the underlying mechanism works well when `excludeGarmentIds` is populated — **correcting an earlier overclaim**: the app itself still never populates it on a real Regenerate click (Sprint 18 finding, unchanged), so live in-app Regenerate does not yet get this benefit. Not "exclusion handling active" as previously stated here.
+* **Validator Safety**: `VERIFIED` by code review + real adversarial testing (Gemini never attempted to invent a garment even when given only 2 unsuitable items) — the actual rejection code path was never live-triggered since nothing needed rejecting.
+* **Credential Architecture**: `VERIFIED` — 100% server-side, 0 secrets in client JS, re-confirmed post-Sprint-20. (A real key briefly landed in the tracked `.env.example` instead of `.env` mid-session — caught and fixed before any commit captured it; see Sprint 20.)
 
 ---
 
 ## Next Priority Task
-* **Task**: Supply `GEMINI_API_KEY` in local `.env` and perform live presentation dry-run.
+* **Task**: Once the free-tier quota resets — run "job interview" and "first date dinner" live and check two things at once: (1) whether `whyItWorks` now honestly names the men's wardrobe's formal/evening gap (Sprint 24) instead of implying a formal look, and (2) whether the outfits meaningfully diverge from each other (Sprint 22/23). Also upload one real photo to confirm the vision endpoint's `style` field (Sprint 23) returns sensible values, and re-test the `sometimes`/`usually` layering cases (pending since Sprint 20).
 
 ---
 

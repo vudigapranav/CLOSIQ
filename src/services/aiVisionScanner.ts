@@ -13,6 +13,11 @@ export interface VisionAnalysisResult {
   aiConfidence: number;
   pairingNotes: string;
   fit: string;
+  /** Short style descriptor, e.g. "Streetwear Essential". Only ever set from real
+   *  garment data (catalog entries or real Gemini vision analysis) — the
+   *  deterministic pixel-color fallback scanner has no basis to guess one, so
+   *  it deliberately leaves this undefined rather than inventing a label. */
+  style?: string;
   layeringRole?: LayeringRole;
 }
 
@@ -185,6 +190,7 @@ export async function analyzeCatalogGarment(entry: CatalogEntry): Promise<Vision
     aiConfidence: Math.round((Math.random() * 0.04 + 0.95) * 100) / 100,
     pairingNotes: entry.pairingNotes,
     fit: entry.fit,
+    style: entry.style,
     layeringRole: entry.layeringRole
   };
 }

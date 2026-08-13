@@ -12,6 +12,7 @@ interface TodayScreenProps {
   wardrobe: GarmentItem[];
   savedOutfits: Outfit[];
   layeringPreference: LayeringPreference;
+  externalOutfit?: Outfit | null;
   onSaveOutfit: (outfit: Outfit) => void;
   onUnsaveOutfit: (outfit: Outfit) => void;
   onWearOutfit?: (outfit: Outfit) => void;
@@ -34,6 +35,7 @@ export const TodayScreen: React.FC<TodayScreenProps> = ({
   wardrobe,
   savedOutfits,
   layeringPreference,
+  externalOutfit,
   onSaveOutfit,
   onUnsaveOutfit,
   onWearOutfit,
@@ -44,23 +46,37 @@ export const TodayScreen: React.FC<TodayScreenProps> = ({
   const [selectedOccasion, setSelectedOccasion] = useState('College');
   const [customInput, setCustomInput] = useState('');
   const [variationSeed, setVariationSeed] = useState(0);
-  const [outfit, setOutfit] = useState<Outfit | null>(null);
+  const [outfit, setOutfit] = useState<Outfit | null>(externalOutfit || null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [showBreakdown, setShowBreakdown] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [wornOutfitId, setWornOutfitId] = useState<string | null>(null);
 
+  useEffect(() => {
+    if (externalOutfit) {
+      setOutfit(externalOutfit);
+      if (externalOutfit.occasion) {
+        if (OCCASIONS.includes(externalOutfit.occasion)) {
+          setSelectedOccasion(externalOutfit.occasion);
+          setCustomInput('');
+        } else {
+          setCustomInput(externalOutfit.occasion);
+        }
+      }
+    }
+  }, [externalOutfit]);
+
   const activePrompt = customInput.trim() || selectedOccasion;
   const generationToken = useRef(0);
 
-  const runGeneration = async (promptText: string, seed: number) => {
+  const runGeneration = async (promptText: string, seed: number, excludeGarmentIds: string[] = []) => {
     if (wardrobe.length === 0) return;
     const token = ++generationToken.current;
     setIsGenerating(true);
     setErrorMessage(null);
     setShowBreakdown(false);
     try {
-      const generated = await generateAIOutfitWithGemini(wardrobe, { prompt: promptText, layeringPreference }, seed);
+      const generated = await generateAIOutfitWithGemini(wardrobe, { prompt: promptText, layeringPreference, excludeGarmentIds }, seed);
       if (token !== generationToken.current) return;
       setOutfit(generated);
     } catch {
@@ -99,7 +115,13 @@ export const TodayScreen: React.FC<TodayScreenProps> = ({
   const handleSwapLook = () => {
     const nextSeed = variationSeed + 1;
     setVariationSeed(nextSeed);
-    runGeneration(activePrompt, nextSeed);
+    // Regenerate = "give me a different look for the same occasion" — exclude
+    // the outfit currently on screen so Gemini has an explicit signal not to
+    // just hand the same combination back. A fresh Generate (new occasion
+    // chip, new free-text prompt) intentionally does NOT exclude anything —
+    // see handleSelectOccasion/handleCustomSubmit below.
+    const excludeIds = outfit ? outfit.items.map((item) => item.id) : [];
+    runGeneration(activePrompt, nextSeed, excludeIds);
   };
 
   const isSaved = outfit ? savedOutfits.some((o) => isSameOutfit(o, outfit)) : false;

@@ -1081,6 +1081,7 @@ function catalogEntryToGarmentItem(entry: CatalogEntry): GarmentItem {
     aiConfidence: 0.97,
     pairingNotes: entry.pairingNotes,
     fit: entry.fit,
+    style: entry.style,
     layeringRole: entry.layeringRole,
     profile: entry.profile,
     isSeedItem: true
