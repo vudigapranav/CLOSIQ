@@ -13,29 +13,29 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
   onTabChange
 }) => {
   const tabs: { key: NavTab; label: string; icon: React.ReactNode }[] = [
-    { key: 'today', label: 'Today', icon: <Calendar size={20} /> },
-    { key: 'collection', label: 'Collection', icon: <Grid size={20} /> },
-    { key: 'stylist', label: 'Stylist', icon: <Sparkles size={20} /> },
-    { key: 'profile', label: 'Profile', icon: <User size={20} /> }
+    { key: 'today', label: 'Today', icon: <Calendar size={19} /> },
+    { key: 'collection', label: 'Collection', icon: <Grid size={19} /> },
+    { key: 'stylist', label: 'Stylist', icon: <Sparkles size={19} /> },
+    { key: 'profile', label: 'Profile', icon: <User size={19} /> }
   ];
 
   return (
     <nav
       style={{
         position: 'fixed',
-        bottom: 0,
+        bottom: 16,
         left: '50%',
         transform: 'translateX(-50%)',
-        width: '100%',
-        maxWidth: 480,
-        height: 72,
-        backgroundColor: 'var(--color-bg)',
-        backdropFilter: 'blur(16px)',
-        borderTop: '1px solid var(--color-border)',
+        width: 'calc(100% - 24px)',
+        maxWidth: 456,
+        backgroundColor: 'var(--color-surface)',
+        border: '1px solid var(--color-border)',
+        borderRadius: 'var(--radius-xl)',
+        boxShadow: 'var(--shadow-lg)',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-around',
-        padding: '0 8px',
+        padding: '8px',
         zIndex: 50,
         transition: 'background-color 0.25s ease'
       }}
@@ -53,24 +53,25 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
               flexDirection: 'column',
               alignItems: 'center',
               justifyContent: 'center',
-              gap: 4,
-              background: 'transparent',
+              gap: 3,
+              flex: 1,
+              background: isActive ? 'var(--color-primary-alpha)' : 'transparent',
               border: 'none',
               color: isActive ? 'var(--color-primary)' : 'var(--color-text-muted)',
               cursor: 'pointer',
-              padding: '8px 16px',
-              borderRadius: 'var(--radius-sm)',
-              transition: 'color 0.2s ease, transform 0.15s ease'
+              padding: '9px 6px',
+              borderRadius: 'var(--radius-lg)',
+              transition: 'color 0.2s ease, background-color 0.2s ease'
             }}
           >
             {React.cloneElement(tab.icon as React.ReactElement, {
-              strokeWidth: isActive ? 2.3 : 1.7
+              strokeWidth: isActive ? 2.2 : 1.7
             })}
             <span
               style={{
-                fontSize: '0.72rem',
-                fontWeight: isActive ? 600 : 500,
-                letterSpacing: '0.02em'
+                fontSize: '0.68rem',
+                fontWeight: isActive ? 700 : 500,
+                letterSpacing: '0.01em'
               }}
             >
               {tab.label}

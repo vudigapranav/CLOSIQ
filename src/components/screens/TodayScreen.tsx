@@ -287,59 +287,100 @@ export const TodayScreen: React.FC<TodayScreenProps> = ({
             </div>
           </div>
 
-          {/* Visual Garment Cards Grid */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 14, marginBottom: 24 }}>
-            {outfit.items.map((piece, idx) => (
+          {/* Editorial Hero + Supporting Garment Imagery — the outfit's first
+              item is always its top (see generateAIOutfit's item ordering),
+              so it doubles as the natural hero piece; remaining pieces read
+              as a supporting row underneath, per the brief's hero-first
+              outfit composition. */}
+          <div style={{ marginBottom: 24 }}>
+            <div
+              className="animate-card-enter"
+              style={{
+                position: 'relative',
+                width: '100%',
+                height: 300,
+                borderRadius: 'var(--radius-lg)',
+                overflow: 'hidden',
+                border: '1px solid var(--color-border)',
+                backgroundColor: 'var(--color-surface-subtle)',
+                marginBottom: outfit.items.length > 1 ? 10 : 0
+              }}
+            >
+              <GarmentImage
+                src={outfit.items[0].imageUrl}
+                alt={outfit.items[0].name}
+                category={outfit.items[0].category}
+                hexColor={outfit.items[0].hexColor}
+              />
               <div
-                key={piece.id}
-                className="animate-card-enter"
                 style={{
-                  backgroundColor: 'var(--color-surface-subtle)',
-                  borderRadius: 'var(--radius-md)',
-                  overflow: 'hidden',
-                  border: '1px solid var(--color-border)',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  animationDelay: `${idx * 60}ms`
+                  position: 'absolute',
+                  bottom: 0,
+                  left: 0,
+                  right: 0,
+                  padding: '32px 16px 14px',
+                  background: 'linear-gradient(180deg, transparent, rgba(20, 32, 24, 0.78))'
                 }}
               >
-                <div style={{ width: '100%', height: 176 }}>
-                  <GarmentImage src={piece.imageUrl} alt={piece.name} category={piece.category} hexColor={piece.hexColor} />
-                </div>
-                <div style={{ padding: 12 }}>
-                  <span className="text-metadata" style={{ fontSize: '0.65rem' }}>{piece.category}</span>
+                <span className="text-metadata" style={{ color: 'rgba(250, 247, 236, 0.85)' }}>{outfit.items[0].category}</span>
+                <div style={{ fontSize: '0.98rem', fontWeight: 700, color: '#FFFFFF', marginTop: 2 }}>{outfit.items[0].name}</div>
+              </div>
+            </div>
+
+            {outfit.items.length > 1 && (
+              <div style={{ display: 'grid', gridTemplateColumns: `repeat(${Math.min(outfit.items.length - 1, 3)}, 1fr)`, gap: 10 }}>
+                {outfit.items.slice(1).map((piece, idx) => (
                   <div
+                    key={piece.id}
+                    className="animate-card-enter"
                     style={{
-                      fontSize: '0.82rem',
-                      fontWeight: 600,
-                      color: 'var(--color-text-primary)',
-                      display: '-webkit-box',
-                      WebkitLineClamp: 2,
-                      WebkitBoxOrient: 'vertical',
-                      overflow: 'hidden'
+                      backgroundColor: 'var(--color-surface-subtle)',
+                      borderRadius: 'var(--radius-md)',
+                      overflow: 'hidden',
+                      border: '1px solid var(--color-border)',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      animationDelay: `${(idx + 1) * 60}ms`
                     }}
                   >
-                    {piece.name}
+                    <div style={{ width: '100%', height: 122 }}>
+                      <GarmentImage src={piece.imageUrl} alt={piece.name} category={piece.category} hexColor={piece.hexColor} />
+                    </div>
+                    <div style={{ padding: 10 }}>
+                      <div
+                        style={{
+                          fontSize: '0.76rem',
+                          fontWeight: 600,
+                          color: 'var(--color-text-primary)',
+                          display: '-webkit-box',
+                          WebkitLineClamp: 2,
+                          WebkitBoxOrient: 'vertical',
+                          overflow: 'hidden'
+                        }}
+                      >
+                        {piece.name}
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 4 }}>
+                        <span
+                          style={{
+                            width: 7,
+                            height: 7,
+                            borderRadius: '50%',
+                            backgroundColor: piece.hexColor,
+                            display: 'inline-block',
+                            border: '1px solid rgba(0,0,0,0.15)',
+                            flexShrink: 0
+                          }}
+                        />
+                        <span className="text-caption" style={{ fontSize: '0.68rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {piece.color}
+                        </span>
+                      </div>
+                    </div>
                   </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 4 }}>
-                    <span
-                      style={{
-                        width: 7,
-                        height: 7,
-                        borderRadius: '50%',
-                        backgroundColor: piece.hexColor,
-                        display: 'inline-block',
-                        border: '1px solid rgba(0,0,0,0.15)',
-                        flexShrink: 0
-                      }}
-                    />
-                    <span className="text-caption" style={{ fontSize: '0.72rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      {piece.color}
-                    </span>
-                  </div>
-                </div>
+                ))}
               </div>
-            ))}
+            )}
           </div>
 
           {/* Sparse-wardrobe note — shown when a core category had nothing to draw from */}

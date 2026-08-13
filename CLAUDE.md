@@ -46,35 +46,41 @@ The application features 4 core bottom navigation tabs:
 
 ## 4. Visual Design System
 
+**Design language**: *Sage × Cream Editorial Fashion System* (redesigned 2026-08-14 from the earlier all-ivory emerald system). The app "environment" (page canvas — `html`/`body`, `.app-shell`, header, bottom nav backdrop) is a muted warm sage; cream/ivory `--color-surface` remains the dominant *content* surface — cards, modals, inputs "float" on the sage canvas. Green is reserved for typography, buttons, active/selected states, and brand accents, never as a full-bleed background.
+
 ### Theme Colors
 
 #### Light Mode:
-* **Primary Emerald**: `#0D3B2E` (`var(--color-primary)`)
-* **Primary Hover / Light**: `#124E3F` / `#1B5E4B`
-* **Background**: Warm Ivory `#FAF8F5` (`var(--color-bg)`)
-* **Surface**: White `#FFFFFF` / Soft Ivory `#F5F2EC` (`var(--color-surface)`)
-* **Primary Text**: Deep Charcoal `#1A1F1D` (`var(--color-text-primary)`)
-* **Secondary Text**: Muted Gray-Green `#5A6360` (`var(--color-text-secondary)`)
-* **Border**: Subtle Warm Gray `rgba(13, 59, 46, 0.08)` (`var(--color-border)`)
-* **Success**: Restrained Green `#277962`
+* **Environment (page canvas)**: Muted Warm Sage `#C7CDAE` / deep sage accent `#B7BF9A` (`var(--color-bg)` / `var(--color-bg-deep)`)
+* **Primary (Deep Forest Green)**: `#1F3A2B` (`var(--color-primary)`)
+* **Primary Hover / Light**: `#16301F` / `#2E5039`
+* **Surface (cream cards)**: Warm Ivory `#FBF8F0` (`var(--color-surface)`)
+* **Surface Subtle (nested cream)**: `#F1EAD8` (`var(--color-surface-subtle)`)
+* **Surface Elevated**: Pure White `#FFFFFF` (`var(--color-surface-elevated)`)
+* **Primary Text**: Deep Charcoal-Green `#1E2B20` (`var(--color-text-primary)`)
+* **Secondary Text**: Muted Sage-Gray `#5B6350` (`var(--color-text-secondary)`)
+* **Border**: `rgba(31, 58, 43, 0.12)` (`var(--color-border)`)
+* **Success**: `#3C7A55`
 
 #### Dark Mode (`[data-theme="dark"]`):
-* **Background**: Deep Green-Black `#0B100E`
-* **Surface**: Dark Emerald `#141C18` / `#1B2621`
-* **Primary Emerald**: `#38997E` / `#4AB295`
-* **Text**: Warm White `#FAF7F2`
-* **Secondary Text**: Muted Green-Gray `#8A9691`
-* **Border**: Subtle Dark Green `rgba(255, 255, 255, 0.08)`
+* **Environment (page canvas)**: Deep Forest-Black `#0D1712` / `#0A120E` (`var(--color-bg)` / `var(--color-bg-deep)`)
+* **Primary**: Soft Sage-Green `#5AA37E` / hover `#6DB690`
+* **Surface**: `#17221C` / Subtle `#1F2C24` / Elevated `#26342B`
+* **Text**: Warm Off-White `#F5F1E4`
+* **Secondary Text**: Muted Green-Gray `#9CA893`
+* **Border**: `rgba(245, 241, 228, 0.09)`
 
 ### Typography
 * **Serif Headings**: *Playfair Display* (`var(--font-display)`), used for display, screen, and section headings.
 * **Geometric Sans**: *Plus Jakarta Sans* (`var(--font-family)`), used for body text, captions, button labels, and metadata.
 
 ### Surface Characteristics
-* **Border Radius**: Cards `14px` (`--radius-md`) / `20px` (`--radius-lg`), Pills `9999px` (`--radius-pill`).
+* **Border Radius**: Cards `14px` (`--radius-md`) / `20px` (`--radius-lg`), bottom-sheet modals & the floating nav dock `26px` (`--radius-xl`), Pills `9999px` (`--radius-pill`).
 * **Viewport Constraint**: Mobile-style application shell (`max-width: 480px`) centered on desktop with subtle borders and shadows.
-* **Aesthetic Direction**: *Luxury fashion application × intelligent personal assistant × modern Apple-like simplicity*.
-* **Constraint**: NO ecommerce UI patterns (no prices, cart icons, or star ratings).
+* **Bottom Navigation**: Floating cream pill dock (`--radius-xl`, `--shadow-lg`, `16px` inset from screen edges) rather than a full-bleed bar — see `BottomNavigation.tsx`.
+* **Segmented Controls**: Shared `SegmentedControl` component (`src/components/ui/SegmentedControl.tsx`) — single cream track, filled forest-green active pill — used for Wardrobe Profile and Layering Preference in `ProfileScreen`.
+* **Aesthetic Direction**: *Luxury fashion editorial × intelligent personal assistant × modern Apple-like simplicity*.
+* **Constraint**: NO ecommerce UI patterns (no prices, cart icons, or star ratings). No dashed borders (reads as wireframe/placeholder, not premium) — empty/dropzone states use a solid border + soft shadow instead.
 
 ---
 
@@ -205,6 +211,7 @@ The AI engine must use stable garment IDs from the active wardrobe.
   * [src/components/ui/GarmentImage.tsx](file:///Users/pranav07vudiga/Desktop/Projects/Hackathon/Demux/CLOSIQ/src/components/ui/GarmentImage.tsx)
   * [src/components/ui/ClosiqLogo.tsx](file:///Users/pranav07vudiga/Desktop/Projects/Hackathon/Demux/CLOSIQ/src/components/ui/ClosiqLogo.tsx)
   * [src/components/ui/SplashScreen.tsx](file:///Users/pranav07vudiga/Desktop/Projects/Hackathon/Demux/CLOSIQ/src/components/ui/SplashScreen.tsx)
+  * [src/components/ui/SegmentedControl.tsx](file:///Users/pranav07vudiga/Desktop/Projects/Hackathon/Demux/CLOSIQ/src/components/ui/SegmentedControl.tsx)
 * **Modal Dialogs**:
   * [src/components/modals/AddItemModal.tsx](file:///Users/pranav07vudiga/Desktop/Projects/Hackathon/Demux/CLOSIQ/src/components/modals/AddItemModal.tsx)
   * [src/components/modals/ClothingDetailModal.tsx](file:///Users/pranav07vudiga/Desktop/Projects/Hackathon/Demux/CLOSIQ/src/components/modals/ClothingDetailModal.tsx)

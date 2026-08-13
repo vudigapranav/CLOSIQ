@@ -2,6 +2,7 @@ import React from 'react';
 import { Sparkles, Heart, Moon, Sun, Lightbulb, Trash2 } from 'lucide-react';
 import { SectionHeader } from '../ui/SectionHeader';
 import { GarmentImage } from '../ui/GarmentImage';
+import { SegmentedControl } from '../ui/SegmentedControl';
 import { INITIAL_PROFILE } from '../../data/initialWardrobe';
 import { GarmentItem, Outfit, WardrobeProfile, LayeringPreference } from '../../types/wardrobe';
 
@@ -268,7 +269,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
       <SectionHeader title="Saved Looks" subtitle="Outfits pinned to your rotation" />
 
       {savedOutfits.length === 0 ? (
-        <div style={{ padding: 24, textAlign: 'center', backgroundColor: 'var(--color-surface)', borderRadius: 'var(--radius-lg)', border: '1px dashed var(--color-border)', marginBottom: 24 }}>
+        <div style={{ padding: 24, textAlign: 'center', backgroundColor: 'var(--color-surface)', borderRadius: 'var(--radius-lg)', border: '1px solid var(--color-border)', boxShadow: 'var(--shadow-sm)', marginBottom: 24 }}>
           <Heart size={28} color="var(--color-text-muted)" style={{ marginBottom: 6 }} />
           <p className="text-body" style={{ fontSize: '0.85rem' }}>No saved outfits yet. Tap "Save" on any look from Today or the AI Stylist.</p>
         </div>
@@ -328,35 +329,17 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
           borderRadius: 'var(--radius-lg)',
           border: '1px solid var(--color-border)',
           padding: 16,
-          marginBottom: 24,
-          display: 'grid',
-          gridTemplateColumns: 'repeat(2, 1fr)',
-          gap: 10
+          marginBottom: 24
         }}
       >
-        {(['men', 'women'] as WardrobeProfile[]).map((option) => {
-          const isActive = wardrobeProfile === option;
-          return (
-            <button
-              key={option}
-              onClick={() => onChangeWardrobeProfile(option)}
-              style={{
-                padding: '10px 12px',
-                borderRadius: 'var(--radius-md)',
-                border: `1px solid ${isActive ? 'var(--color-primary)' : 'var(--color-border)'}`,
-                backgroundColor: isActive ? 'var(--color-primary)' : 'var(--color-surface-subtle)',
-                color: isActive ? 'var(--color-text-on-primary)' : 'var(--color-text-secondary)',
-                fontSize: '0.85rem',
-                fontWeight: 600,
-                textTransform: 'capitalize',
-                cursor: 'pointer',
-                transition: 'all 0.2s ease'
-              }}
-            >
-              {option}
-            </button>
-          );
-        })}
+        <SegmentedControl
+          options={[
+            { value: 'men', label: 'Men' },
+            { value: 'women', label: 'Women' }
+          ]}
+          value={wardrobeProfile}
+          onChange={onChangeWardrobeProfile}
+        />
       </div>
 
       {/* 5. Layering Preference */}
@@ -368,35 +351,10 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
           borderRadius: 'var(--radius-lg)',
           border: '1px solid var(--color-border)',
           padding: 16,
-          marginBottom: 24,
-          display: 'grid',
-          gridTemplateColumns: 'repeat(3, 1fr)',
-          gap: 8
+          marginBottom: 24
         }}
       >
-        {LAYERING_OPTIONS.map((option) => {
-          const isActive = layeringPreference === option.value;
-          return (
-            <button
-              key={option.value}
-              onClick={() => onChangeLayeringPreference(option.value)}
-              style={{
-                padding: '10px 6px',
-                borderRadius: 'var(--radius-md)',
-                border: `1px solid ${isActive ? 'var(--color-primary)' : 'var(--color-border)'}`,
-                backgroundColor: isActive ? 'var(--color-primary-alpha)' : 'var(--color-surface-subtle)',
-                color: isActive ? 'var(--color-primary)' : 'var(--color-text-secondary)',
-                fontSize: '0.78rem',
-                fontWeight: 600,
-                whiteSpace: 'nowrap',
-                cursor: 'pointer',
-                transition: 'all 0.2s ease'
-              }}
-            >
-              {option.label}
-            </button>
-          );
-        })}
+        <SegmentedControl options={LAYERING_OPTIONS} value={layeringPreference} onChange={onChangeLayeringPreference} />
       </div>
 
       {/* 6. Appearance & Preferences */}

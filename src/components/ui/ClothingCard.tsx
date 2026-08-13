@@ -35,7 +35,7 @@ export const ClothingCard: React.FC<ClothingCardProps> = ({
       tabIndex={0}
       style={{
         backgroundColor: 'var(--color-surface)',
-        borderRadius: 'var(--radius-md)',
+        borderRadius: 'var(--radius-lg)',
         border: '1px solid var(--color-border)',
         overflow: 'hidden',
         cursor: 'pointer',
@@ -45,14 +45,14 @@ export const ClothingCard: React.FC<ClothingCardProps> = ({
         flexDirection: 'column'
       }}
     >
-      <div style={{ position: 'relative', width: '100%', height: 210, backgroundColor: 'var(--color-surface-subtle)' }}>
+      <div style={{ position: 'relative', width: '100%', height: 228, backgroundColor: 'var(--color-surface-subtle)' }}>
         <GarmentImage src={imageUrl} alt={name} category={category} hexColor={hexColor} />
         <div
           style={{
             position: 'absolute',
             bottom: 8,
             left: 8,
-            backgroundColor: 'rgba(0,0,0,0.65)',
+            backgroundColor: 'rgba(20, 32, 24, 0.72)',
             backdropFilter: 'blur(8px)',
             padding: '3px 10px',
             borderRadius: 'var(--radius-pill)',
