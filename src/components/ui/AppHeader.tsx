@@ -42,6 +42,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({ isDarkMode, onToggleTheme 
           transition: 'all 0.2s ease'
         }}
         title={isDarkMode ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
+        aria-label={isDarkMode ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
       >
         {isDarkMode ? <Sun size={18} color="#C5A880" /> : <Moon size={18} color="var(--color-primary)" />}
       </button>

@@ -57,6 +57,8 @@ export const ClothingDetailModal: React.FC<ClothingDetailModalProps> = ({
           </span>
           <button
             onClick={onClose}
+            aria-label="Close"
+            title="Close"
             style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-text-muted)' }}
           >
             <X size={22} />

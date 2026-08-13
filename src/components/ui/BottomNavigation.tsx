@@ -46,6 +46,8 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
           <button
             key={tab.key}
             onClick={() => onTabChange(tab.key)}
+            aria-label={tab.label}
+            aria-current={isActive ? 'page' : undefined}
             style={{
               display: 'flex',
               flexDirection: 'column',

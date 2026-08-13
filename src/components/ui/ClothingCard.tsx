@@ -25,6 +25,14 @@ export const ClothingCard: React.FC<ClothingCardProps> = ({
   return (
     <div
       onClick={onClick}
+      onKeyDown={(e) => {
+        if ((e.key === 'Enter' || e.key === ' ') && onClick) {
+          e.preventDefault();
+          onClick();
+        }
+      }}
+      role="button"
+      tabIndex={0}
       style={{
         backgroundColor: 'var(--color-surface)',
         borderRadius: 'var(--radius-md)',

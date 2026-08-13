@@ -196,7 +196,12 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({ wardrobeProfile, onC
               ? 'Something Went Wrong'
               : 'Confirm Garment Details'}
           </h2>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-text-muted)' }}>
+          <button
+            onClick={onClose}
+            aria-label="Close"
+            title="Close"
+            style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-text-muted)' }}
+          >
             <X size={22} />
           </button>
         </div>
