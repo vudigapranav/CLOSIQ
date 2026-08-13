@@ -175,6 +175,7 @@ export function App() {
             onSaveOutfit={handleSaveOutfit}
             onUnsaveOutfit={handleUnsaveOutfit}
             onSelectItemDetail={(item) => setSelectedDetailItem(item)}
+            onOpenUpload={() => setIsAddItemOpen(true)}
           />
         )}
         {activeTab === 'profile' && (

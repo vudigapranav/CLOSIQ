@@ -58,6 +58,8 @@ export interface Outfit {
   title: string;
   occasion: string;
   vibe: string;
+  /** Human-readable formality tier, e.g. "Smart Casual" — shown as the outfit's "Style" label. */
+  formalityLabel: string;
   temperature: number;
   items: GarmentItem[];
   styleScore: number;
