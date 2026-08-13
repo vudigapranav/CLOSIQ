@@ -71,7 +71,6 @@ export interface Outfit {
 
 export interface UserProfile {
   name: string;
-  avatarUrl: string;
   styleArchetype: string;
   archetypeDescription: string;
   dominantPalette: { name: string; hex: string; percentage: number }[];

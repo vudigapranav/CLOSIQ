@@ -5,6 +5,7 @@ import { getQuickAddSamples, CatalogEntry } from '../../data/garmentCatalog';
 import { analyzeUploadedPhoto, analyzeCatalogGarment, VisionAnalysisResult } from '../../services/aiVisionScanner';
 import { GarmentImage } from '../ui/GarmentImage';
 import { PrimaryButton } from '../ui/PrimaryButton';
+import { CategoryChip } from '../ui/CategoryChip';
 
 interface AddItemModalProps {
   wardrobeProfile: WardrobeProfile;
@@ -30,6 +31,14 @@ function readFileAsDataUrl(file: File): Promise<string> {
 }
 
 const SCAN_CAPTIONS = ['Detecting category…', 'Reading color & texture…', 'Finalizing details…'];
+
+const UPLOAD_CATEGORY_OPTIONS: { key: GarmentCategory; label: string }[] = [
+  { key: 'tops', label: 'Tops' },
+  { key: 'bottoms', label: 'Bottoms' },
+  { key: 'shoes', label: 'Footwear' },
+  { key: 'outerwear', label: 'Outerwear' },
+  { key: 'accessories', label: 'Accessories' }
+];
 
 export const AddItemModal: React.FC<AddItemModalProps> = ({ wardrobeProfile, onClose, onAddGarment }) => {
   const quickAddSamples = getQuickAddSamples(wardrobeProfile);
@@ -116,6 +125,7 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({ wardrobeProfile, onC
   };
 
   const handleConfirmAdd = () => {
+    if (!name.trim()) return;
     const newItem: GarmentItem = {
       id: `garment-${Date.now()}`,
       name,
@@ -194,6 +204,20 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({ wardrobeProfile, onC
         {/* STEP 1: OPTIONS */}
         {step === 'options' && (
           <div>
+            <div className="text-metadata" style={{ marginBottom: 10 }}>
+              What are you adding?
+            </div>
+            <div className="hide-scrollbar" style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 4, marginBottom: 20 }}>
+              {UPLOAD_CATEGORY_OPTIONS.map((opt) => (
+                <CategoryChip
+                  key={opt.key}
+                  label={opt.label}
+                  active={category === opt.key}
+                  onClick={() => setCategory(opt.key)}
+                />
+              ))}
+            </div>
+
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 12, marginBottom: 20 }}>
               <label
                 style={{
@@ -407,6 +431,7 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({ wardrobeProfile, onC
 
             <button
               onClick={handleConfirmAdd}
+              disabled={!name.trim()}
               style={{
                 width: '100%',
                 padding: '14px 20px',
@@ -416,7 +441,8 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({ wardrobeProfile, onC
                 backgroundColor: 'var(--color-primary)',
                 color: 'var(--color-text-on-primary)',
                 border: 'none',
-                cursor: 'pointer',
+                cursor: name.trim() ? 'pointer' : 'not-allowed',
+                opacity: name.trim() ? 1 : 0.5,
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',

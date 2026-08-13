@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { ArrowRight } from 'lucide-react';
 import { PrimaryButton } from '../ui/PrimaryButton';
+import { ClosiqLogo } from '../ui/ClosiqLogo';
 import { WardrobeProfile, LayeringPreference } from '../../types/wardrobe';
 
 interface OnboardingScreenProps {
@@ -28,18 +29,7 @@ export const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onComplete }
       }}
     >
       <div style={{ textAlign: 'center', marginBottom: 48 }}>
-        <div
-          style={{
-            fontFamily: 'var(--font-display)',
-            fontSize: '1.4rem',
-            fontWeight: 600,
-            letterSpacing: '0.18em',
-            color: 'var(--color-primary)',
-            textTransform: 'uppercase'
-          }}
-        >
-          CLOSIQ
-        </div>
+        <ClosiqLogo width={170} />
         <p className="text-body" style={{ marginTop: 6 }}>Your wardrobe, understood.</p>
       </div>
 

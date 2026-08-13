@@ -76,9 +76,15 @@ export const StylistScreen: React.FC<StylistScreenProps> = ({
 
   const handleSwapPiece = (category: GarmentCategory) => {
     if (!outfit) return;
+    const candidateCount = wardrobe.filter((i) => i.category === category).length;
+    if (candidateCount <= 1) {
+      setErrorMessage(`No other ${formatCategoryList([category])} in your wardrobe to swap in yet.`);
+      return;
+    }
     try {
       const updated = swapGarmentInOutfit(outfit, category, wardrobe);
       setOutfit(updated);
+      setErrorMessage(null);
     } catch {
       setErrorMessage("That swap didn't work — please try again.");
     }

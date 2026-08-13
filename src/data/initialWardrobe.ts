@@ -1,8 +1,7 @@
 import { UserProfile } from '../types/wardrobe';
 
 export const INITIAL_PROFILE: UserProfile = {
-  name: 'Elena Rostova',
-  avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=400&q=80',
+  name: 'Pranav',
   styleArchetype: 'Elevated Architectural Minimalist',
   archetypeDescription: 'Your wardrobe leans on timeless tailoring, muted earthy neutrals, and rich tactile textures like Mongolian cashmere, Mulberry silk, and heavy wool twill.',
   dominantPalette: [

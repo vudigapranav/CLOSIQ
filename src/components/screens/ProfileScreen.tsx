@@ -71,11 +71,26 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 14 }}>
-          <img
-            src={INITIAL_PROFILE.avatarUrl}
-            alt={INITIAL_PROFILE.name}
-            style={{ width: 64, height: 64, borderRadius: '50%', objectFit: 'cover', border: '2px solid var(--color-primary)' }}
-          />
+          <div
+            style={{
+              width: 64,
+              height: 64,
+              borderRadius: '50%',
+              border: '2px solid var(--color-primary)',
+              backgroundColor: 'var(--color-primary-alpha)',
+              color: 'var(--color-primary)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontFamily: 'var(--font-display)',
+              fontSize: '1.3rem',
+              fontWeight: 600,
+              flexShrink: 0
+            }}
+            aria-label={INITIAL_PROFILE.name}
+          >
+            {INITIAL_PROFILE.name.charAt(0).toUpperCase()}
+          </div>
           <div>
             <h2 className="text-section-heading">{INITIAL_PROFILE.name}</h2>
             <div

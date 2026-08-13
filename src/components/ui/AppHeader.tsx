@@ -1,5 +1,6 @@
 import React from 'react';
 import { Sun, Moon } from 'lucide-react';
+import { ClosiqLogo } from './ClosiqLogo';
 
 interface AppHeaderProps {
   isDarkMode: boolean;
@@ -16,25 +17,14 @@ export const AppHeader: React.FC<AppHeaderProps> = ({ isDarkMode, onToggleTheme 
         backgroundColor: 'var(--color-bg)',
         backdropFilter: 'blur(12px)',
         borderBottom: '1px solid var(--color-border)',
-        padding: '16px 20px',
+        padding: '10px 20px',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
         transition: 'background-color 0.25s ease'
       }}
     >
-      <div
-        style={{
-          fontFamily: 'var(--font-display)',
-          fontSize: '1.4rem',
-          fontWeight: 600,
-          letterSpacing: '0.18em',
-          color: 'var(--color-primary)',
-          textTransform: 'uppercase'
-        }}
-      >
-        CLOSIQ
-      </div>
+      <ClosiqLogo width={92} style={{ padding: '6px 10px', boxShadow: 'none' }} />
 
       <button
         onClick={onToggleTheme}

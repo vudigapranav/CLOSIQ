@@ -21,9 +21,24 @@ Every catalog garment has a stable `id` and belongs to one wardrobe profile (see
 | `shoes`                   | `footwear`  |
 | `accessories`             | `accessories` |
 
-Example: garment id `oversized_graphic_tee` (profile `men`, category `tops`) resolves to
-`/wardrobe/men/tops/oversized_graphic_tee.png`. Garment id `tank_top` (profile `women`,
-category `tops`) resolves to `/wardrobe/women/tops/tank_top.png`.
+Example: garment id `charcoal_art_tee` (profile `men`, category `tops`) resolves to
+`/wardrobe/men/tops/charcoal_art_tee.png`. Garment id `fitted_ribbed_tank_top` (profile `women`,
+category `tops`) resolves to `/wardrobe/women/tops/fitted_ribbed_tank_top.png`.
+
+## Source material: `public/test samples/`
+
+The hackathon team drops real generated/photographed garment photos into
+`public/test samples/<menswear|women>/<their-own-category-names>/`. That folder is **source
+material, not the app's asset location** — never reference it directly from app code, and never
+move, rename, or delete anything inside it.
+
+Every file currently in the catalog under `public/wardrobe/<profile>/<category>/<id>.png` is a
+**symlink** back into `public/test samples/...`, not a copy — this keeps the repo from
+duplicating the (large, multi-MB) source PNGs while still giving every garment a stable,
+predictable path. `vite build` dereferences these symlinks automatically, so the production
+build ends up with real files, not links. See `STATE.md` → **Wardrobe Asset Status** for the
+full inventory, exclusions (exact-duplicate images), and one filename/content mismatch that was
+corrected during classification.
 
 ## Adding a new generated image
 

@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
-import { Search, Plus, X } from 'lucide-react';
+import { Search, Plus, X, Shirt } from 'lucide-react';
 import { CategoryChip } from '../ui/CategoryChip';
 import { ClothingCard } from '../ui/ClothingCard';
+import { EmptyState } from '../ui/EmptyState';
+import { PrimaryButton } from '../ui/PrimaryButton';
 import { GarmentItem } from '../../types/wardrobe';
 
 interface CollectionScreenProps {
@@ -145,22 +147,41 @@ export const CollectionScreen: React.FC<CollectionScreenProps> = ({
         })}
       </div>
 
-      {/* Wardrobe Grid */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 14 }}>
-        {filteredWardrobe.map((item) => (
-          <ClothingCard
-            key={item.id}
-            name={item.name}
-            category={item.category === 'shoes' ? 'Footwear' : item.category.charAt(0).toUpperCase() + item.category.slice(1)}
-            color={item.color}
-            hexColor={item.hexColor}
-            imageUrl={item.imageUrl}
-            brand={item.brand}
-            wearCount={item.wearCount}
-            onClick={() => onSelectItem(item)}
-          />
-        ))}
-      </div>
+      {/* Wardrobe Grid / Empty States */}
+      {wardrobe.length === 0 ? (
+        <EmptyState
+          icon={<Shirt size={28} color="var(--color-primary)" />}
+          title="Your collection is empty."
+          description="Add your first piece and CLOSIQ will start organizing your wardrobe."
+          action={
+            <PrimaryButton icon={<Plus size={18} />} onClick={onOpenAddItem}>
+              Add Your First Item
+            </PrimaryButton>
+          }
+        />
+      ) : filteredWardrobe.length === 0 ? (
+        <EmptyState
+          icon={<Search size={26} color="var(--color-primary)" />}
+          title="No items match."
+          description="Try a different category or search term."
+        />
+      ) : (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 14 }}>
+          {filteredWardrobe.map((item) => (
+            <ClothingCard
+              key={item.id}
+              name={item.name}
+              category={item.category === 'shoes' ? 'Footwear' : item.category.charAt(0).toUpperCase() + item.category.slice(1)}
+              color={item.color}
+              hexColor={item.hexColor}
+              imageUrl={item.imageUrl}
+              brand={item.brand}
+              wearCount={item.wearCount}
+              onClick={() => onSelectItem(item)}
+            />
+          ))}
+        </div>
+      )}
     </div>
   );
 };

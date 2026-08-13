@@ -33,6 +33,14 @@ const VIBE_BY_FORMALITY: Record<FormalityLevel, string> = {
   evening: 'Refined After-Dark'
 };
 
+/** Human-readable formality tier, e.g. "Smart Casual" — shown as the outfit's "Style" label. */
+const FORMALITY_LABEL: Record<FormalityLevel, string> = {
+  casual: 'Casual',
+  smart_casual: 'Smart Casual',
+  formal: 'Formal',
+  evening: 'Evening'
+};
+
 /** "tops", "tops and bottoms", or "tops, bottoms and footwear" — for sparse-outfit UI copy. */
 export function formatCategoryList(categories: GarmentCategory[]): string {
   const labels = categories.map((c) => CATEGORY_DISPLAY_LABEL[c]);
@@ -127,6 +135,17 @@ export function generateWhyItWorksExplanation(
   const shoes = items.find((i) => i.category === 'shoes');
   const outer = items.find((i) => i.category === 'outerwear');
 
+  // A sparse wardrobe (e.g. only one item added so far) has no top/bottom to
+  // describe a pairing between — describe what's actually there instead of
+  // inventing "neutral"/"tailored" placeholders for garments that don't exist.
+  if (!top && !bottom) {
+    if (items.length === 0) {
+      return 'Add a few pieces to your Collection and CLOSIQ can start building outfits from what you actually own.';
+    }
+    const pieceNames = items.map((i) => i.name).join(' and ');
+    return `${pieceNames} ${items.length === 1 ? 'is' : 'are'} the starting point — add a few more pieces to unlock full outfit pairings.`;
+  }
+
   const topColor = top ? top.color.toLowerCase() : 'neutral';
   const bottomColor = bottom ? bottom.color.toLowerCase() : 'tailored';
   const shoeName = shoes ? shoes.name.toLowerCase() : 'footwear';
@@ -206,12 +225,14 @@ export function generateAIOutfit(
     : 'Elevated Monochromatic';
 
   const vibe = VIBE_BY_FORMALITY[targetFormality];
+  const formalityLabel = FORMALITY_LABEL[targetFormality];
 
   return {
     id: `outfit-${Date.now()}`,
     title,
     occasion: promptText,
     vibe,
+    formalityLabel,
     temperature: 68,
     items: uniqueItems,
     styleScore: score,
@@ -241,7 +262,36 @@ export function isSameOutfit(a: Outfit, b: Outfit): boolean {
 }
 
 /**
- * Swaps ONE single garment in an outfit with another item of same category strictly from user wardrobe
+ * Replaces the item of `categoryToSwap` with `newItem` and recomputes score/
+ * rationale/title. Shared by every swap path so there is exactly one place
+ * that defines what "committing a swap" means.
+ */
+function buildSwappedOutfit(outfit: Outfit, categoryToSwap: GarmentCategory, newItem: GarmentItem): Outfit {
+  const updatedItems = outfit.items.map((item) =>
+    item.category === categoryToSwap ? newItem : item
+  );
+
+  const newScore = calculateStyleMatchScore(updatedItems);
+  const newWhy = generateWhyItWorksExplanation(updatedItems, outfit.occasion);
+  // Strip any existing suffix first so repeated swaps don't compound into
+  // "Title (Variation) (Variation) (Variation)".
+  const baseTitle = outfit.title.replace(/ \(Variation\)$/, '');
+
+  return {
+    ...outfit,
+    title: `${baseTitle} (Variation)`,
+    items: updatedItems,
+    styleScore: newScore,
+    explanation: {
+      ...outfit.explanation,
+      summary: newWhy
+    }
+  };
+}
+
+/**
+ * Swaps ONE single garment in an outfit with the next candidate of the same
+ * category strictly from the user's wardrobe (no preview — immediate cycle).
  */
 export function swapGarmentInOutfit(
   outfit: Outfit,
@@ -253,25 +303,40 @@ export function swapGarmentInOutfit(
 
   if (candidates.length <= 1) return outfit;
 
-  // Find next candidate in wardrobe
   const currentIndex = candidates.findIndex((c) => c.id === currentItem?.id);
   const nextCandidate = candidates[(currentIndex + 1) % candidates.length];
 
-  const updatedItems = outfit.items.map((item) =>
-    item.category === categoryToSwap ? nextCandidate : item
+  return buildSwappedOutfit(outfit, categoryToSwap, nextCandidate);
+}
+
+/**
+ * Compatible alternatives for a category — the currently-equipped item
+ * excluded, base-layer tops filtered per `layeringPreference` exactly like
+ * initial generation does, ranked by closeness to the outfit's own occasion
+ * formality so the best matches surface first. Lets the UI show a preview
+ * strip the user picks from, instead of blindly cycling to "next".
+ */
+export function getSwapCandidates(
+  outfit: Outfit,
+  categoryToSwap: GarmentCategory,
+  wardrobe: GarmentItem[],
+  layeringPreference: LayeringPreference = 'sometimes'
+): GarmentItem[] {
+  const currentItem = outfit.items.find((i) => i.category === categoryToSwap);
+  const hasOuterLayer = outfit.items.some((i) => i.category === 'outerwear');
+
+  let pool = wardrobe.filter((i) => i.category === categoryToSwap && i.id !== currentItem?.id);
+  if (categoryToSwap === 'tops') {
+    pool = applyLayeringPreference(pool, layeringPreference, outfit.occasion, hasOuterLayer);
+  }
+
+  const targetFormality = resolveTargetFormality(outfit.occasion);
+  return [...pool].sort(
+    (a, b) => formalityDistance(a.formality, targetFormality) - formalityDistance(b.formality, targetFormality)
   );
+}
 
-  const newScore = calculateStyleMatchScore(updatedItems);
-  const newWhy = generateWhyItWorksExplanation(updatedItems, outfit.occasion);
-
-  return {
-    ...outfit,
-    title: `${outfit.title} (Variation)`,
-    items: updatedItems,
-    styleScore: newScore,
-    explanation: {
-      ...outfit.explanation,
-      summary: newWhy
-    }
-  };
+/** Commits a specific, user-chosen alternative as the new garment for that category. */
+export function applySwapCandidate(outfit: Outfit, categoryToSwap: GarmentCategory, newItem: GarmentItem): Outfit {
+  return buildSwappedOutfit(outfit, categoryToSwap, newItem);
 }
