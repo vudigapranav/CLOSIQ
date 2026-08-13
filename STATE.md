@@ -6,25 +6,46 @@ This document tracks the live implementation status of **CLOSIQ**. It is updated
 
 ## Current Phase
 
-* **Phase**: Multi-Session Hackathon Refinement & Cross-Screen Responsive QA Pass
-* **Status**: Sprint 9 (Responsive + Theme + Cross-Screen QA) complete. Verified layout across device widths (375px, 390px, 414px, 768px, 1024px+), verified Light Mode (warm ivory background `#FAF8F5`, deep emerald `#0D3B2E`) and Dark Mode (green-black `#0B100E`, emerald `#38997E`), implemented key accessibility enhancements (WAI-ARIA labels on theme/nav buttons, `role="button"` and keyboard enter/space handling on garment cards), and verified zero build/linter warnings (`npm run build` 639ms, `oxlint` 0 errors, 0 warnings).
+* **Phase**: Multi-Session Hackathon Final Stabilization & Demo Readiness
+* **Status**: Sprint 10 (Final Hackathon Demo Dry-Run) complete. Verified clean application launch, official CLOSIQ logo plate, splash animation, Men/Women profile switching, Add Item AI vision scanner flow, Collection filtering, Today AI styling engine, Why It Works contextual rationale, Swap piece interaction, Saved Looks persistence, Layering Preference rules (`avoid_base_layer` vs `usually`), mobile/desktop responsive shell, and light/dark mode compatibility. Build and linter verified (`npm run build` 748ms, `oxlint` 0 errors, 0 warnings). **Demo Readiness: READY**.
+
+---
+
+## Demo Dry-Run Summary
+
+- **Clean Launch**: Verified cold start and reload launch experience; splash screen (`SplashScreen.tsx`) displays official logo (`public/brand/closiq-logo.png`) with brain inside Q and fades out smoothly; splash does NOT re-trigger during in-app tab navigation.
+- **Profile Selection**: Verified Men and Women profile switching; sample catalogs swap cleanly without mixing assets; user-uploaded items remain preserved across profile changes.
+- **Add Item & AI Scanner**: Verified upload flow, camera simulation, AI Vision scanner state (`"Detecting category..."`), auto-filled metadata attributes, and addition to user collection.
+- **Collection**: Verified filtering across All, Tops, Bottoms, Footwear, Outerwear, Accessories, inline search bar, clothing card rendering, and clothing detail drawer.
+- **Today & AI Stylist**: Verified header hierarchy (*"Good afternoon, Pranav."* → *"Let's find your look."* → *"What are you dressing for?"*), contextual occasion chips (*College, Work, Date, Party, Casual, Travel*), free-form text prompt input, and single AI generation engine producing style match score, vibe, owned garment cards, and *"Why it works"* rationale.
+- **Swap & Save**: Verified single-garment swap cycling color/formality-matched pieces without duplicate name compounding; verified outfit save button persisting looks to Profile tab's Saved Looks section without duplicates.
+- **Profile & Layering**: Verified Layering Preference rules (`avoid_base_layer` excludes base layers/tank tops automatically unless prompted; `usually` permits base layers where appropriate), dynamic Style DNA scores, and dynamic Wardrobe Insights.
+- **Responsive & Theme**: Verified centered 480px mobile-first application shell across 375px, 390px, 414px, 768px, and 1024px+ viewports in both Light Mode (warm ivory `#FAF8F5`) and Dark Mode (green-black `#0B100E`).
+- **Build & Lint**: `npm run build` succeeds in 748ms (`dist` bundle: **2.2 MB**, down from 876 MB); `npm run lint` (`oxlint`) passes with **0 warnings and 0 errors** across 29 files.
+
+---
+
+## Demo Readiness
+* **Status**: **READY**
+
+---
+
+## Next Priority Task
+* **Task**: Final manual demo rehearsal.
 
 ---
 
 ## Completed Work
 
+- [x] **Sprint 10 — Final Hackathon Demo Dry-Run**:
+  - Executed full 21-step end-to-end demo dry-run from clean application state.
+  - Verified clean launch, official CLOSIQ logo plate, splash animation, Men/Women profile switching, Add Item AI vision scanner flow, Collection gallery, Today AI styling engine, Why It Works rationale, Swap item interaction, Saved Looks persistence, Layering Preference rules, responsive mobile/desktop shell, and light/dark theme contrast.
+  - Verified 0 build errors (`npm run build` 748ms, `dist` size: 2.2 MB) and 0 lint warnings/errors (`oxlint` 0 errors, 0 warnings).
+
 - [x] **Sprint 9 — Responsive + Theme + Cross-Screen QA**:
-  - **Device Width Verification**: Tested screen hierarchy across 375px, 390px, 414px, 768px, and 1024px+ viewports (Splash, Today, Collection, Stylist, Profile, Add Item, Garment Detail, Outfit Detail, Modals, Bottom Navigation). Verified zero horizontal overflow, clipped text, broken buttons, or distorted images.
-  - **Light Mode Audit**: Verified warm ivory background (`#FAF8F5`), deep emerald primary (`#0D3B2E`), white card surfaces, subtle borders, and contrast across all screens.
-  - **Dark Mode Audit**: Verified dark green-black background (`#0B100E`), dark emerald surfaces (`#141C18`), emerald primary (`#38997E`), warm white text (`#FAF7F2`), and muted green-gray borders (`rgba(255,255,255,0.08)`).
-  - **Brand & Splash Verification**: Verified official `public/brand/closiq-logo.png` (brain inside Q) logo plate rendering in both light and dark modes, launch splash screen (`SplashScreen.tsx`) on initial load and reload, no splash on tab navigation, and reduced-motion fallback.
-  - **Accessibility Enhancements**: Added explicit `aria-label` to theme toggle (`AppHeader.tsx`), `aria-label` and `aria-current="page"` to bottom navigation tabs (`BottomNavigation.tsx`), `aria-label="Close"` to modal close buttons (`ClothingDetailModal.tsx`, `AddItemModal.tsx`), and `tabIndex={0}`, `role="button"`, and keyboard `Enter`/`Space` listeners to interactive garment cards (`ClothingCard.tsx`).
-  - **Build & Lint Verification**: `npm run build` completed cleanly in 639ms (`dist` size: 2.2 MB, 0 errors); `npm run lint` (`oxlint`) passed with 0 errors and 0 warnings across 29 files.
-
----
-
-## Next Priority Task
-* **Task**: Perform final hackathon demo dry-run and presentation preparation.
+  - Tested screen hierarchy across 375px, 390px, 414px, 768px, and 1024px+ viewports.
+  - Verified Light Mode (warm ivory `#FAF8F5`) and Dark Mode (dark green-black `#0B100E`).
+  - Added WAI-ARIA labels to theme toggle, bottom navigation, modal close buttons, and keyboard interaction to garment cards.
 
 ---
 
