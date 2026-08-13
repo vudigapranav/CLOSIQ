@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Sparkles, RefreshCw, Heart, Eye, Plus, AlertTriangle } from 'lucide-react';
+import { Sparkles, RefreshCw, Heart, Eye, Plus, AlertTriangle, ArrowRight, Check, Sun, ChevronRight } from 'lucide-react';
 import { PrimaryButton } from '../ui/PrimaryButton';
 import { SecondaryButton } from '../ui/SecondaryButton';
 import { EmptyState } from '../ui/EmptyState';
@@ -14,11 +14,21 @@ interface TodayScreenProps {
   layeringPreference: LayeringPreference;
   onSaveOutfit: (outfit: Outfit) => void;
   onUnsaveOutfit: (outfit: Outfit) => void;
+  onWearOutfit?: (outfit: Outfit) => void;
   onOpenUpload?: () => void;
   onNavigateToCollection?: () => void;
+  onSelectItemDetail?: (item: GarmentItem) => void;
+  onNavigateToProfile?: () => void;
 }
 
 const OCCASIONS = ['College', 'Work', 'Date', 'Party', 'Casual', 'Travel'];
+
+function getGreeting(): string {
+  const hour = new Date().getHours();
+  if (hour < 12) return 'Good morning';
+  if (hour < 18) return 'Good afternoon';
+  return 'Good evening';
+}
 
 export const TodayScreen: React.FC<TodayScreenProps> = ({
   wardrobe,
@@ -26,7 +36,10 @@ export const TodayScreen: React.FC<TodayScreenProps> = ({
   layeringPreference,
   onSaveOutfit,
   onUnsaveOutfit,
-  onOpenUpload
+  onWearOutfit,
+  onOpenUpload,
+  onSelectItemDetail,
+  onNavigateToProfile
 }) => {
   const [selectedOccasion, setSelectedOccasion] = useState('College');
   const [customInput, setCustomInput] = useState('');
@@ -35,6 +48,7 @@ export const TodayScreen: React.FC<TodayScreenProps> = ({
   const [isGenerating, setIsGenerating] = useState(false);
   const [showBreakdown, setShowBreakdown] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [wornOutfitId, setWornOutfitId] = useState<string | null>(null);
 
   const activePrompt = customInput.trim() || selectedOccasion;
   const generationToken = useRef(0);
@@ -89,6 +103,7 @@ export const TodayScreen: React.FC<TodayScreenProps> = ({
   };
 
   const isSaved = outfit ? savedOutfits.some((o) => isSameOutfit(o, outfit)) : false;
+  const isWorn = outfit ? wornOutfitId === outfit.id : false;
 
   const handleToggleSave = () => {
     if (!outfit) return;
@@ -99,11 +114,30 @@ export const TodayScreen: React.FC<TodayScreenProps> = ({
     }
   };
 
+  const handleWearThis = () => {
+    if (!outfit || isWorn) return;
+    onWearOutfit?.(outfit);
+    setWornOutfitId(outfit.id);
+  };
+
+  const recentlyAdded = [...wardrobe]
+    .sort((a, b) => b.dateAdded.localeCompare(a.dateAdded))
+    .slice(0, 8);
+
+  const otherOccasions = OCCASIONS.filter((occ) => occ !== activePrompt);
+
+  const colorTally: Record<string, number> = {};
+  wardrobe.forEach((item) => {
+    const c = item.color.split(' ')[0] || item.color;
+    colorTally[c] = (colorTally[c] || 0) + 1;
+  });
+  const topColor = Object.entries(colorTally).sort((a, b) => b[1] - a[1])[0]?.[0];
+
   if (wardrobe.length === 0) {
     return (
       <div style={{ padding: '20px 20px 32px' }}>
         <div style={{ marginBottom: 24 }}>
-          <h1 className="text-screen-heading">Good afternoon, Pranav.</h1>
+          <h1 className="text-screen-heading">{getGreeting()}, Pranav.</h1>
           <p className="text-body" style={{ marginTop: 2 }}>Let's find your look.</p>
         </div>
 
@@ -124,9 +158,31 @@ export const TodayScreen: React.FC<TodayScreenProps> = ({
   return (
     <div style={{ padding: '20px 20px 32px' }}>
       {/* 1. Header */}
-      <div style={{ marginBottom: 28 }}>
-        <h1 className="text-screen-heading">Good afternoon, Pranav.</h1>
-        <p className="text-body" style={{ marginTop: 2 }}>Let's find your look.</p>
+      <div style={{ marginBottom: 22 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10 }}>
+          <div>
+            <h1 className="text-screen-heading">{getGreeting()}, Pranav.</h1>
+            <p className="text-body" style={{ marginTop: 2 }}>Let's find your look.</p>
+          </div>
+          {outfit && (
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 4,
+                padding: '6px 12px',
+                borderRadius: 'var(--radius-pill)',
+                backgroundColor: 'var(--color-surface)',
+                border: '1px solid var(--color-border)',
+                flexShrink: 0,
+                whiteSpace: 'nowrap'
+              }}
+            >
+              <Sun size={13} color="var(--color-primary)" />
+              <span style={{ fontSize: '0.76rem', fontWeight: 600, color: 'var(--color-text-secondary)' }}>{outfit.temperature}°</span>
+            </div>
+          )}
+        </div>
         <p
           className="text-section-heading"
           style={{ fontSize: '1.1rem', marginTop: 18 }}
@@ -199,14 +255,14 @@ export const TodayScreen: React.FC<TodayScreenProps> = ({
             borderRadius: 'var(--radius-md)',
             backgroundColor: 'var(--color-surface)',
             border: '1px solid var(--color-border)',
-            borderLeft: '3px solid #D9534F',
+            borderLeft: '3px solid var(--color-danger)',
             marginBottom: 24,
             display: 'flex',
             alignItems: 'center',
             gap: 12
           }}
         >
-          <AlertTriangle size={18} color="#D9534F" style={{ flexShrink: 0 }} />
+          <AlertTriangle size={18} color="var(--color-danger)" style={{ flexShrink: 0 }} />
           <p className="text-body" style={{ fontSize: '0.85rem', flex: 1 }}>{errorMessage}</p>
           <SecondaryButton style={{ flexShrink: 0, padding: '8px 14px', fontSize: '0.78rem' }} onClick={() => runGeneration(activePrompt, variationSeed)}>
             Retry
@@ -225,7 +281,7 @@ export const TodayScreen: React.FC<TodayScreenProps> = ({
             border: '1px solid var(--color-border)',
             padding: 24,
             boxShadow: 'var(--shadow-md)',
-            marginBottom: 24,
+            marginBottom: 20,
             opacity: isGenerating ? 0.55 : 1,
             transition: 'opacity 0.2s ease'
           }}
@@ -319,10 +375,10 @@ export const TodayScreen: React.FC<TodayScreenProps> = ({
                   left: 0,
                   right: 0,
                   padding: '32px 16px 14px',
-                  background: 'linear-gradient(180deg, transparent, rgba(20, 32, 24, 0.78))'
+                  background: 'linear-gradient(180deg, transparent, rgba(43, 39, 35, 0.78))'
                 }}
               >
-                <span className="text-metadata" style={{ color: 'rgba(250, 247, 236, 0.85)' }}>{outfit.items[0].category}</span>
+                <span className="text-metadata" style={{ color: 'rgba(251, 247, 239, 0.85)' }}>{outfit.items[0].category}</span>
                 <div style={{ fontSize: '0.98rem', fontWeight: 700, color: '#FFFFFF', marginTop: 2 }}>{outfit.items[0].name}</div>
               </div>
             </div>
@@ -421,20 +477,30 @@ export const TodayScreen: React.FC<TodayScreenProps> = ({
             </p>
           </div>
 
-          {/* Action Buttons: stacked so nothing wraps at 375px */}
+          {/* Action Buttons: "Wear this" is the hero action; View/Swap/Save
+              share a secondary row so nothing wraps at 375px. */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             <PrimaryButton
               fullWidth
-              icon={<Eye size={16} />}
-              onClick={() => setShowBreakdown(!showBreakdown)}
+              icon={isWorn ? <Check size={16} /> : <ArrowRight size={16} />}
+              onClick={handleWearThis}
+              style={isWorn ? { backgroundColor: 'var(--color-success)' } : undefined}
             >
-              {showBreakdown ? 'Hide Breakdown' : 'View Outfit'}
+              {isWorn ? 'Worn Today' : 'Wear this'}
             </PrimaryButton>
 
-            <div style={{ display: 'flex', gap: 10 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
               <SecondaryButton
-                style={{ flex: 1, whiteSpace: 'nowrap' }}
-                icon={<RefreshCw size={16} />}
+                style={{ padding: '10px 4px', fontSize: '0.76rem', whiteSpace: 'nowrap' }}
+                icon={<Eye size={14} />}
+                onClick={() => setShowBreakdown(!showBreakdown)}
+              >
+                {showBreakdown ? 'Hide' : 'View'}
+              </SecondaryButton>
+
+              <SecondaryButton
+                style={{ padding: '10px 4px', fontSize: '0.76rem', whiteSpace: 'nowrap' }}
+                icon={<RefreshCw size={14} />}
                 onClick={handleSwapLook}
                 title="Generate an alternative outfit combination"
               >
@@ -442,8 +508,8 @@ export const TodayScreen: React.FC<TodayScreenProps> = ({
               </SecondaryButton>
 
               <SecondaryButton
-                style={{ flex: 1, whiteSpace: 'nowrap', color: isSaved ? '#D9534F' : 'var(--color-text-primary)' }}
-                icon={<Heart size={16} fill={isSaved ? '#D9534F' : 'none'} />}
+                style={{ padding: '10px 4px', fontSize: '0.76rem', whiteSpace: 'nowrap', color: isSaved ? 'var(--color-danger)' : 'var(--color-text-primary)' }}
+                icon={<Heart size={14} fill={isSaved ? 'var(--color-danger)' : 'none'} />}
                 onClick={handleToggleSave}
                 title="Save Look"
               >
@@ -470,6 +536,114 @@ export const TodayScreen: React.FC<TodayScreenProps> = ({
           )}
         </div>
       )}
+
+      {/* 5. Outfit Suggestions — quick shortcuts to other occasions */}
+      {otherOccasions.length > 0 && (
+        <div style={{ marginBottom: 20 }}>
+          <div className="text-metadata" style={{ marginBottom: 10 }}>Try a different look</div>
+          <div className="hide-scrollbar" style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 2 }}>
+            {otherOccasions.map((occ) => (
+              <button
+                key={occ}
+                onClick={() => handleSelectOccasion(occ)}
+                style={{
+                  flexShrink: 0,
+                  padding: '9px 16px',
+                  borderRadius: 'var(--radius-pill)',
+                  fontSize: '0.78rem',
+                  fontWeight: 500,
+                  backgroundColor: 'var(--color-surface)',
+                  color: 'var(--color-text-secondary)',
+                  border: '1px solid var(--color-border)',
+                  cursor: 'pointer',
+                  whiteSpace: 'nowrap'
+                }}
+              >
+                For {occ}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* 6. Recently Added */}
+      {recentlyAdded.length > 0 && (
+        <div style={{ marginBottom: 20 }}>
+          <div className="text-metadata" style={{ marginBottom: 10 }}>Recently added</div>
+          <div className="hide-scrollbar" style={{ display: 'flex', gap: 10, overflowX: 'auto', paddingBottom: 2 }}>
+            {recentlyAdded.map((item) => (
+              <button
+                key={item.id}
+                onClick={() => onSelectItemDetail?.(item)}
+                title={item.name}
+                style={{
+                  flexShrink: 0,
+                  width: 72,
+                  padding: 0,
+                  border: 'none',
+                  background: 'none',
+                  cursor: onSelectItemDetail ? 'pointer' : 'default',
+                  textAlign: 'left'
+                }}
+              >
+                <div style={{ width: 72, height: 72, borderRadius: 'var(--radius-md)', overflow: 'hidden', border: '1px solid var(--color-border)' }}>
+                  <GarmentImage src={item.imageUrl} alt={item.name} category={item.category} hexColor={item.hexColor} />
+                </div>
+                <div
+                  className="text-caption"
+                  style={{ marginTop: 6, fontSize: '0.68rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+                >
+                  {item.name}
+                </div>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* 7. Wardrobe Insights teaser */}
+      <button
+        onClick={onNavigateToProfile}
+        style={{
+          width: '100%',
+          display: 'flex',
+          alignItems: 'center',
+          gap: 12,
+          padding: 14,
+          borderRadius: 'var(--radius-lg)',
+          backgroundColor: 'var(--color-surface)',
+          border: '1px solid var(--color-border)',
+          cursor: onNavigateToProfile ? 'pointer' : 'default',
+          textAlign: 'left'
+        }}
+      >
+        <div
+          style={{
+            width: 40,
+            height: 40,
+            borderRadius: '50%',
+            backgroundColor: 'var(--color-primary-alpha)',
+            color: 'var(--color-primary)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            flexShrink: 0
+          }}
+        >
+          <Sparkles size={17} />
+        </div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--color-text-primary)' }}>
+            {wardrobe.length} {wardrobe.length === 1 ? 'piece' : 'pieces'} in your wardrobe
+          </div>
+          {topColor && (
+            <div className="text-caption" style={{ fontSize: '0.75rem', marginTop: 1 }}>
+              {topColor} is your most common tone — see full insights
+            </div>
+          )}
+        </div>
+        {onNavigateToProfile && <ChevronRight size={18} color="var(--color-text-muted)" style={{ flexShrink: 0 }} />}
+      </button>
     </div>
   );
 };

@@ -6,12 +6,19 @@ import { TodayScreen } from './components/screens/TodayScreen';
 import { CollectionScreen } from './components/screens/CollectionScreen';
 import { StylistScreen } from './components/screens/StylistScreen';
 import { ProfileScreen } from './components/screens/ProfileScreen';
+import { PlannerScreen } from './components/screens/PlannerScreen';
 import { ClothingDetailModal } from './components/modals/ClothingDetailModal';
 import { AddItemModal } from './components/modals/AddItemModal';
 import { SplashScreen } from './components/ui/SplashScreen';
 import { getProfileSeedWardrobe } from './data/garmentCatalog';
-import { GarmentItem, Outfit, WardrobeProfile, LayeringPreference } from './types/wardrobe';
+import { GarmentItem, Outfit, WardrobeProfile, LayeringPreference, WeekDay, WeeklyPlanEntry } from './types/wardrobe';
 import { isSameOutfit } from './services/aiStylist';
+
+const WEEK_DAYS: WeekDay[] = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+
+function createEmptyWeeklyPlan(): WeeklyPlanEntry[] {
+  return WEEK_DAYS.map((day) => ({ day, label: '' }));
+}
 
 export function App() {
   const [activeTab, setActiveTab] = useState<NavTab>('today');
@@ -40,6 +47,11 @@ export function App() {
     return saved ? JSON.parse(saved) : [];
   });
 
+  const [weeklyPlan, setWeeklyPlan] = useState<WeeklyPlanEntry[]>(() => {
+    const saved = localStorage.getItem('closiq_weekly_plan');
+    return saved ? (JSON.parse(saved) as WeeklyPlanEntry[]) : createEmptyWeeklyPlan();
+  });
+
   const [isDarkMode, setIsDarkMode] = useState<boolean>(() => {
     const saved = localStorage.getItem('closiq_dark_mode');
     return saved ? JSON.parse(saved) : false;
@@ -64,6 +76,10 @@ export function App() {
   useEffect(() => {
     localStorage.setItem('closiq_saved_outfits', JSON.stringify(savedOutfits));
   }, [savedOutfits]);
+
+  useEffect(() => {
+    localStorage.setItem('closiq_weekly_plan', JSON.stringify(weeklyPlan));
+  }, [weeklyPlan]);
 
   useEffect(() => {
     localStorage.setItem('closiq_dark_mode', JSON.stringify(isDarkMode));
@@ -100,6 +116,27 @@ export function App() {
 
   const handleRemoveSavedOutfit = (id: string) => {
     setSavedOutfits((prev) => prev.filter((o) => o.id !== id));
+  };
+
+  // "Wear this" on Today — bumps wearCount for every item actually worn,
+  // so Collection's "Worn N times" and the wardrobe-insights math stay real.
+  const handleWearOutfit = (outfit: Outfit) => {
+    const wornIds = new Set(outfit.items.map((i) => i.id));
+    setWardrobe((prev) =>
+      prev.map((item) => (wornIds.has(item.id) ? { ...item, wearCount: item.wearCount + 1 } : item))
+    );
+  };
+
+  const handleUpdatePlanLabel = (day: WeekDay, label: string) => {
+    setWeeklyPlan((prev) => prev.map((entry) => (entry.day === day ? { ...entry, label } : entry)));
+  };
+
+  const handleAssignPlanOutfit = (day: WeekDay, outfit: Outfit) => {
+    setWeeklyPlan((prev) => prev.map((entry) => (entry.day === day ? { ...entry, outfit } : entry)));
+  };
+
+  const handleClearPlanOutfit = (day: WeekDay) => {
+    setWeeklyPlan((prev) => prev.map((entry) => (entry.day === day ? { ...entry, outfit: undefined } : entry)));
   };
 
   const handleCompleteOnboarding = (profile: WardrobeProfile, layering: LayeringPreference) => {
@@ -156,8 +193,11 @@ export function App() {
             layeringPreference={layeringPreference}
             onSaveOutfit={handleSaveOutfit}
             onUnsaveOutfit={handleUnsaveOutfit}
+            onWearOutfit={handleWearOutfit}
             onOpenUpload={() => setIsAddItemOpen(true)}
             onNavigateToCollection={() => setActiveTab('collection')}
+            onSelectItemDetail={(item) => setSelectedDetailItem(item)}
+            onNavigateToProfile={() => setActiveTab('profile')}
           />
         )}
         {activeTab === 'collection' && (
@@ -178,6 +218,16 @@ export function App() {
             onOpenUpload={() => setIsAddItemOpen(true)}
           />
         )}
+        {activeTab === 'planner' && (
+          <PlannerScreen
+            weeklyPlan={weeklyPlan}
+            savedOutfits={savedOutfits}
+            onUpdateLabel={handleUpdatePlanLabel}
+            onAssignOutfit={handleAssignPlanOutfit}
+            onClearOutfit={handleClearPlanOutfit}
+            onNavigateToStylist={() => setActiveTab('stylist')}
+          />
+        )}
         {activeTab === 'profile' && (
           <ProfileScreen
             isDarkMode={isDarkMode}
@@ -189,6 +239,8 @@ export function App() {
             onChangeWardrobeProfile={handleChangeProfile}
             layeringPreference={layeringPreference}
             onChangeLayeringPreference={handleChangeLayeringPreference}
+            onNavigateToCollection={() => setActiveTab('collection')}
+            onNavigateToPlanner={() => setActiveTab('planner')}
           />
         )}
       </main>

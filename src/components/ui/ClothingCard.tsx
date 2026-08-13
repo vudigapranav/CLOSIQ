@@ -52,7 +52,7 @@ export const ClothingCard: React.FC<ClothingCardProps> = ({
             position: 'absolute',
             bottom: 8,
             left: 8,
-            backgroundColor: 'rgba(20, 32, 24, 0.72)',
+            backgroundColor: 'rgba(43, 39, 35, 0.72)',
             backdropFilter: 'blur(8px)',
             padding: '3px 10px',
             borderRadius: 'var(--radius-pill)',

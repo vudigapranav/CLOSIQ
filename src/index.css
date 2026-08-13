@@ -1,37 +1,36 @@
-/* CLOSIQ Design System & Tokens — Sage × Cream Editorial Fashion System */
+/* CLOSIQ Design System & Tokens — Warm Ivory × Taupe Editorial Fashion System */
 
 :root {
   color-scheme: light dark;
 
-  /* Color Tokens - Light Mode */
-  /* Deep forest green: typography, buttons, active states, brand accents */
-  --color-primary: #1F3A2B;
-  --color-primary-hover: #16301F;
-  --color-primary-light: #2E5039;
-  --color-primary-alpha: rgba(31, 58, 43, 0.10);
+  /* Muted olive-brown: typography accents, buttons, active states, brand */
+  --color-primary: #6B5A3D;
+  --color-primary-hover: #59492F;
+  --color-primary-light: #8A7754;
+  --color-primary-alpha: rgba(107, 90, 61, 0.10);
 
-  /* Muted warm sage: the app "environment" — page canvas behind cream cards */
-  --color-bg: #C7CDAE;
-  --color-bg-deep: #B7BF9A;
+  /* Warm ivory/cream: the app environment — page canvas */
+  --color-bg: #F7F2E9;
+  --color-bg-deep: #EFE6D6;
 
-  /* Warm ivory/cream: the dominant content surface */
-  --color-surface: #FBF8F0;
-  --color-surface-subtle: #F1EAD8;
+  /* Soft taupe/beige: the dominant content surface */
+  --color-surface: #EFE7D9;
+  --color-surface-subtle: #E5DAC6;
   --color-surface-elevated: #FFFFFF;
 
-  --color-text-primary: #1E2B20;
-  --color-text-secondary: #5B6350;
-  --color-text-muted: #868F76;
-  --color-text-on-primary: #FAF7EC;
+  --color-text-primary: #2B2723;
+  --color-text-secondary: #6B6459;
+  --color-text-muted: #978F7E;
+  --color-text-on-primary: #FBF7EF;
 
-  --color-border: rgba(31, 58, 43, 0.12);
-  --color-border-medium: rgba(31, 58, 43, 0.20);
-  --color-success: #3C7A55;
-  --color-danger: #B0473C;
+  --color-border: rgba(43, 39, 35, 0.10);
+  --color-border-medium: rgba(43, 39, 35, 0.18);
+  --color-success: #5C7A52;
+  --color-danger: #A8493B;
 
-  --shadow-sm: 0 2px 10px rgba(20, 32, 24, 0.10);
-  --shadow-md: 0 10px 28px rgba(20, 32, 24, 0.14);
-  --shadow-lg: 0 22px 44px rgba(20, 32, 24, 0.20);
+  --shadow-sm: 0 2px 10px rgba(43, 39, 35, 0.06);
+  --shadow-md: 0 10px 26px rgba(43, 39, 35, 0.09);
+  --shadow-lg: 0 20px 40px rgba(43, 39, 35, 0.14);
 
   /* Typography Tokens */
   --font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
@@ -48,28 +47,28 @@
   scrollbar-color: var(--color-primary-light) var(--color-surface-subtle);
 }
 
-/* Dark Mode Tokens — deep forest, charcoal, muted green, warm off-white */
+/* Dark Mode Tokens — deep warm charcoal, muted gold-olive, warm off-white */
 [data-theme="dark"] {
-  --color-primary: #5AA37E;
-  --color-primary-hover: #6DB690;
-  --color-primary-light: #3D7A5C;
-  --color-primary-alpha: rgba(90, 163, 126, 0.16);
+  --color-primary: #C6A876;
+  --color-primary-hover: #D6BC8E;
+  --color-primary-light: #A38A5E;
+  --color-primary-alpha: rgba(198, 168, 118, 0.16);
 
-  --color-bg: #0D1712;
-  --color-bg-deep: #0A120E;
-  --color-surface: #17221C;
-  --color-surface-subtle: #1F2C24;
-  --color-surface-elevated: #26342B;
+  --color-bg: #1C1815;
+  --color-bg-deep: #14110E;
+  --color-surface: #262019;
+  --color-surface-subtle: #2F2820;
+  --color-surface-elevated: #382F25;
 
-  --color-text-primary: #F5F1E4;
-  --color-text-secondary: #9CA893;
-  --color-text-muted: #6C7A6A;
-  --color-text-on-primary: #0D1712;
+  --color-text-primary: #F5EFE4;
+  --color-text-secondary: #B3A996;
+  --color-text-muted: #7D7566;
+  --color-text-on-primary: #1C1815;
 
-  --color-border: rgba(245, 241, 228, 0.09);
-  --color-border-medium: rgba(245, 241, 228, 0.18);
-  --color-success: #5FAE84;
-  --color-danger: #D97A6C;
+  --color-border: rgba(245, 239, 228, 0.08);
+  --color-border-medium: rgba(245, 239, 228, 0.16);
+  --color-success: #7FA873;
+  --color-danger: #D08A7B;
 
   --shadow-sm: 0 2px 10px rgba(0, 0, 0, 0.28);
   --shadow-md: 0 10px 28px rgba(0, 0, 0, 0.38);

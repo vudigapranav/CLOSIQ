@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ArrowRight } from 'lucide-react';
+import { ArrowRight, ArrowLeft, Shirt, Sparkles, CalendarDays } from 'lucide-react';
 import { PrimaryButton } from '../ui/PrimaryButton';
 import { ClosiqLogo } from '../ui/ClosiqLogo';
 import { WardrobeProfile, LayeringPreference } from '../../types/wardrobe';
@@ -8,15 +8,113 @@ interface OnboardingScreenProps {
   onComplete: (profile: WardrobeProfile, layering: LayeringPreference) => void;
 }
 
+type OnboardingStep = 'welcome' | 'setup';
+
 const LAYERING_OPTIONS: { value: LayeringPreference; label: string; description: string }[] = [
   { value: 'avoid', label: 'Avoid', description: 'Skip base layers unless I ask' },
   { value: 'sometimes', label: 'Sometimes', description: "Use them when they fit the look" },
   { value: 'usually', label: 'Usually', description: 'I like a layered base most days' }
 ];
 
+const WELCOME_POINTS = [
+  { icon: <Shirt size={18} />, text: 'Digitize the clothes you already own' },
+  { icon: <Sparkles size={18} />, text: 'Get AI styling recommendations built from your wardrobe' },
+  { icon: <CalendarDays size={18} />, text: 'Plan what to wear, day by day' }
+];
+
+function ProgressDots({ step }: { step: OnboardingStep }) {
+  return (
+    <div style={{ display: 'flex', justifyContent: 'center', gap: 6, marginBottom: 28 }}>
+      {(['welcome', 'setup'] as OnboardingStep[]).map((s) => (
+        <span
+          key={s}
+          style={{
+            width: s === step ? 20 : 6,
+            height: 6,
+            borderRadius: 'var(--radius-pill)',
+            backgroundColor: s === step ? 'var(--color-primary)' : 'var(--color-border-medium)',
+            transition: 'all 0.25s ease'
+          }}
+        />
+      ))}
+    </div>
+  );
+}
+
 export const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onComplete }) => {
+  const [step, setStep] = useState<OnboardingStep>('welcome');
   const [profile, setProfile] = useState<WardrobeProfile | null>(null);
   const [layering, setLayering] = useState<LayeringPreference>('sometimes');
+
+  if (step === 'welcome') {
+    return (
+      <div
+        className="animate-fade-in"
+        style={{
+          minHeight: '100vh',
+          display: 'flex',
+          flexDirection: 'column',
+          padding: '20px 24px 32px'
+        }}
+      >
+        <ProgressDots step={step} />
+
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', textAlign: 'center' }}>
+          <ClosiqLogo width={190} />
+
+          <h1 className="text-display" style={{ marginTop: 32, fontSize: '2rem' }}>
+            Your wardrobe.
+            <br />
+            Understood.
+          </h1>
+          <p className="text-body" style={{ marginTop: 12, maxWidth: 320 }}>
+            CLOSIQ turns the clothes you already own into outfits you'd actually wear — no shopping required.
+          </p>
+
+          <div style={{ marginTop: 36, width: '100%', maxWidth: 340, display: 'flex', flexDirection: 'column', gap: 12 }}>
+            {WELCOME_POINTS.map((point, idx) => (
+              <div
+                key={idx}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 12,
+                  padding: '12px 16px',
+                  borderRadius: 'var(--radius-lg)',
+                  backgroundColor: 'var(--color-surface)',
+                  border: '1px solid var(--color-border)',
+                  textAlign: 'left'
+                }}
+              >
+                <div
+                  style={{
+                    width: 34,
+                    height: 34,
+                    borderRadius: '50%',
+                    backgroundColor: 'var(--color-primary-alpha)',
+                    color: 'var(--color-primary)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    flexShrink: 0
+                  }}
+                >
+                  {point.icon}
+                </div>
+                <span style={{ fontSize: '0.85rem', fontWeight: 500, color: 'var(--color-text-primary)' }}>{point.text}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div style={{ marginTop: 32 }}>
+          <PrimaryButton fullWidth icon={<ArrowRight size={18} />} onClick={() => setStep('setup')}>
+            Get Started
+          </PrimaryButton>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div
@@ -25,12 +123,31 @@ export const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onComplete }
         minHeight: '100vh',
         display: 'flex',
         flexDirection: 'column',
-        padding: '48px 24px 32px'
+        padding: '20px 24px 32px'
       }}
     >
-      <div style={{ textAlign: 'center', marginBottom: 48 }}>
-        <ClosiqLogo width={170} />
-        <p className="text-body" style={{ marginTop: 6 }}>Your wardrobe, understood.</p>
+      <ProgressDots step={step} />
+
+      <div style={{ marginBottom: 8 }}>
+        <button
+          onClick={() => setStep('welcome')}
+          aria-label="Back"
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 4,
+            background: 'none',
+            border: 'none',
+            cursor: 'pointer',
+            color: 'var(--color-text-muted)',
+            fontSize: '0.78rem',
+            fontWeight: 600,
+            padding: 0,
+            marginBottom: 20
+          }}
+        >
+          <ArrowLeft size={14} /> Back
+        </button>
       </div>
 
       <div style={{ flex: 1 }}>

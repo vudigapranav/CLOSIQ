@@ -35,39 +35,41 @@ This document is the permanent instruction and context guide for every Claude se
 
 ## 3. Primary Navigation
 
-The application features 4 core bottom navigation tabs:
+**Updated 2026-08-14**: the application now features 5 core bottom navigation tabs (previously 4 — the internal `NavTab` keys are unchanged for low-risk continuity, only the visible labels and the addition of Planner are new; see `src/components/ui/BottomNavigation.tsx`):
 
-1. **Today (`"What should I wear?"`)**: Primary home experience showing daily AI outfit recommendations tailored to weather and schedule, with visual clothing cards, style match score, *"Why it works"* rationale, and action controls (View, Swap, Save).
-2. **Collection (`"What do I own?"`)**: Digital wardrobe gallery showing all cataloged user garments, category chips filter, search bar, and item detail drawer.
-3. **Stylist (`"Help me create an outfit"`)**: Interactive AI stylist studio featuring natural-language prompt input, occasion suggestion chips, weather & vibe sliders, and real-time outfit generation with single-piece swapper.
-4. **Profile (`"What does CLOSIQ know about my style?"`)**: Wardrobe profile configuration (Men/Women), Style DNA archetype, closet color breakdown, versatility metrics, layering preferences, saved looks, and appearance theme switcher.
+1. **Home** (internal key `today`, `"What should I wear?"`): Primary home experience showing daily AI outfit recommendations tailored to weather and schedule, a dynamic time-of-day greeting, visual clothing cards, style match score, a "Wear this" action, *"Why it works"* rationale, Recently Added rail, quick occasion shortcuts, and a Wardrobe Insights teaser.
+2. **Wardrobe** (internal key `collection`, `"What do I own?"`): Digital wardrobe gallery showing all cataloged user garments, category chips filter, search bar, and item detail drawer.
+3. **AI Stylist** (internal key `stylist`, `"Help me create an outfit"`): Interactive AI stylist studio featuring natural-language prompt input, Occasion chips, an optional Style chip row (Minimal/Streetwear/Smart Casual/Vintage/Athleisure — folds into the prompt, not a separate filter), and real-time outfit generation with single-piece swapper. Carries a quiet always-on accent in the nav bar as the app's hero feature.
+4. **Planner** (internal key `planner`, new screen `src/components/screens/PlannerScreen.tsx`): Weekly outfit planner — Mon–Sun rows, each with an editable free-text occasion label and an optional outfit assigned from Saved Looks. State lives in `App.tsx` (`weeklyPlan`, persisted to `localStorage` under `closiq_weekly_plan`) using the `WeeklyPlanEntry`/`WeekDay` types in `src/types/wardrobe.ts`.
+5. **Profile** (`"What does CLOSIQ know about my style?"`): Style Archetype card, quick links to Wardrobe/Planner, Style DNA archetype, closet color breakdown, saved looks, Style Preferences (Wardrobe Profile Men/Women + Layering, grouped), and Settings (Notifications — informational only, no backend — plus the working appearance theme toggle).
 
 ---
 
 ## 4. Visual Design System
 
-**Design language**: *Sage × Cream Editorial Fashion System* (redesigned 2026-08-14 from the earlier all-ivory emerald system). The app "environment" (page canvas — `html`/`body`, `.app-shell`, header, bottom nav backdrop) is a muted warm sage; cream/ivory `--color-surface` remains the dominant *content* surface — cards, modals, inputs "float" on the sage canvas. Green is reserved for typography, buttons, active/selected states, and brand accents, never as a full-bleed background.
+**Design language**: *Warm Ivory × Taupe Editorial Fashion System* (redesigned 2026-08-14, superseding the same-day earlier Sage × Cream system — the palette changed twice in one day; this section reflects the current, final state). Inspired by a premium-fashion-editorial reference: warm ivory/cream as the app environment, soft taupe/beige as the dominant card surface, deep charcoal as primary text, and a muted olive-brown reserved for typography accents, buttons, active/selected states, and brand — never as a full-bleed background. Restrained color use throughout; no bright gradients, neon, or glassmorphism.
 
 ### Theme Colors
 
 #### Light Mode:
-* **Environment (page canvas)**: Muted Warm Sage `#C7CDAE` / deep sage accent `#B7BF9A` (`var(--color-bg)` / `var(--color-bg-deep)`)
-* **Primary (Deep Forest Green)**: `#1F3A2B` (`var(--color-primary)`)
-* **Primary Hover / Light**: `#16301F` / `#2E5039`
-* **Surface (cream cards)**: Warm Ivory `#FBF8F0` (`var(--color-surface)`)
-* **Surface Subtle (nested cream)**: `#F1EAD8` (`var(--color-surface-subtle)`)
+* **Environment (page canvas)**: Warm Ivory `#F7F2E9` / deep ivory `#EFE6D6` (`var(--color-bg)` / `var(--color-bg-deep)`)
+* **Primary (Muted Olive-Brown)**: `#6B5A3D` (`var(--color-primary)`)
+* **Primary Hover / Light**: `#59492F` / `#8A7754`
+* **Surface (taupe/beige cards)**: `#EFE7D9` (`var(--color-surface)`)
+* **Surface Subtle (nested beige)**: `#E5DAC6` (`var(--color-surface-subtle)`)
 * **Surface Elevated**: Pure White `#FFFFFF` (`var(--color-surface-elevated)`)
-* **Primary Text**: Deep Charcoal-Green `#1E2B20` (`var(--color-text-primary)`)
-* **Secondary Text**: Muted Sage-Gray `#5B6350` (`var(--color-text-secondary)`)
-* **Border**: `rgba(31, 58, 43, 0.12)` (`var(--color-border)`)
-* **Success**: `#3C7A55`
+* **Primary Text**: Deep Charcoal `#2B2723` (`var(--color-text-primary)`)
+* **Secondary Text**: Muted Warm Gray-Brown `#6B6459` (`var(--color-text-secondary)`)
+* **Border**: `rgba(43, 39, 35, 0.10)` (`var(--color-border)`)
+* **Success**: `#5C7A52`
+* **Danger** (errors, destructive actions): `#A8493B` (`var(--color-danger)`) — always reference this token, never hardcode a red
 
 #### Dark Mode (`[data-theme="dark"]`):
-* **Environment (page canvas)**: Deep Forest-Black `#0D1712` / `#0A120E` (`var(--color-bg)` / `var(--color-bg-deep)`)
-* **Primary**: Soft Sage-Green `#5AA37E` / hover `#6DB690`
-* **Surface**: `#17221C` / Subtle `#1F2C24` / Elevated `#26342B`
-* **Text**: Warm Off-White `#F5F1E4`
-* **Secondary Text**: Muted Green-Gray `#9CA893`
+* **Environment (page canvas)**: Deep Warm Charcoal `#1C1815` / `#14110E` (`var(--color-bg)` / `var(--color-bg-deep)`)
+* **Primary**: Muted Gold-Olive `#C6A876` / hover `#D6BC8E`
+* **Surface**: `#262019` / Subtle `#2F2820` / Elevated `#382F25`
+* **Text**: Warm Off-White `#F5EFE4`
+* **Secondary Text**: Muted Warm Gray `#B3A996`
 * **Border**: `rgba(245, 241, 228, 0.09)`
 
 ### Typography
@@ -77,8 +79,8 @@ The application features 4 core bottom navigation tabs:
 ### Surface Characteristics
 * **Border Radius**: Cards `14px` (`--radius-md`) / `20px` (`--radius-lg`), bottom-sheet modals & the floating nav dock `26px` (`--radius-xl`), Pills `9999px` (`--radius-pill`).
 * **Viewport Constraint**: Mobile-style application shell (`max-width: 480px`) centered on desktop with subtle borders and shadows.
-* **Bottom Navigation**: Floating cream pill dock (`--radius-xl`, `--shadow-lg`, `16px` inset from screen edges) rather than a full-bleed bar — see `BottomNavigation.tsx`.
-* **Segmented Controls**: Shared `SegmentedControl` component (`src/components/ui/SegmentedControl.tsx`) — single cream track, filled forest-green active pill — used for Wardrobe Profile and Layering Preference in `ProfileScreen`.
+* **Bottom Navigation**: Floating taupe pill dock (`--radius-xl`, `--shadow-lg`, `16px` inset from screen edges), 5 tabs, rather than a full-bleed bar — see `BottomNavigation.tsx`. The AI Stylist tab carries a permanent soft `--color-primary-alpha` accent (icon + background) even when inactive, so it reads as the app's hero feature without breaking the otherwise minimal nav.
+* **Segmented Controls**: Shared `SegmentedControl` component (`src/components/ui/SegmentedControl.tsx`) — single taupe track, filled olive-brown active pill — used for Wardrobe Profile and Layering Preference in `ProfileScreen`.
 * **Aesthetic Direction**: *Luxury fashion editorial × intelligent personal assistant × modern Apple-like simplicity*.
 * **Constraint**: NO ecommerce UI patterns (no prices, cart icons, or star ratings). No dashed borders (reads as wireframe/placeholder, not premium) — empty/dropzone states use a solid border + soft shadow instead.
 
@@ -195,6 +197,7 @@ The AI engine must use stable garment IDs from the active wardrobe.
   * [src/components/screens/TodayScreen.tsx](file:///Users/pranav07vudiga/Desktop/Projects/Hackathon/Demux/CLOSIQ/src/components/screens/TodayScreen.tsx)
   * [src/components/screens/CollectionScreen.tsx](file:///Users/pranav07vudiga/Desktop/Projects/Hackathon/Demux/CLOSIQ/src/components/screens/CollectionScreen.tsx)
   * [src/components/screens/StylistScreen.tsx](file:///Users/pranav07vudiga/Desktop/Projects/Hackathon/Demux/CLOSIQ/src/components/screens/StylistScreen.tsx)
+  * [src/components/screens/PlannerScreen.tsx](file:///Users/pranav07vudiga/Desktop/Projects/Hackathon/Demux/CLOSIQ/src/components/screens/PlannerScreen.tsx)
   * [src/components/screens/ProfileScreen.tsx](file:///Users/pranav07vudiga/Desktop/Projects/Hackathon/Demux/CLOSIQ/src/components/screens/ProfileScreen.tsx)
 * **UI Components**:
   * [src/components/ui/AppHeader.tsx](file:///Users/pranav07vudiga/Desktop/Projects/Hackathon/Demux/CLOSIQ/src/components/ui/AppHeader.tsx)
@@ -218,6 +221,12 @@ The AI engine must use stable garment IDs from the active wardrobe.
 * **Services**:
   * [src/services/aiStylist.ts](file:///Users/pranav07vudiga/Desktop/Projects/Hackathon/Demux/CLOSIQ/src/services/aiStylist.ts)
   * [src/services/aiVisionScanner.ts](file:///Users/pranav07vudiga/Desktop/Projects/Hackathon/Demux/CLOSIQ/src/services/aiVisionScanner.ts)
+  * [src/services/ai/geminiClient.ts](file:///Users/pranav07vudiga/Desktop/Projects/Hackathon/Demux/CLOSIQ/src/services/ai/geminiClient.ts) / `wardrobeVision.ts` / `outfitStylist.ts` / `validator.ts` — client-side proxies to `/api/ai/*`, never hold the API key.
+* **Server** (Sprint 19 — `GEMINI_API_KEY` is read here ONLY, never sent to the browser):
+  * [server/geminiServer.js](file:///Users/pranav07vudiga/Desktop/Projects/Hackathon/Demux/CLOSIQ/server/geminiServer.js) — single source of truth for Gemini prompts/schemas (converted from `.ts` to plain `.js` in Sprint 19 so it's runnable by plain Node in production, not just Vite/esbuild — the old `.ts` file no longer exists).
+  * [server/apiRouter.js](file:///Users/pranav07vudiga/Desktop/Projects/Hackathon/Demux/CLOSIQ/server/apiRouter.js) — shared `/api/ai/*` request parsing + routing (`handleApiRequest(req, res)`), used identically by both dev and production.
+  * [server/index.js](file:///Users/pranav07vudiga/Desktop/Projects/Hackathon/Demux/CLOSIQ/server/index.js) — production entry point (`npm run start`): plain Node `http`, serves built `dist/` with SPA fallback, exposes `/api/ai/*` via `apiRouter.js`. No framework.
+  * `vite.config.js`'s `geminiApiPlugin()` — dev-only equivalent (`npm run dev`), delegates to the same `apiRouter.js`. Also calls `loadEnv()` and merges into `process.env` so `.env` reaches server code in dev (Vite does not do this automatically).
 * **Data & Types**:
   * [src/types/wardrobe.ts](file:///Users/pranav07vudiga/Desktop/Projects/Hackathon/Demux/CLOSIQ/src/types/wardrobe.ts)
   * [src/data/garmentCatalog.ts](file:///Users/pranav07vudiga/Desktop/Projects/Hackathon/Demux/CLOSIQ/src/data/garmentCatalog.ts)

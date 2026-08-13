@@ -190,7 +190,7 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({ wardrobeProfile, onC
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
           <h2 className="text-section-heading">
             {step === 'options'
-              ? 'Add to Collection'
+              ? 'Add to Wardrobe'
               : step === 'scanning'
               ? 'AI Analysis'
               : step === 'error'
@@ -312,8 +312,8 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({ wardrobeProfile, onC
                 width: 56,
                 height: 56,
                 borderRadius: '50%',
-                backgroundColor: 'rgba(217, 83, 79, 0.12)',
-                color: '#D9534F',
+                backgroundColor: 'rgba(168, 73, 59, 0.12)',
+                color: 'var(--color-danger)',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
@@ -455,7 +455,7 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({ wardrobeProfile, onC
                 gap: 8
               }}
             >
-              <Check size={18} /> Confirm & Add to Collection
+              <Check size={18} /> Add to Wardrobe
             </button>
           </div>
         )}

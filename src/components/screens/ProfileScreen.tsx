@@ -1,5 +1,5 @@
 import React from 'react';
-import { Sparkles, Heart, Moon, Sun, Lightbulb, Trash2 } from 'lucide-react';
+import { Sparkles, Heart, Moon, Sun, Lightbulb, Trash2, Shirt, CalendarDays, Bell } from 'lucide-react';
 import { SectionHeader } from '../ui/SectionHeader';
 import { GarmentImage } from '../ui/GarmentImage';
 import { SegmentedControl } from '../ui/SegmentedControl';
@@ -16,6 +16,8 @@ interface ProfileScreenProps {
   onChangeWardrobeProfile: (profile: WardrobeProfile) => void;
   layeringPreference: LayeringPreference;
   onChangeLayeringPreference: (preference: LayeringPreference) => void;
+  onNavigateToCollection?: () => void;
+  onNavigateToPlanner?: () => void;
 }
 
 const LAYERING_OPTIONS: { value: LayeringPreference; label: string }[] = [
@@ -135,7 +137,9 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
   wardrobeProfile,
   onChangeWardrobeProfile,
   layeringPreference,
-  onChangeLayeringPreference
+  onChangeLayeringPreference,
+  onNavigateToCollection,
+  onNavigateToPlanner
 }) => {
   const handleRemoveSaved = (id: string) => {
     if (onRemoveSavedOutfit) onRemoveSavedOutfit(id);
@@ -209,6 +213,55 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
         <p className="text-body" style={{ fontSize: '0.85rem', lineHeight: 1.5 }}>
           {INITIAL_PROFILE.archetypeDescription}
         </p>
+      </div>
+
+      {/* Quick Links */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 10, marginBottom: 24 }}>
+        <button
+          onClick={onNavigateToCollection}
+          style={{
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'flex-start',
+            gap: 8,
+            padding: 16,
+            borderRadius: 'var(--radius-lg)',
+            backgroundColor: 'var(--color-surface)',
+            border: '1px solid var(--color-border)',
+            boxShadow: 'var(--shadow-sm)',
+            cursor: onNavigateToCollection ? 'pointer' : 'default',
+            textAlign: 'left'
+          }}
+        >
+          <Shirt size={18} color="var(--color-primary)" />
+          <div>
+            <div style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--color-text-primary)' }}>My Wardrobe</div>
+            <div className="text-caption" style={{ fontSize: '0.72rem' }}>{wardrobe.length} items</div>
+          </div>
+        </button>
+
+        <button
+          onClick={onNavigateToPlanner}
+          style={{
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'flex-start',
+            gap: 8,
+            padding: 16,
+            borderRadius: 'var(--radius-lg)',
+            backgroundColor: 'var(--color-surface)',
+            border: '1px solid var(--color-border)',
+            boxShadow: 'var(--shadow-sm)',
+            cursor: onNavigateToPlanner ? 'pointer' : 'default',
+            textAlign: 'left'
+          }}
+        >
+          <CalendarDays size={18} color="var(--color-primary)" />
+          <div>
+            <div style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--color-text-primary)' }}>Outfit Planner</div>
+            <div className="text-caption" style={{ fontSize: '0.72rem' }}>Plan your week</div>
+          </div>
+        </button>
       </div>
 
       {/* 1. Style DNA Section */}
@@ -320,8 +373,8 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
         </div>
       )}
 
-      {/* 4. Wardrobe Profile */}
-      <SectionHeader title="Wardrobe Profile" subtitle="Which generated wardrobe CLOSIQ shows you" />
+      {/* 4. Style Preferences — Wardrobe Profile + Layering grouped together */}
+      <SectionHeader title="Style Preferences" subtitle="How CLOSIQ tailors recommendations to you" />
 
       <div
         style={{
@@ -329,71 +382,89 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
           borderRadius: 'var(--radius-lg)',
           border: '1px solid var(--color-border)',
           padding: 16,
-          marginBottom: 24
-        }}
-      >
-        <SegmentedControl
-          options={[
-            { value: 'men', label: 'Men' },
-            { value: 'women', label: 'Women' }
-          ]}
-          value={wardrobeProfile}
-          onChange={onChangeWardrobeProfile}
-        />
-      </div>
-
-      {/* 5. Layering Preference */}
-      <SectionHeader title="Layering" subtitle="How CLOSIQ styles base layers under other pieces" />
-
-      <div
-        style={{
-          backgroundColor: 'var(--color-surface)',
-          borderRadius: 'var(--radius-lg)',
-          border: '1px solid var(--color-border)',
-          padding: 16,
-          marginBottom: 24
-        }}
-      >
-        <SegmentedControl options={LAYERING_OPTIONS} value={layeringPreference} onChange={onChangeLayeringPreference} />
-      </div>
-
-      {/* 6. Appearance & Preferences */}
-      <SectionHeader title="Preferences" />
-
-      <div
-        style={{
-          backgroundColor: 'var(--color-surface)',
-          borderRadius: 'var(--radius-lg)',
-          border: '1px solid var(--color-border)',
-          padding: 16,
+          marginBottom: 24,
           display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center'
+          flexDirection: 'column',
+          gap: 16
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          {isDarkMode ? <Moon size={18} color="var(--color-primary)" /> : <Sun size={18} color="#C5A880" />}
-          <div>
-            <div style={{ fontSize: '0.88rem', fontWeight: 600, color: 'var(--color-text-primary)' }}>Appearance Theme</div>
-            <div className="text-caption">Toggle light and dark mode</div>
-          </div>
+        <div>
+          <div className="text-metadata" style={{ marginBottom: 8 }}>Wardrobe Profile</div>
+          <SegmentedControl
+            options={[
+              { value: 'men', label: 'Men' },
+              { value: 'women', label: 'Women' }
+            ]}
+            value={wardrobeProfile}
+            onChange={onChangeWardrobeProfile}
+          />
         </div>
 
-        <button
-          onClick={onToggleTheme}
-          style={{
-            padding: '6px 14px',
-            borderRadius: 'var(--radius-pill)',
-            fontSize: '0.78rem',
-            fontWeight: 500,
-            backgroundColor: 'var(--color-surface-subtle)',
-            color: 'var(--color-text-primary)',
-            border: '1px solid var(--color-border)',
-            cursor: 'pointer'
-          }}
-        >
-          {isDarkMode ? 'Light Mode' : 'Dark Mode'}
-        </button>
+        <div style={{ borderTop: '1px solid var(--color-border)', paddingTop: 16 }}>
+          <div className="text-metadata" style={{ marginBottom: 8 }}>Layering</div>
+          <SegmentedControl options={LAYERING_OPTIONS} value={layeringPreference} onChange={onChangeLayeringPreference} />
+        </div>
+      </div>
+
+      {/* 5. Settings — Notifications (informational) + working Appearance toggle */}
+      <SectionHeader title="Settings" />
+
+      <div
+        style={{
+          backgroundColor: 'var(--color-surface)',
+          borderRadius: 'var(--radius-lg)',
+          border: '1px solid var(--color-border)',
+          overflow: 'hidden'
+        }}
+      >
+        <div style={{ padding: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--color-border)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <Bell size={18} color="var(--color-text-muted)" />
+            <div>
+              <div style={{ fontSize: '0.88rem', fontWeight: 600, color: 'var(--color-text-primary)' }}>Notifications</div>
+              <div className="text-caption">Wardrobe reminders and outfit suggestions</div>
+            </div>
+          </div>
+          <span
+            style={{
+              fontSize: '0.68rem',
+              fontWeight: 600,
+              color: 'var(--color-text-muted)',
+              backgroundColor: 'var(--color-surface-subtle)',
+              padding: '3px 9px',
+              borderRadius: 'var(--radius-pill)',
+              flexShrink: 0
+            }}
+          >
+            Coming soon
+          </span>
+        </div>
+
+        <div style={{ padding: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            {isDarkMode ? <Moon size={18} color="var(--color-primary)" /> : <Sun size={18} color="var(--color-primary-light)" />}
+            <div>
+              <div style={{ fontSize: '0.88rem', fontWeight: 600, color: 'var(--color-text-primary)' }}>Appearance Theme</div>
+              <div className="text-caption">Toggle light and dark mode</div>
+            </div>
+          </div>
+
+          <button
+            onClick={onToggleTheme}
+            style={{
+              padding: '6px 14px',
+              borderRadius: 'var(--radius-pill)',
+              fontSize: '0.78rem',
+              fontWeight: 500,
+              backgroundColor: 'var(--color-surface-subtle)',
+              color: 'var(--color-text-primary)',
+              border: '1px solid var(--color-border)',
+              cursor: 'pointer'
+            }}
+          >
+            {isDarkMode ? 'Light Mode' : 'Dark Mode'}
+          </button>
+        </div>
       </div>
     </div>
   );

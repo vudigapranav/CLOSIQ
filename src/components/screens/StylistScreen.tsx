@@ -27,6 +27,8 @@ interface StylistScreenProps {
 
 const GENERATION_CAPTIONS = ['Checking your wardrobe…', 'Curating your look…', 'Finding the right combination…'];
 
+const STYLE_OPTIONS = ['Minimal', 'Streetwear', 'Smart Casual', 'Vintage', 'Athleisure'];
+
 export const StylistScreen: React.FC<StylistScreenProps> = ({
   wardrobe,
   savedOutfits,
@@ -38,6 +40,7 @@ export const StylistScreen: React.FC<StylistScreenProps> = ({
 }) => {
   const [prompt, setPrompt] = useState('I have a college presentation tomorrow');
   const [selectedChip, setSelectedChip] = useState('College');
+  const [selectedStyle, setSelectedStyle] = useState<string | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [variationSeed, setVariationSeed] = useState(0);
   const [outfit, setOutfit] = useState<Outfit | null>(() => {
@@ -63,9 +66,11 @@ export const StylistScreen: React.FC<StylistScreenProps> = ({
     setErrorMessage(null);
     setInfoMessage(null);
     try {
+      const basePrompt = prompt || selectedChip;
+      const effectivePrompt = selectedStyle ? `${basePrompt} — ${selectedStyle.toLowerCase()} style` : basePrompt;
       const next = await generateAIOutfitWithGemini(
         wardrobe,
-        { prompt: prompt || selectedChip, layeringPreference },
+        { prompt: effectivePrompt, layeringPreference },
         seed
       );
       if (token !== generationToken.current) return;
@@ -254,11 +259,11 @@ export const StylistScreen: React.FC<StylistScreenProps> = ({
           />
         </div>
 
-        {/* Contextual Suggestion Chips */}
+        {/* Occasion Chips */}
         <div style={{ fontSize: '0.72rem', textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--color-text-muted)', fontWeight: 600, marginBottom: 8 }}>
-          Contextual Suggestions
+          Occasion
         </div>
-        <div className="hide-scrollbar" style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 20 }}>
+        <div className="hide-scrollbar" style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 18 }}>
           {STYLIST_SUGGESTION_CHIPS.map((chip) => {
             const isActive = selectedChip === chip;
             return (
@@ -288,6 +293,41 @@ export const StylistScreen: React.FC<StylistScreenProps> = ({
           })}
         </div>
 
+        {/* Style Chips — optional, folds into the natural-language prompt
+            rather than a separate filtering dimension, so it uses the exact
+            same generation path occasion chips already do. */}
+        <div style={{ fontSize: '0.72rem', textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--color-text-muted)', fontWeight: 600, marginBottom: 8 }}>
+          Style
+        </div>
+        <div className="hide-scrollbar" style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 20 }}>
+          {STYLE_OPTIONS.map((style) => {
+            const isActive = selectedStyle === style;
+            return (
+              <button
+                key={style}
+                onClick={() => {
+                  setSelectedStyle(isActive ? null : style);
+                  setVariationSeed(0);
+                }}
+                style={{
+                  padding: '6px 14px',
+                  borderRadius: 'var(--radius-pill)',
+                  fontSize: '0.78rem',
+                  fontWeight: 500,
+                  backgroundColor: isActive ? 'var(--color-primary-alpha)' : 'var(--color-surface-subtle)',
+                  color: isActive ? 'var(--color-primary)' : 'var(--color-text-secondary)',
+                  border: `1px solid ${isActive ? 'var(--color-primary)' : 'var(--color-border)'}`,
+                  cursor: 'pointer',
+                  whiteSpace: 'nowrap',
+                  transition: 'all 0.2s ease'
+                }}
+              >
+                {style}
+              </button>
+            );
+          })}
+        </div>
+
         {/* Generate Button */}
         <PrimaryButton fullWidth icon={<Sparkles size={18} />} onClick={handleGenerate} disabled={isGenerating}>
           {isGenerating ? 'Styling Your Wardrobe...' : 'Generate Outfit'}
@@ -303,14 +343,14 @@ export const StylistScreen: React.FC<StylistScreenProps> = ({
             borderRadius: 'var(--radius-md)',
             backgroundColor: 'var(--color-surface)',
             border: '1px solid var(--color-border)',
-            borderLeft: '3px solid #D9534F',
+            borderLeft: '3px solid var(--color-danger)',
             marginBottom: 24,
             display: 'flex',
             alignItems: 'center',
             gap: 12
           }}
         >
-          <AlertTriangle size={18} color="#D9534F" style={{ flexShrink: 0 }} />
+          <AlertTriangle size={18} color="var(--color-danger)" style={{ flexShrink: 0 }} />
           <p className="text-body" style={{ fontSize: '0.85rem', flex: 1 }}>{errorMessage}</p>
           <SecondaryButton style={{ flexShrink: 0, padding: '8px 14px', fontSize: '0.78rem' }} onClick={() => runGeneration(variationSeed)}>
             Retry
@@ -607,8 +647,8 @@ export const StylistScreen: React.FC<StylistScreenProps> = ({
             {/* Actions: Save | Regenerate | Details — 3 columns so labels never wrap at 375px */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
               <SecondaryButton
-                style={{ padding: '10px 4px', fontSize: '0.75rem', whiteSpace: 'nowrap', color: isSaved ? '#D9534F' : 'var(--color-text-primary)' }}
-                icon={<Heart size={14} fill={isSaved ? '#D9534F' : 'none'} />}
+                style={{ padding: '10px 4px', fontSize: '0.75rem', whiteSpace: 'nowrap', color: isSaved ? 'var(--color-danger)' : 'var(--color-text-primary)' }}
+                icon={<Heart size={14} fill={isSaved ? 'var(--color-danger)' : 'none'} />}
                 onClick={handleToggleSave}
               >
                 {isSaved ? 'Saved' : 'Save'}

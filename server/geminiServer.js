@@ -4,9 +4,13 @@ import { GoogleGenAI } from '@google/genai';
  * Server-Side Gemini API Handler.
  * Executes EXCLUSIVELY in Node.js server environment.
  * The GEMINI_API_KEY is read strictly from process.env and is NEVER sent to the client browser.
+ *
+ * Runs under both `npm run dev` (imported by vite.config.js's dev middleware)
+ * and `npm run start` (imported by server/index.js) — this file is the one
+ * source of truth for Gemini prompt/schema behavior in either mode.
  */
 
-function getServerApiKey(): string | null {
+function getServerApiKey() {
   const key = process.env.GEMINI_API_KEY;
   if (key && key !== 'your_gemini_api_key_here') {
     return key;
@@ -14,7 +18,12 @@ function getServerApiKey(): string | null {
   return null;
 }
 
-const GEMINI_MODEL = 'gemini-2.5-flash';
+// 'gemini-2.5-flash' returns 404 ("no longer available to new users") for
+// this project's API key as of Sprint 20's live verification — confirmed via
+// ai.models.list() and a direct generateContent call. 'gemini-flash-latest'
+// is Google's rolling alias for the current-generation flash model, so it
+// won't go stale the same way a pinned version number will.
+const GEMINI_MODEL = 'gemini-flash-latest';
 
 const SYSTEM_PROMPT = `You are CLOSIQ, an expert personal AI stylist.
 Your primary rule: You MUST ONLY style outfits using the user's actual wardrobe items provided in the JSON input.
@@ -31,11 +40,7 @@ STRICT STYLING RULES:
  * Endpoint 1: POST /api/ai/analyze-garment
  * Analyzes uploaded clothing photo bytes using Gemini Vision.
  */
-export async function handleAnalyzeGarmentServer(body: {
-  imageData: string;
-  mimeType?: string;
-  categoryHint?: string;
-}) {
+export async function handleAnalyzeGarmentServer(body) {
   const apiKey = getServerApiKey();
   if (!apiKey) {
     return { ok: false, mode: 'demo', error: 'GEMINI_API_KEY not configured on server' };
@@ -88,7 +93,7 @@ Category hint: ${body.categoryHint || 'tops'}.`;
     if (!text) throw new Error('Empty response from Gemini Vision');
 
     return { ok: true, mode: 'gemini', data: JSON.parse(text) };
-  } catch (err: any) {
+  } catch (err) {
     console.error('[Server Gemini Error] Garment analysis failed:', err?.message || err);
     return { ok: false, mode: 'demo', error: err?.message || 'Vision analysis failed' };
   }
@@ -98,13 +103,7 @@ Category hint: ${body.categoryHint || 'tops'}.`;
  * Endpoint 2: POST /api/ai/generate-outfit
  * Generates an occasion-tailored outfit strictly from the provided closet context.
  */
-export async function handleGenerateOutfitServer(body: {
-  wardrobe: any[];
-  prompt: string;
-  layeringPreference?: string;
-  excludeGarmentIds?: string[];
-  seed?: number;
-}) {
+export async function handleGenerateOutfitServer(body) {
   const apiKey = getServerApiKey();
   if (!apiKey) {
     return { ok: false, mode: 'demo', error: 'GEMINI_API_KEY not configured on server' };
@@ -154,7 +153,7 @@ Return structured JSON matching this schema:
     if (!text) throw new Error('Empty response from Gemini Stylist');
 
     return { ok: true, mode: 'gemini', data: JSON.parse(text) };
-  } catch (err: any) {
+  } catch (err) {
     console.error('[Server Gemini Error] Outfit generation failed:', err?.message || err);
     return { ok: false, mode: 'demo', error: err?.message || 'Outfit generation failed' };
   }
@@ -164,13 +163,7 @@ Return structured JSON matching this schema:
  * Endpoint 3: POST /api/ai/swap-garment
  * Replaces a single garment in an outfit with a compatible piece from the closet.
  */
-export async function handleSwapGarmentServer(body: {
-  currentOutfitGarmentIds: string[];
-  targetGarmentIdToSwap: string;
-  targetCategory: string;
-  prompt: string;
-  wardrobe: any[];
-}) {
+export async function handleSwapGarmentServer(body) {
   const apiKey = getServerApiKey();
   if (!apiKey) {
     return { ok: false, mode: 'demo', error: 'GEMINI_API_KEY not configured on server' };
@@ -217,7 +210,7 @@ Return structured JSON:
     if (!text) throw new Error('Empty response from Gemini Swap');
 
     return { ok: true, mode: 'gemini', data: JSON.parse(text) };
-  } catch (err: any) {
+  } catch (err) {
     console.error('[Server Gemini Error] Swap failed:', err?.message || err);
     return { ok: false, mode: 'demo', error: err?.message || 'Swap failed' };
   }

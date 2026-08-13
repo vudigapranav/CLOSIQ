@@ -50,7 +50,7 @@ export const CollectionScreen: React.FC<CollectionScreenProps> = ({
       {/* Header Bar */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
         <div>
-          <h1 className="text-screen-heading">My Collection</h1>
+          <h1 className="text-screen-heading">My Wardrobe</h1>
           <p className="text-body" style={{ marginTop: 2 }}>Everything you own, beautifully organized.</p>
         </div>
 

@@ -90,3 +90,13 @@ export interface OccasionPreset {
   targetFormality: FormalityLevel;
   tempRange: [number, number];
 }
+
+export type WeekDay = 'Mon' | 'Tue' | 'Wed' | 'Thu' | 'Fri' | 'Sat' | 'Sun';
+
+/** One row of the Outfit Planner — a day's occasion label plus an optional
+ *  outfit assigned to it (chosen from the user's saved looks). */
+export interface WeeklyPlanEntry {
+  day: WeekDay;
+  label: string;
+  outfit?: Outfit;
+}
