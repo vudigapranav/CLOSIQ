@@ -1,0 +1,288 @@
+/* CLOSIQ Design System & Tokens - Sprint 1 Shell */
+
+:root {
+  color-scheme: light dark;
+
+  /* Color Tokens - Light Mode */
+  --color-primary: #0D3B2E;
+  --color-primary-hover: #124E3F;
+  --color-primary-light: #1B5E4B;
+  --color-primary-alpha: rgba(13, 59, 46, 0.08);
+
+  --color-bg: #FAF8F5;
+  --color-surface: #FFFFFF;
+  --color-surface-subtle: #F5F2EC;
+  --color-surface-elevated: #FFFFFF;
+
+  --color-text-primary: #1A1F1D;
+  --color-text-secondary: #5A6360;
+  --color-text-muted: #8E9693;
+  --color-text-on-primary: #FFFFFF;
+
+  --color-border: rgba(13, 59, 46, 0.08);
+  --color-border-medium: rgba(13, 59, 46, 0.16);
+  --color-success: #277962;
+
+  --shadow-sm: 0 2px 8px rgba(13, 59, 46, 0.04);
+  --shadow-md: 0 6px 20px rgba(13, 59, 46, 0.06);
+  --shadow-lg: 0 16px 36px rgba(13, 59, 46, 0.1);
+
+  /* Typography Tokens */
+  --font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+  --font-display: 'Playfair Display', Georgia, serif;
+
+  /* Spacing & Radii */
+  --radius-sm: 8px;
+  --radius-md: 14px;
+  --radius-lg: 20px;
+  --radius-pill: 9999px;
+
+  accent-color: var(--color-primary);
+  scrollbar-color: var(--color-primary-light) var(--color-surface-subtle);
+}
+
+/* Dark Mode Tokens */
+[data-theme="dark"] {
+  --color-primary: #38997E;
+  --color-primary-hover: #4AB295;
+  --color-primary-light: #1B5E4B;
+  --color-primary-alpha: rgba(56, 153, 126, 0.12);
+
+  --color-bg: #0B100E;
+  --color-surface: #141C18;
+  --color-surface-subtle: #1B2621;
+  --color-surface-elevated: #22302A;
+
+  --color-text-primary: #FAF7F2;
+  --color-text-secondary: #8A9691;
+  --color-text-muted: #626E69;
+  --color-text-on-primary: #0B100E;
+
+  --color-border: rgba(255, 255, 255, 0.08);
+  --color-border-medium: rgba(255, 255, 255, 0.16);
+  --color-success: #4AB295;
+
+  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.25);
+  --shadow-md: 0 6px 20px rgba(0, 0, 0, 0.35);
+  --shadow-lg: 0 16px 36px rgba(0, 0, 0, 0.5);
+
+  scrollbar-color: var(--color-primary) var(--color-surface-subtle);
+}
+
+/* Reset & Global Elements */
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html, body {
+  width: 100%;
+  height: 100%;
+  background-color: var(--color-bg);
+  color: var(--color-text-primary);
+  font-family: var(--font-family);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  overflow-x: hidden;
+  transition: background-color 0.25s ease, color 0.25s ease;
+}
+
+#root {
+  min-height: 100vh;
+  display: flex;
+  justify-content: center;
+}
+
+/* Application Viewport Constraint */
+.app-shell {
+  width: 100%;
+  max-width: 480px;
+  min-height: 100vh;
+  background-color: var(--color-bg);
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  box-shadow: var(--shadow-md);
+  padding-bottom: 84px; /* Room for bottom navigation */
+  transition: background-color 0.25s ease;
+}
+
+@media (min-width: 481px) {
+  .app-shell {
+    border-left: 1px solid var(--color-border);
+    border-right: 1px solid var(--color-border);
+  }
+}
+
+/* Typography Hierarchy Classes */
+.text-display {
+  font-family: var(--font-display);
+  font-size: 2.25rem;
+  font-weight: 500;
+  line-height: 1.15;
+  letter-spacing: -0.02em;
+  color: var(--color-text-primary);
+}
+
+.text-screen-heading {
+  font-family: var(--font-display);
+  font-size: 1.75rem;
+  font-weight: 500;
+  line-height: 1.2;
+  letter-spacing: -0.01em;
+  color: var(--color-text-primary);
+}
+
+.text-section-heading {
+  font-family: var(--font-display);
+  font-size: 1.25rem;
+  font-weight: 500;
+  line-height: 1.25;
+  color: var(--color-text-primary);
+}
+
+.text-body {
+  font-family: var(--font-family);
+  font-size: 0.92rem;
+  font-weight: 400;
+  line-height: 1.5;
+  color: var(--color-text-secondary);
+}
+
+.text-caption {
+  font-family: var(--font-family);
+  font-size: 0.78rem;
+  font-weight: 400;
+  line-height: 1.4;
+  color: var(--color-text-muted);
+}
+
+.text-button {
+  font-family: var(--font-family);
+  font-size: 0.88rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.text-metadata {
+  font-family: var(--font-family);
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--color-text-muted);
+}
+
+/* Motion System */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(28px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes cardEnter {
+  from { opacity: 0; transform: translateY(10px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes pulseGlow {
+  0%, 100% { transform: scale(1); opacity: 0.85; }
+  50% { transform: scale(1.08); opacity: 1; }
+}
+
+@keyframes shimmerSweep {
+  0% { transform: translateX(-120%); }
+  100% { transform: translateX(220%); }
+}
+
+@keyframes countUp {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes splashEnter {
+  from { opacity: 0; transform: scale(0.94); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.25s ease-out both;
+}
+
+.animate-slide-up {
+  animation: slideUp 0.32s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.animate-card-enter {
+  animation: cardEnter 0.42s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.animate-pulse-glow {
+  animation: pulseGlow 1.7s ease-in-out infinite;
+}
+
+.animate-count-up {
+  animation: countUp 0.3s ease-out both;
+}
+
+.animate-splash-enter {
+  animation: splashEnter 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.scan-shimmer-overlay {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  border-radius: inherit;
+}
+
+.scan-shimmer-overlay::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 40%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.4), transparent);
+  animation: shimmerSweep 1.7s ease-in-out infinite;
+}
+
+[data-theme="dark"] .scan-shimmer-overlay::before {
+  background: linear-gradient(90deg, transparent, rgba(74, 178, 149, 0.35), transparent);
+}
+
+.scan-shimmer-overlay::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(13, 59, 46, 0.06), transparent 40%, rgba(13, 59, 46, 0.1));
+}
+
+/* Hides native scrollbars on horizontally-scrolling chip/rail rows without
+   losing native touch scroll behavior. */
+.hide-scrollbar {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.hide-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-fade-in,
+  .animate-slide-up,
+  .animate-card-enter,
+  .animate-pulse-glow,
+  .animate-count-up,
+  .animate-splash-enter,
+  .scan-shimmer-overlay::before {
+    animation: none !important;
+  }
+}
