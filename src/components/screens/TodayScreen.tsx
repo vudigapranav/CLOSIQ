@@ -109,7 +109,7 @@ export const TodayScreen: React.FC<TodayScreenProps> = ({
         <EmptyState
           icon={<Sparkles size={28} color="var(--color-primary)" />}
           title="Your wardrobe is waiting."
-          description="Add a few pieces and CLOSIQ will start styling personalized looks from what you own."
+          description="Add a few pieces and CLOSIQ will start styling you."
           action={
             <PrimaryButton icon={<Plus size={18} />} onClick={onOpenUpload}>
               Add Your First Item
@@ -123,10 +123,14 @@ export const TodayScreen: React.FC<TodayScreenProps> = ({
   return (
     <div style={{ padding: '20px 20px 32px' }}>
       {/* 1. Header */}
-      <div style={{ marginBottom: 20 }}>
+      <div style={{ marginBottom: 28 }}>
         <h1 className="text-screen-heading">Good afternoon, Pranav.</h1>
-        <p className="text-body" style={{ marginTop: 2, fontSize: '1rem', fontWeight: 500, color: 'var(--color-text-primary)' }}>
-          What's the occasion?
+        <p className="text-body" style={{ marginTop: 2 }}>Let's find your look.</p>
+        <p
+          className="text-section-heading"
+          style={{ fontSize: '1.1rem', marginTop: 18 }}
+        >
+          What are you dressing for?
         </p>
       </div>
 
@@ -162,7 +166,7 @@ export const TodayScreen: React.FC<TodayScreenProps> = ({
       <div style={{ marginBottom: 24, position: 'relative' }}>
         <input
           type="text"
-          placeholder="Tell CLOSIQ what you're dressing for, then press Enter..."
+          placeholder="Tell CLOSIQ what you're dressing for..."
           value={customInput}
           onChange={(e) => setCustomInput(e.target.value)}
           onKeyDown={(e) => {
@@ -226,7 +230,7 @@ export const TodayScreen: React.FC<TodayScreenProps> = ({
           }}
         >
           {/* Card Header & Match Badge */}
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, marginBottom: 16 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10, marginBottom: 20 }}>
             <div style={{ minWidth: 0 }}>
               <span
                 className="text-metadata"
@@ -246,10 +250,24 @@ export const TodayScreen: React.FC<TodayScreenProps> = ({
               </span>
               <h2
                 className="text-section-heading"
-                style={{ fontSize: '1.4rem', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+                style={{ fontSize: '1.6rem', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
               >
                 {outfit.title}
               </h2>
+              <p
+                style={{
+                  fontFamily: 'var(--font-display)',
+                  fontStyle: 'italic',
+                  fontSize: '0.88rem',
+                  color: 'var(--color-text-secondary)',
+                  marginTop: 2,
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap'
+                }}
+              >
+                {outfit.vibe}
+              </p>
             </div>
 
             <div
@@ -269,7 +287,7 @@ export const TodayScreen: React.FC<TodayScreenProps> = ({
           </div>
 
           {/* Visual Garment Cards Grid */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 12, marginBottom: 20 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 14, marginBottom: 24 }}>
             {outfit.items.map((piece, idx) => (
               <div
                 key={piece.id}
@@ -284,10 +302,10 @@ export const TodayScreen: React.FC<TodayScreenProps> = ({
                   animationDelay: `${idx * 60}ms`
                 }}
               >
-                <div style={{ width: '100%', height: 130 }}>
+                <div style={{ width: '100%', height: 176 }}>
                   <GarmentImage src={piece.imageUrl} alt={piece.name} category={piece.category} hexColor={piece.hexColor} />
                 </div>
-                <div style={{ padding: 10 }}>
+                <div style={{ padding: 12 }}>
                   <span className="text-metadata" style={{ fontSize: '0.65rem' }}>{piece.category}</span>
                   <div
                     style={{

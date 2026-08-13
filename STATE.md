@@ -7,7 +7,7 @@ This document tracks the live implementation status of **CLOSIQ**. It is updated
 ## Current Phase
 
 * **Phase**: Multi-Session Hackathon Refinement & Wardrobe Profile Context Integration
-* **Status**: Sprints 1 through 8 complete. Men/Women wardrobe profiles, layering roles/preference, profile-scoped catalog with explicit `style`/`imagePath` schema, the official CLOSIQ brand launch splash, and graceful missing-asset handling are all wired end-to-end and spot-verified in browser.
+* **Status**: Sprints 1 through 9 complete. The full P0 hero demo loop (profile → add clothing → real photo upload → AI scan → confirm → Collection → Today occasion → generate → why-it-works → swap → save → Profile) has been hardened and verified end-to-end from a fresh state, at 375/390/414px, in both light and dark mode.
 
 ---
 
@@ -57,12 +57,20 @@ This document tracks the live implementation status of **CLOSIQ**. It is updated
   - Confirmed `public/wardrobe/<men|women>/<tops|bottoms|outerwear|footwear|accessories>/` structure matches spec exactly; still only `.gitkeep` placeholders, no PNGs (team adds those manually, per instructions).
   - Missing-asset handling reconfirmed as the existing `GarmentImage` onError → on-brand placeholder (icon + category label). Deliberately did **not** add a separate manually-maintained "asset present?" boolean to the catalog — it would duplicate/risk drifting from the real filesystem state; the runtime fallback can never go stale. Documented this decision in `public/wardrobe/README.md`.
   - Deliberately did **not** rename `id`→`garmentId` or `name`→`displayName` across the codebase — those fields already serve exactly that role everywhere (React keys, dedup, AI, save/swap logic); a cosmetic rename would touch ~15 files for zero functional gain and risk regressions. Documented the equivalence in code comments and here instead.
+- [x] **Sprint 9 — P0 Core Demo Flow Hardening**:
+  - **Single outfit engine confirmed**: Today and Stylist both call `generateAIOutfit()` (`src/services/aiStylist.ts`) — no separate/static outfit system exists. Verified live: generating the same wardrobe on both screens produces the identical outfit and the same "Saved" state.
+  - **Real bug fixed — wrong-category fallback removed**: `generateAIOutfit()` used to fall back to `wardrobe[0]`/`wardrobe[1]`/`wardrobe[2]` when a category (bottoms/shoes) was empty, which could silently insert a wrong-category item into the outfit or (via `Set` dedup collapsing to a single item) crash `calculateStyleMatchScore` on an `undefined` entry. Fixed: each slot is now `undefined` when its category is empty and simply omitted — never backfilled from a different category.
+  - **New: sparse-outfit graceful UX**: `Outfit.missingCategories` (new field, `src/types/wardrobe.ts`) records which of tops/bottoms/shoes had nothing to draw from. Today and Stylist both render a small inline note ("Add bottoms and footwear to your Collection for a more complete look.") via a new shared `formatCategoryList()` helper in `aiStylist.ts` — verified live with a single-item wardrobe.
+  - **Generation failure hardening**: `runGeneration`/`handleGenerate`/`handleRegenerate`/`handleSwapPiece` in both screens now wrap `generateAIOutfit`/`swapGarmentInOutfit` in try/catch/finally, so `isGenerating` can never get stuck `true` (a silent UI freeze) and a real error banner + Retry button shows instead.
+  - **Real bug fixed — uploaded photo persistence**: `AddItemModal.tsx` used `URL.createObjectURL(file)` for uploaded photos, which only stays valid for the current page session — after any reload the `blob:` URL is dead even though its string is still sitting in `localStorage`, silently breaking the "real uploaded images must remain attached" requirement. Switched to a `FileReader`-based base64 `data:` URL, which survives `JSON.stringify`/`localStorage`/reload. Verified live: uploaded a real image, reloaded the page, photo still rendered correctly in both Today's outfit card and Collection.
+  - **New error states in Add Item flow**: file-type validation (rejects non-images with a friendly message instead of silently mis-scanning them) and a try/catch around the upload+analysis pipeline, surfaced via a new `error` step in `AddItemModal` (icon + message + "Try Again," which resets cleanly back to the options step). Verified live by uploading a `.txt` file.
+  - Confirmed `AIRecommendationCard.tsx` and `OutfitCard.tsx` are unused dead code (zero imports anywhere) — not a second live outfit system, left untouched (out of scope for this sprint).
 
 ---
 
 ## Current Sprint
 
-* **Active Sprint**: None — Sprint 8 complete. Awaiting next priority (see Next Task).
+* **Active Sprint**: None — Sprint 9 complete. Awaiting next priority (see Next Task).
 
 ---
 
@@ -116,6 +124,11 @@ This document tracks the live implementation status of **CLOSIQ**. It is updated
 * `src/data/garmentCatalog.ts`: Added `style` field to all 20 catalog entries; added materialized `imagePath` field to `GARMENT_CATALOG`; renamed internal literal array to `RAW_CATALOG` (private) with `GARMENT_CATALOG` derived from it.
 * `src/components/modals/AddItemModal.tsx`: Uses `entry.imagePath` directly instead of calling `getGarmentImagePath()` at each use site.
 * `public/wardrobe/README.md`: Documented the `imagePath` derivation and the missing-asset design decision (runtime fallback only, no manual status flag).
+* `src/types/wardrobe.ts`: Added `Outfit.missingCategories?: GarmentCategory[]`.
+* `src/services/aiStylist.ts`: Removed the wrong-category `|| wardrobe[N]` fallback in `generateAIOutfit()`; compute and return `missingCategories`; added exported `formatCategoryList()` helper.
+* `src/components/screens/TodayScreen.tsx`: try/catch/finally around generation; error banner + Retry; sparse-outfit note.
+* `src/components/screens/StylistScreen.tsx`: Same hardening as Today, applied to `handleGenerate`/`handleRegenerate`/initial generation/`handleSwapPiece`; consolidated into a shared `runGeneration()`.
+* `src/components/modals/AddItemModal.tsx`: Switched uploaded photos from `URL.createObjectURL` to a `FileReader`-based base64 `data:` URL; added file-type validation and a new `error` step with Retry.
 
 ---
 
@@ -130,11 +143,11 @@ This document tracks the live implementation status of **CLOSIQ**. It is updated
 
 ## AI Status
 
-* **Outfit Generator**: Working. Selects items strictly from active user wardrobe. `applyLayeringPreference()` correctly excludes `base_layer` tops when preference is `avoid`, unless the prompt explicitly asks for layering or the outfit already has an outer layer (verified: tank top only surfaces via generation/swap when a jacket/coat is present — by design).
-* **Vision Scanner**: Working simulated AI analysis stage (`"Understanding your garment..."`).
-* **Occasion Handling**: Working with presets (*College, Work, Date Night, etc.*) and free-form prompts.
-* **Swap Behavior**: Working single-piece replacement logic. Note: `swapGarmentInOutfit()` cycles candidates by category only and does not re-check `layeringPreference` itself — acceptable today because it only surfaces a base layer when an outer layer is already in the outfit, but worth a closer look if swap logic changes.
-* **Save Behavior**: Working saved looks state.
+* **Outfit Generator**: Working, single shared engine (`generateAIOutfit`) for Today and Stylist — confirmed identical output from both screens. Selects items strictly from active user wardrobe. `applyLayeringPreference()` correctly excludes `base_layer` tops when preference is `avoid`, unless the prompt explicitly asks for layering or the outfit already has an outer layer. No longer backfills an empty category with a wrong-category item (Sprint 9 fix) — missing categories are surfaced via `Outfit.missingCategories` and a UI note instead.
+* **Vision Scanner**: Working simulated AI analysis stage (`"Understanding your garment..."`), now with a real-photo-tested pixel-based dominant color extraction path (`extractDominantColor`) and file-type validation in front of it.
+* **Occasion Handling**: Working with presets (*College, Work, Date Night, etc.*) and free-form prompts. Custom text confirmed to flow into `activePrompt`/`generateAIOutfit` and change the outfit title/label live.
+* **Swap Behavior**: Working single-piece replacement logic, now wrapped in try/catch (`handleSwapPiece`). Note: `swapGarmentInOutfit()` cycles candidates by category only and does not re-check `layeringPreference` itself — acceptable today because it only surfaces a base layer when an outer layer is already in the outfit, but worth a closer look if swap logic changes.
+* **Save Behavior**: Working saved looks state, confirmed shared across Today/Stylist/Profile (save on Today → reflected as "Saved" on Stylist → appears in Profile's Saved Looks).
 
 ---
 
@@ -142,9 +155,10 @@ This document tracks the live implementation status of **CLOSIQ**. It is updated
 
 * **Light Mode**: Verified `#FAF8F5` warm ivory and `#0D3B2E` deep emerald palette.
 * **Dark Mode**: Verified `#0B100E` green-black and `#38997E` emerald palette, toggled live via Profile screen.
-* **Mobile Responsiveness**: Verified at 375×812 viewport — no overflow/clipping in Collection grid or nav.
-* **Wardrobe Asset Resolution (Sprint 8)**: Spot-checked in browser — Men Collection shows all 10 catalog items (tank top correctly under Tops, 2 items per category), Today's AI outfit resolves real catalog `imageUrl`s for both Men and Women, all via `GarmentImage`'s graceful placeholder (no PNGs exist yet, no broken icons, no unrelated stock imagery). Full click-through re-verification was cut short mid-session at the user's request ("don't test anything") — the above was captured before that point; nothing since has touched this code path.
-* **Launch Splash**: Verified — fades/scales in, holds, fades out to reveal the app already rendered underneath, in both light and dark mode, at mobile (375px) and desktop widths. Does not re-trigger on Today↔Collection↔Stylist tab navigation (confirmed by click-through). `prefers-reduced-motion` path verified by code/CSS review (the Browser pane tool has no way to emulate that media feature directly).
+* **Mobile Responsiveness**: Verified at 375×812, 390×844, and 414×896 — no overflow/clipping in Today, Collection, or Add Item modal, in either theme.
+* **Wardrobe Asset Resolution (Sprint 8)**: Spot-checked in browser — Men Collection shows all 10 catalog items (tank top correctly under Tops, 2 items per category), Today's AI outfit resolves real catalog `imageUrl`s for both Men and Women, all via `GarmentImage`'s graceful placeholder (no PNGs exist yet, no broken icons, no unrelated stock imagery).
+* **Launch Splash**: Verified — fades/scales in, holds, fades out to reveal the app already rendered underneath, in both light and dark mode, at mobile (375px) and desktop widths. Does not re-trigger on Today↔Collection↔Stylist tab navigation. `prefers-reduced-motion` path verified by code/CSS review (the Browser pane tool has no way to emulate that media feature directly).
+* **P0 Flow (Sprint 9)**: Verified live end-to-end from a fresh (cleared `localStorage`) state — Men profile → Add Item → real image upload (simulated via a genuine PNG file, not a mock) → AI scanning state → real pixel-based color detection → confirm → Collection → Today → occasion chip → custom free-text occasion (title updates live) → generate → why-it-works → swap → save → Stylist (shows identical outfit, "Saved" state carries over) → Profile (saved look appears with the real uploaded photo rendering correctly in the thumbnail). Reload-persistence of the uploaded photo confirmed directly (see AI Status). Upload error state (non-image file) verified live: shows "Something Went Wrong" + message + Try Again, resets cleanly. Retested at 375/390/414px and light/dark.
 * **Known Visual Problems**: None.
 
 ---
@@ -155,6 +169,8 @@ This document tracks the live implementation status of **CLOSIQ**. It is updated
 * `swapGarmentInOutfit()` doesn't independently apply `layeringPreference` (see AI Status note above) — currently benign, revisit if swap logic is reworked.
 * `logo.png`'s baked-in background (`#F5F6F2`) is a very close but not pixel-exact match to `--color-bg` in light mode (`#FAF8F5`); the `ClosiqLogo` plate uses the asset's own swatch so this is imperceptible in practice, but if the design system's light background token ever changes, re-check for a visible seam.
 * `~/Downloads/closiq-wordmark.svg` exists and is named similarly to the real asset but is **not** the official logo (no brain motif, wrong palette) — do not let a future session pick it up by mistake.
+* **localStorage size with base64 photos**: uploaded images are now stored as base64 `data:` URLs (≈33% larger than the raw file) directly in `localStorage`'s ~5–10MB-per-origin budget. Fine for a handful of demo uploads; if many/large photos get uploaded during a real demo, `localStorage.setItem` could start throwing `QuotaExceededError` (not currently caught — the `useEffect` persistence in `App.tsx` would silently fail to save on that write). Acceptable tradeoff for hackathon reliability (this fixes the worse bug of photos vanishing on reload) but worth a guard if the demo grows.
+* `AIRecommendationCard.tsx` and `OutfitCard.tsx` (`src/components/ui/`) are confirmed dead code — zero imports anywhere in the app. Not a duplicate outfit system (nothing renders them), just unused files from early scaffolding. Left alone this sprint (out of scope); safe to delete in a future cleanup pass.
 
 ---
 
@@ -167,4 +183,4 @@ This document tracks the live implementation status of **CLOSIQ**. It is updated
 ## Last Updated
 
 * **Date**: 2026-08-13
-* **Session**: Sprint 8 — completed the wardrobe catalog data layer (`style` + materialized `imagePath` fields) and reconfirmed image resolution for Collection and AI Stylist across both profiles. Browser verification pass was stopped mid-way at user's request; no further changes made after that point.
+* **Session**: Sprint 9 — P0 core demo flow hardening. Fixed a real crash/wrong-item bug in the outfit engine's category fallback, fixed uploaded photos breaking on reload (blob → base64), added missing error states across generation and upload/AI-analysis, and verified the complete 18-step flow live from a fresh state at 375/390/414px in both themes.

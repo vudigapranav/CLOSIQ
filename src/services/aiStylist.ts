@@ -26,6 +26,13 @@ const CATEGORY_DISPLAY_LABEL: Record<GarmentCategory, string> = {
   accessories: 'accessories'
 };
 
+const VIBE_BY_FORMALITY: Record<FormalityLevel, string> = {
+  casual: 'Easy & Relaxed',
+  smart_casual: 'Elevated Casual',
+  formal: 'Structured Minimalist',
+  evening: 'Refined After-Dark'
+};
+
 /** "tops", "tops and bottoms", or "tops, bottoms and footwear" — for sparse-outfit UI copy. */
 export function formatCategoryList(categories: GarmentCategory[]): string {
   const labels = categories.map((c) => CATEGORY_DISPLAY_LABEL[c]);
@@ -198,11 +205,13 @@ export function generateAIOutfit(
     ? 'Architectural Executive'
     : 'Elevated Monochromatic';
 
+  const vibe = VIBE_BY_FORMALITY[targetFormality];
+
   return {
     id: `outfit-${Date.now()}`,
     title,
     occasion: promptText,
-    vibe: 'Architectural Minimalist',
+    vibe,
     temperature: 68,
     items: uniqueItems,
     styleScore: score,
