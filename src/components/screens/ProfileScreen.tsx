@@ -18,10 +18,112 @@ interface ProfileScreenProps {
 }
 
 const LAYERING_OPTIONS: { value: LayeringPreference; label: string }[] = [
-  { value: 'avoid', label: 'Avoid' },
+  { value: 'avoid', label: 'Avoid base layers' },
   { value: 'sometimes', label: 'Sometimes' },
   { value: 'usually', label: 'Usually' }
 ];
+
+function calculateStyleDNA(wardrobe: GarmentItem[], savedOutfits: Outfit[], layeringPreference: LayeringPreference) {
+  if (wardrobe.length === 0) {
+    return [
+      { label: 'Elevated Minimalist', score: 85 },
+      { label: 'Classic Tailoring', score: 80 },
+      { label: 'Smart Casual', score: 88 },
+      { label: 'Experimental Layering', score: layeringPreference === 'avoid' ? 30 : layeringPreference === 'usually' ? 85 : 55 }
+    ];
+  }
+
+  const neutralColors = ['navy', 'black', 'white', 'beige', 'grey', 'gray', 'charcoal', 'cream', 'khaki', 'tan', 'slate'];
+  const neutralCount = wardrobe.filter((item) =>
+    neutralColors.some((nc) => item.color.toLowerCase().includes(nc))
+  ).length;
+  const neutralRatio = neutralCount / wardrobe.length;
+
+  const tailoringCount = wardrobe.filter(
+    (item) =>
+      item.category === 'outerwear' ||
+      item.name.toLowerCase().includes('blazer') ||
+      item.name.toLowerCase().includes('trouser') ||
+      item.name.toLowerCase().includes('oxford') ||
+      item.name.toLowerCase().includes('coat') ||
+      item.name.toLowerCase().includes('suit')
+  ).length;
+
+  const layeringCount = wardrobe.filter(
+    (item) => item.layeringRole === 'base_layer' || item.layeringRole === 'outer_layer'
+  ).length;
+
+  const minimalistScore = Math.min(98, Math.max(60, Math.round(70 + neutralRatio * 25)));
+  const tailoringScore = Math.min(95, Math.max(50, Math.round(60 + (tailoringCount / Math.max(1, wardrobe.length)) * 50)));
+  const smartCasualScore = Math.min(96, Math.max(75, Math.round(82 + (savedOutfits.length > 0 ? 6 : 2))));
+
+  let layeringScore = 50;
+  if (layeringPreference === 'avoid') layeringScore = 35;
+  else if (layeringPreference === 'usually') layeringScore = 88;
+  else layeringScore = 65;
+  if (layeringCount > 2) layeringScore = Math.min(95, layeringScore + 10);
+
+  return [
+    { label: 'Elevated Minimalist', score: minimalistScore },
+    { label: 'Classic Tailoring', score: tailoringScore },
+    { label: 'Smart Casual', score: smartCasualScore },
+    { label: 'Experimental Layering', score: layeringScore }
+  ];
+}
+
+function calculateWardrobeInsights(
+  wardrobe: GarmentItem[],
+  savedOutfits: Outfit[],
+  layeringPreference: LayeringPreference
+): string[] {
+  if (wardrobe.length === 0) {
+    return [
+      'Add items to your Collection to unlock personalized wardrobe intelligence.',
+      'CLOSIQ will analyze your closet colors, layering roles, and outfit versatility.'
+    ];
+  }
+
+  const insights: string[] = [];
+
+  const colorCounts: Record<string, number> = {};
+  wardrobe.forEach((item) => {
+    const c = item.color.split(' ')[0] || item.color;
+    colorCounts[c] = (colorCounts[c] || 0) + 1;
+  });
+  const topColors = Object.entries(colorCounts)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 3)
+    .map(([color]) => color);
+
+  if (topColors.length > 0) {
+    insights.push(`Your collection is anchored by ${topColors.join(', ')} tones.`);
+  }
+
+  const topsCount = wardrobe.filter((i) => i.category === 'tops').length;
+  const bottomsCount = wardrobe.filter((i) => i.category === 'bottoms').length;
+  const shoesCount = wardrobe.filter((i) => i.category === 'footwear').length;
+  const totalCombos = topsCount * Math.max(1, bottomsCount) * Math.max(1, shoesCount);
+
+  if (topsCount > 0 && bottomsCount > 0) {
+    insights.push(`You have ${topsCount} tops and ${bottomsCount} bottoms — yielding over ${totalCombos} potential outfit combinations.`);
+  } else if (topsCount > 0) {
+    insights.push(`You have ${topsCount} tops cataloged. Add bottoms to unlock full outfit pairing capability.`);
+  }
+
+  const versatileItem = wardrobe.find((i) => i.category === 'tops' || i.category === 'outerwear') || wardrobe[0];
+  if (versatileItem) {
+    const calcOutfits = Math.max(3, Math.min(12, bottomsCount * 2 || 4));
+    insights.push(`Your ${versatileItem.name} can create at least ${calcOutfits} distinct looks across occasions.`);
+  }
+
+  if (layeringPreference === 'avoid') {
+    insights.push('Base layers are set to "Avoid base layers" — CLOSIQ prioritizes clean primary layers.');
+  } else if (layeringPreference === 'usually') {
+    insights.push('Layering is enabled — CLOSIQ incorporates structured base and outer pieces.');
+  }
+
+  return insights.slice(0, 3);
+}
 
 export const ProfileScreen: React.FC<ProfileScreenProps> = ({
   isDarkMode,
@@ -38,18 +140,8 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
     if (onRemoveSavedOutfit) onRemoveSavedOutfit(id);
   };
 
-  const styleDNA = [
-    { label: 'Elevated Minimalist', score: 92 },
-    { label: 'Classic Tailoring', score: 86 },
-    { label: 'Smart Casual', score: 88 },
-    { label: 'Experimental Layering', score: 45 }
-  ];
-
-  const wardrobeInsights = [
-    'Your wardrobe works best with neutral colors.',
-    `You have ${wardrobe.filter(i => i.category === 'tops').length || 6} versatile tops but only ${wardrobe.filter(i => i.category === 'bottoms').length || 3} everyday bottoms.`,
-    'Your Navy Oxford Shirt can create 6 different outfits.'
-  ];
+  const styleDNA = calculateStyleDNA(wardrobe, savedOutfits, layeringPreference);
+  const wardrobeInsights = calculateWardrobeInsights(wardrobe, savedOutfits, layeringPreference);
 
   return (
     <div style={{ padding: '20px 20px 32px' }}>

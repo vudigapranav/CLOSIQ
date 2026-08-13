@@ -1,4 +1,4 @@
-import { GarmentItem, Outfit, OutfitExplanation, GarmentCategory, FormalityLevel, LayeringPreference } from '../types/wardrobe';
+import { GarmentItem, Outfit, GarmentCategory, FormalityLevel, LayeringPreference } from '../types/wardrobe';
 
 export interface StyleRequest {
   prompt: string;

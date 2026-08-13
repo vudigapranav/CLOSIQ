@@ -10,7 +10,6 @@ export const PrimaryButton: React.FC<PrimaryButtonProps> = ({
   children,
   icon,
   fullWidth = false,
-  className = '',
   style,
   ...props
 }) => {

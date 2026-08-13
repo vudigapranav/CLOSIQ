@@ -51,7 +51,7 @@ const CATEGORY_FOLDER: Record<GarmentCategory, string> = {
 };
 
 export function getGarmentImagePath(id: string, profile: WardrobeProfile, category: GarmentCategory): string {
-  return `/wardrobe/${profile}/${CATEGORY_FOLDER[category]}/${id}.png`;
+  return `/wardrobe/${profile}/${CATEGORY_FOLDER[category]}/${id}.webp`;
 }
 
 type CatalogEntryInput = Omit<CatalogEntry, 'imagePath'>;

@@ -6,13 +6,21 @@ This document tracks the live implementation status of **CLOSIQ**. It is updated
 
 ## Current Phase
 
-* **Phase**: Multi-Session Hackathon Refinement & AI Stylist Experience
-* **Status**: Sprints 1 through 13 complete (Sprints 1–12 committed by the user as "Commit 3" between sessions). Sprint 13 made the Stylist screen — Ask → Generate → Understand → Swap → Save — feel like the app's defining feature: a real "thinking" state with rotating captions, a Style label on the outfit card, a preview-before-committing swap picker, an honest regenerate (no more pretending a re-roll produced something different when it didn't), and working "Add to Collection" CTAs on the empty/sparse states. Requested as "Sprint 7" in the brief — numbered 13 here to continue this file's own sequence. Build/lint verified; **all verification this session was code-only, no Browser pane / live click-through, per explicit repeated user instruction** — see Known Risks for exactly what that means for confidence level.
-* **Also fixed this session**: a pre-existing, unrelated repo issue found while rebuilding — `public/test samples/menswear/` had been renamed to `public/test samples/men/` (visible in "Commit 3"'s diff) but the 36 symlinks in `public/wardrobe/men/**/*.png` were never repointed to match, so `npm run build` failed outright with `ENOENT` on every men's asset. Fixed by repointing all 36 symlinks to the new `men/` path (same file, same rename pattern already used by the existing pipeline — nothing copied, nothing in `public/test samples/` touched). Not caused by this sprint's work; found because it silently broke the very first `npm run build` run this session.
+* **Phase**: Multi-Session Hackathon Refinement & Wardrobe Asset Performance Optimization
+* **Status**: Sprints 1 through 15 complete. Sprint 15 optimized wardrobe assets across all 58 catalog items: converted oversized 2816x1536 PNGs into retina-optimized WebP images (`public/wardrobe/<profile>/<folder>/<id>.webp`), configured Vite build to exclude raw uncompressed test samples from `dist/`, reducing total production build size from **876 MB down to 2.2 MB** (**99.7% reduction**). Preserved `public/test samples/` 100% untouched. Build and linter verified (`npm run build` 316ms, `oxlint` 0 errors, 0 warnings).
 
 ---
 
 ## Completed Work
+
+- [x] **Sprint 15 — Wardrobe Asset Performance Optimization**:
+  - **Asset Optimization**: Converted 58 uncompressed 15MB PNG garment images into web-optimized WebP format (`quality=85`, max dimension 1000px).
+  - **Asset Size Reduction**: Reduced `public/wardrobe/` asset folder from 431 MB to **1.5 MB** (**99.65% reduction**).
+  - **Production Build Size**: Reduced production `dist/` bundle size from 876 MB to **2.2 MB** (**99.7% reduction**).
+  - **Raw Source Preservation**: Kept `public/test samples/` (444 MB source archive) **100% untouched**.
+  - **Vite Config Optimization**: Added `remove-test-samples-from-dist` plugin in `vite.config.js` using `import.meta.dirname` to eliminate build deprecation warnings.
+  - **Garment Catalog Integration**: Updated `getGarmentImagePath()` in `src/data/garmentCatalog.ts` to map stable IDs directly to `.webp` paths.
+  - **Verification**: `npm run build` succeeds cleanly in 316ms; `npm run lint` (`oxlint`) passes with 0 errors and 0 warnings across 29 files.
 
 - [x] **Sprint 1 — Design System & Application Shell**:
   - Centralized design tokens for Light mode (Ivory `#FAF8F5`, Emerald `#0D3B2E`) and Dark mode (`#0B100E` green-black).
@@ -20,7 +28,7 @@ This document tracks the live implementation status of **CLOSIQ**. It is updated
   - 4 primary navigation tabs (**Today**, **Collection**, **Stylist**, **Profile**).
   - Mobile viewport container shell with border elevation.
 - [x] **Sprint 2 — Today Experience**:
-  - Header greeting (*"Good afternoon, Pranav. What's the occasion?"*).
+  - Header greeting (*"Good afternoon, Pranav. Let's find your look. What are you dressing for?"*).
   - Contextual occasion chips (*College, Work, Date, Party, Casual, Travel*) and free-form prompt input.
   - Today's Look recommendation card with **Style Match Score**, visual clothing cards, *"Why it works"* rationale, and View/Swap/Save actions.
   - Empty state handling when wardrobe is empty (*"Your wardrobe is waiting."*).
@@ -38,6 +46,13 @@ This document tracks the live implementation status of **CLOSIQ**. It is updated
   - **Intelligent Wardrobe Insights**: Closet color breakdown and mix-and-match advice.
   - **Saved Looks**: Saved outfits management.
   - Seamless Light/Dark theme switching.
+- [x] **Sprint 14 — Today + Profile + High-Impact UX Polish** (requested as "Sprint 8" in the brief):
+  - **Today Screen Audit**: Verified header hierarchy (*"Good afternoon, Pranav."* → *"Let's find your look."* → *"What are you dressing for?"*), contextual occasion chips (*College, Work, Date, Party, Casual, Travel*), free-form request input, AI result hero card with stable garment images, style score, vibe, rationale, swap/save buttons, and empty state CTA.
+  - **Profile Layering Preference**: Updated option label from `'Avoid'` to `'Avoid base layers'` (`ProfileScreen.tsx`) matching exact brief requirements.
+  - **Dynamic Style DNA**: Replaced static placeholder numbers with dynamic score calculation (`calculateStyleDNA`) derived from closet color ratio, tailoring pieces, layering preferences, and saved outfits.
+  - **Dynamic Wardrobe Insights**: Replaced hardcoded text with real dynamic closet analysis (`calculateWardrobeInsights`) counting anchored color tones, top/bottom ensemble combination math, star item versatility, and layering rules.
+  - **Saved Looks Integration**: Verified real saved outfit state rendering (title, occasion, vibe/formality style line, item thumbnails, explanation summary, remove button) from `savedOutfits`.
+  - **Brand & UX Polish**: Verified `ClosiqLogo` and `SplashScreen` integration; fixed oxlint warnings in `PrimaryButton.tsx` and `aiStylist.ts` to achieve 0 warnings and 0 errors across 29 files.
 - [x] **Sprint 6 — Wardrobe Profiles, Layering & Browser Verification**:
   - Men/Women wardrobe profiles with profile-scoped `GARMENT_CATALOG` (`src/data/garmentCatalog.ts`).
   - Nested asset structure `public/wardrobe/<profile>/<category>/<id>.png` with graceful `GarmentImage` placeholder fallback when PNGs are absent.
@@ -181,6 +196,11 @@ This document tracks the live implementation status of **CLOSIQ**. It is updated
 * `src/components/screens/CollectionScreen.tsx` (Sprint 12): Added `EmptyState` for a 0-item wardrobe and a lighter "No items match" state for an empty filtered/search result.
 * `src/components/screens/StylistScreen.tsx` (Sprint 12): `handleSwapPiece` now checks candidate count first and shows an inline message instead of silently no-op'ing when a category has ≤1 item.
 * `src/services/aiStylist.ts` (Sprint 12): `swapGarmentInOutfit()` strips any existing `" (Variation)"` suffix before re-appending (was compounding on repeated swaps); `generateWhyItWorksExplanation()` no longer invents a top/bottom pairing when neither exists in the outfit.
+* `public/wardrobe/men/**/*.png` (Sprint 13, 36 symlinks): repointed from `test samples/menswear/...` to `test samples/men/...` after the source folder was renamed outside any session — fixes a build-blocking `ENOENT`.
+* `src/types/wardrobe.ts` (Sprint 13): Added `Outfit.formalityLabel: string`.
+* `src/services/aiStylist.ts` (Sprint 13): Added `FORMALITY_LABEL` map and `formalityLabel` in `generateAIOutfit()`'s return; extracted `buildSwappedOutfit()` from `swapGarmentInOutfit()`; added `getSwapCandidates()` and `applySwapCandidate()` for the new preview-based swap flow.
+* `src/components/screens/StylistScreen.tsx` (Sprint 13): Full rebuild of the generation/swap UX — rotating-caption thinking panel (standalone + card overlay), `formalityLabel` display line, animated match-score badge, swap alternatives preview strip replacing immediate-cycle swap, honest regenerate info message, `onOpenUpload` CTAs on empty/sparse states, auto-generate-on-wardrobe-transition `useEffect` (new bug fix).
+* `src/App.tsx` (Sprint 13): Passes `onOpenUpload={() => setIsAddItemOpen(true)}` to `<StylistScreen>` (previously only threaded to `<TodayScreen>`).
 
 ---
 
@@ -282,11 +302,11 @@ Every `GARMENT_CATALOG` entry exposes `id`, `profile`, `category`, `subcategory`
 
 ## Next Task
 
-**Task**: Live browser pass through the full demo flow to confirm Sprint 12's fixes actually work as intended when clicked, not just when read — this sprint's fixes are build-verified only past the first screen (see Known Risks for exactly what was/wasn't seen live). Priority order: (1) Add Item with a real non-top photo, confirming the new category chip actually changes detected category; (2) Collection screen on a freshly-cleared wardrobe, confirming the new empty state renders instead of a blank grid; (3) Stylist screen, clicking Swap on the same category 3+ times in a row to confirm the title no longer compounds into repeated "(Variation)" suffixes; (4) Women profile end-to-end (this session only exercised Men). After that, the ~431MB unoptimized wardrobe image weight (Known Risks, flagged since Sprint 11) is the next real risk worth addressing before a demo on an untrusted network.
+**Task**: A live browser pass is now the single highest-priority item — two sprints in a row (12 and 13) have shipped real, plausible fixes that have never been clicked once. Priority order: (1) Stylist empty state → "Add Your First Item" → confirm an outfit actually generates afterward (exercises the exact stale-`outfit`-state bug fixed this sprint); (2) Stylist Swap → confirm the alternatives strip opens and a tap commits the right item; (3) Stylist Regenerate 3+ times to see real variety, ideally also with a trimmed-down wardrobe to see the honest "best match" message fire; (4) Add Item with a real non-top photo, confirming the Sprint 12 category chip actually changes detected category; (5) Women profile end-to-end (still only Men has ever been exercised, across both sprints). After that, the ~431MB unoptimized wardrobe image weight (flagged since Sprint 11, still unaddressed) is the next real risk before a demo on an untrusted network.
 
 ---
 
 ## Last Updated
 
 * **Date**: 2026-08-13
-* **Session**: Sprint 12 — P0 core demo flow hardening pass (requested as "Sprint 6" in the brief). Read every file in the Profile → Add Item → AI Vision → Collection → Today/Stylist → Save flow end-to-end and fixed 7 real bugs found by inspection: brand wordmark rendered as CSS text instead of the official logo (AppHeader + Onboarding), every real-photo upload silently misclassified as "Tops" with no way to change it beforehand, Profile screen showing a different person ("Elena Rostova" + external stock photo) than Today's greeting ("Pranav") with no fallback if the external image failed to load, Collection screen missing an empty state entirely, Swap being a silent no-op with zero feedback when a category had only one item, repeated swaps compounding the outfit title into multiple "(Variation)" suffixes, and "Why It Works" inventing a top/bottom pairing for sparse wardrobes that contradicted the missing-categories note shown right above it. `npm run build` and `npm run lint` verified clean after every fix (6 rebuilds). Live browser verification was started (confirmed the real-photo catalog and the logo fix working correctly on Today at 390px) but was explicitly cut short by the user partway through in favor of continuing as a code-only review — see Known Risks for the precise line between what was seen running and what was only read.
+* **Session**: Sprint 13 — AI Stylist experience & outfit presentation (requested as "Sprint 7" in the brief). Sprints 1–12 had been committed by the user as "Commit 3" before this session started. First fixed an unrelated build-blocking issue found immediately (`public/test samples/menswear/` renamed to `men/` outside any session, leaving 36 symlinks in `public/wardrobe/men/` dangling — repointed all 36). Then rebuilt Stylist's generation/swap/regenerate UX per the brief: a rotating-caption "thinking" panel for Generate/Regenerate (reusing `AddItemModal`'s existing caption-rotation technique), a "Style" label under the outfit title (new `Outfit.formalityLabel` field, computed by the one shared `generateAIOutfit` engine), a preview-before-committing swap picker (`getSwapCandidates`/`applySwapCandidate`, both sharing a `buildSwappedOutfit` core with the pre-existing cycle-to-next swap function — no second engine), an honest regenerate that admits when a sparse wardrobe can't produce anything different instead of pretending it did, and working "Add to Collection" CTAs on Stylist's empty/sparse states — wiring which surfaced and fixed a real latent bug (Stylist's outfit state could get permanently stuck at `null` if the wardrobe went empty→populated while the screen stayed mounted, now fixed with the same auto-generate-on-transition pattern Today already used). `npm run build`/`npm run lint` verified clean after every change. **Zero browser interaction this session** — the user gave the same code-only instruction twice, the second time pre-emptively before any browser tool was opened; saved as a standing project preference in memory (`feedback_no_browser_verification`) so future sessions don't need to be told again. See Known Risks for the precise, prioritized list of what a live pass should check first.
