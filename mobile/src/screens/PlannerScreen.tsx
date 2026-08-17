@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   StyleSheet,
   View,
@@ -69,6 +69,21 @@ export const PlannerScreen: React.FC<PlannerScreenProps> = ({
   const [selectedGarmentForSwap, setSelectedGarmentForSwap] = useState<GarmentItem | null>(null);
   const [swapping, setSwapping] = useState(false);
   const [weather, setWeather] = useState<WeatherData | null>(null);
+
+  // See the identical note in TodayScreen.tsx: mirrors for runGenerate
+  // (memoized, feeds OutfitResultCard) to read without being a useCallback
+  // dependency, so weather resolving from null doesn't recreate the
+  // callback and re-render the memoized card. savingRef is a pure
+  // in-flight lock for handleSaveToEvent — never itself triggers a render.
+  const weatherRef = useRef(weather);
+  useEffect(() => {
+    weatherRef.current = weather;
+  }, [weather]);
+  const userProfileRef = useRef(userProfile);
+  useEffect(() => {
+    userProfileRef.current = userProfile;
+  }, [userProfile]);
+  const savingRef = useRef(false);
 
   useEffect(() => {
     loadPlannerEvents().then(setEvents);
@@ -153,7 +168,7 @@ export const PlannerScreen: React.FC<PlannerScreenProps> = ({
 
   const runGenerate = useCallback(
     async (excludeExtra: string[] = []) => {
-      if (!planningEvent || wardrobe.length === 0) return;
+      if (!planningEvent || wardrobe.length === 0 || planLoading || swapping) return;
       setPlanLoading(true);
       setPlanError(null);
 
@@ -166,10 +181,11 @@ export const PlannerScreen: React.FC<PlannerScreenProps> = ({
       // today; a future-dated event gets no weatherContext rather than a
       // misleading "today's weather" stand-in for a different day.
       const isEventToday = planningEvent.date === todayLocalDate();
+      const currentUserProfile = userProfileRef.current;
       const personalization = {
-        userProfileContext: buildUserStyleContext(profile, layeringPreference, userProfile),
+        userProfileContext: buildUserStyleContext(profile, layeringPreference, currentUserProfile),
         weatherContext: isEventToday
-          ? buildWeatherContext(weather, userProfile?.temperatureUnit || 'celsius')
+          ? buildWeatherContext(weatherRef.current, currentUserProfile?.temperatureUnit || 'celsius')
           : undefined,
         plannerContext: buildPlannerContext(planningEvent),
         recentOutfitContext: recent.context
@@ -185,7 +201,7 @@ export const PlannerScreen: React.FC<PlannerScreenProps> = ({
         setPlanError(res.error || 'CLOSIQ couldn’t build a look right now. Try again.');
       }
     },
-    [planningEvent, wardrobe, layeringPreference, profile, userProfile, weather]
+    [planningEvent, wardrobe, layeringPreference, profile, planLoading, swapping]
   );
 
   const resolvedGarments: GarmentItem[] = useMemo(
@@ -204,40 +220,45 @@ export const PlannerScreen: React.FC<PlannerScreenProps> = ({
   }, [outfitResult, runGenerate]);
 
   const handleSaveToEvent = useCallback(async () => {
-    if (!planningEvent || !outfitResult || resolvedGarments.length === 0) return;
+    if (!planningEvent || !outfitResult || resolvedGarments.length === 0 || savingRef.current) return;
+    savingRef.current = true;
 
-    const newOutfit: Outfit = {
-      id: `outfit-planner-${Date.now()}`,
-      title: outfitResult.data.title,
-      occasion: planningEvent.occasion,
-      vibe: outfitResult.data.vibe,
-      formalityLabel: 'Smart Casual',
-      temperature: 72,
-      items: resolvedGarments,
-      styleScore: outfitResult.data.styleScore,
-      explanation: {
-        summary: outfitResult.data.explanation.summary,
-        colorHarmony: outfitResult.data.explanation.colorHarmony || 'Balanced tones',
-        silhouette: 'Proportional fit',
-        weatherSuitability: 'Suitable for the planned occasion',
-        versatilityNote: 'High pairing versatility'
-      },
-      saved: true,
-      dateCreated: new Date().toISOString()
-    };
+    try {
+      const newOutfit: Outfit = {
+        id: `outfit-planner-${Date.now()}`,
+        title: outfitResult.data.title,
+        occasion: planningEvent.occasion,
+        vibe: outfitResult.data.vibe,
+        formalityLabel: 'Smart Casual',
+        temperature: 72,
+        items: resolvedGarments,
+        styleScore: outfitResult.data.styleScore,
+        explanation: {
+          summary: outfitResult.data.explanation.summary,
+          colorHarmony: outfitResult.data.explanation.colorHarmony || 'Balanced tones',
+          silhouette: 'Proportional fit',
+          weatherSuitability: 'Suitable for the planned occasion',
+          versatilityNote: 'High pairing versatility'
+        },
+        saved: true,
+        dateCreated: new Date().toISOString()
+      };
 
-    const updatedEvents = await updatePlannerEvent(planningEvent.id, { outfit: newOutfit });
-    setEvents(updatedEvents);
-    await recordRecentOutfit(resolvedGarments.map((i) => i.id));
+      const updatedEvents = await updatePlannerEvent(planningEvent.id, { outfit: newOutfit });
+      setEvents(updatedEvents);
+      await recordRecentOutfit(resolvedGarments.map((i) => i.id));
 
-    const refreshed = updatedEvents.find((e) => e.id === planningEvent.id) || null;
-    setPlanningEvent(null);
-    setOutfitResult(null);
-    setSelectedEvent(refreshed);
+      const refreshed = updatedEvents.find((e) => e.id === planningEvent.id) || null;
+      setPlanningEvent(null);
+      setOutfitResult(null);
+      setSelectedEvent(refreshed);
+    } finally {
+      savingRef.current = false;
+    }
   }, [planningEvent, outfitResult, resolvedGarments]);
 
   const handleSwapGarment = async (garment: GarmentItem) => {
-    if (!outfitResult) return;
+    if (!outfitResult || swapping || planLoading) return;
     setSelectedGarmentForSwap(null);
     setSwapping(true);
 

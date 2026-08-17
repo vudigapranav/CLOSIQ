@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
   StyleSheet,
   View,
@@ -88,6 +88,28 @@ export const TodayScreen: React.FC<TodayScreenProps> = ({
   const [weather, setWeather] = useState<WeatherData | null>(null);
   const [weatherStatus, setWeatherStatus] = useState<WeatherFetchStatus | 'loading'>('loading');
 
+  // Mirrors of weather/userProfile/temperatureUnit for handleRegenerateOutfit
+  // and handleSaveOutfit to read WITHOUT being a useCallback dependency.
+  // Both are memoized specifically so OutfitResultCard (React.memo) doesn't
+  // re-render on unrelated changes — but weather resolves from null to a
+  // real reading shortly after mount, and if it were a normal dependency,
+  // that single transition would recreate both callbacks (new identity),
+  // which would re-render OutfitResultCard once even though neither
+  // handler's actual BEHAVIOR needs to change at that instant — the ref
+  // still gives each handler the current value when it's actually called.
+  const weatherRef = useRef(weather);
+  useEffect(() => {
+    weatherRef.current = weather;
+  }, [weather]);
+  const userProfileRef = useRef(userProfile);
+  useEffect(() => {
+    userProfileRef.current = userProfile;
+  }, [userProfile]);
+  const temperatureUnitRef = useRef(temperatureUnit);
+  useEffect(() => {
+    temperatureUnitRef.current = temperatureUnit;
+  }, [temperatureUnit]);
+
   // Fetches once per mount — Today unmounts/remounts on every tab visit
   // (App.tsx renders screens as plain conditional JSX, no persistent
   // navigator, per Sprint M10's State Synchronization finding), which
@@ -149,8 +171,16 @@ export const TodayScreen: React.FC<TodayScreenProps> = ({
     setSelectedGarmentForSwap(null);
   }, [profile]);
 
+  // Ref, not state — a pure in-flight lock that must never itself trigger a
+  // render. Belt-and-suspenders alongside each button's own `disabled=`
+  // prop: that prop only takes effect once its own re-render commits, which
+  // leaves a narrow same-tick window a very fast double-tap could slip
+  // through; checking the ref synchronously at the top of the handler closes
+  // that window outright.
+  const savingRef = useRef(false);
+
   const handleGenerateOutfit = async () => {
-    if (wardrobe.length === 0) return;
+    if (loading || swapping || wardrobe.length === 0) return;
 
     setLoading(true);
     setErrorMessage(null);
@@ -185,7 +215,7 @@ export const TodayScreen: React.FC<TodayScreenProps> = ({
   // input below, and that memo only holds if the handlers passed to it keep
   // a stable identity across those unrelated re-renders.
   const handleRegenerateOutfit = useCallback(async () => {
-    if (!outfitResult || wardrobe.length === 0) return;
+    if (!outfitResult || wardrobe.length === 0 || loading || swapping) return;
 
     setLoading(true);
     setErrorMessage(null);
@@ -194,8 +224,8 @@ export const TodayScreen: React.FC<TodayScreenProps> = ({
     const recent = await buildRecentOutfitContext(savedOutfits);
     const excludeIds = Array.from(new Set([...outfitResult.data.garmentIds, ...recent.excludeGarmentIds]));
     const personalization = {
-      userProfileContext: buildUserStyleContext(profile, layeringPreference, userProfile),
-      weatherContext: buildWeatherContext(weather, temperatureUnit),
+      userProfileContext: buildUserStyleContext(profile, layeringPreference, userProfileRef.current),
+      weatherContext: buildWeatherContext(weatherRef.current, temperatureUnitRef.current),
       recentOutfitContext: recent.context
     };
 
@@ -215,10 +245,10 @@ export const TodayScreen: React.FC<TodayScreenProps> = ({
     } else {
       setErrorMessage(res.error || 'Unable to regenerate look.');
     }
-  }, [outfitResult, wardrobe, customPrompt, selectedOccasion, layeringPreference, savedOutfits, profile, userProfile, weather, temperatureUnit]);
+  }, [outfitResult, wardrobe, customPrompt, selectedOccasion, layeringPreference, savedOutfits, profile, loading, swapping]);
 
   const handleSwapGarment = async (garment: GarmentItem) => {
-    if (!outfitResult) return;
+    if (!outfitResult || swapping || loading) return;
 
     setSelectedGarmentForSwap(null);
     setSwapping(true);
@@ -280,39 +310,45 @@ export const TodayScreen: React.FC<TodayScreenProps> = ({
   );
 
   const handleSaveOutfit = useCallback(async () => {
-    if (!outfitResult || resolvedGarments.length === 0) return;
+    if (!outfitResult || resolvedGarments.length === 0 || savingRef.current) return;
+    savingRef.current = true;
 
-    const newOutfit: Outfit = {
-      id: `outfit-${Date.now()}`,
-      title: outfitResult.data.title,
-      occasion: selectedOccasion,
-      vibe: outfitResult.data.vibe,
-      formalityLabel: 'Smart Casual',
-      // Real reading when we have one (rounded, canonical Celsius — the
-      // Outfit type's `temperature` field is not itself unit-aware); never
-      // invented when weather is unavailable, since this field isn't shown
-      // anywhere in the mobile UI (only `weatherSuitability` below is), so
-      // there is nothing user-facing to fabricate either way.
-      temperature: weather ? Math.round(weather.temperatureCelsius) : 0,
-      items: resolvedGarments,
-      styleScore: outfitResult.data.styleScore,
-      explanation: {
-        summary: outfitResult.data.explanation.summary,
-        colorHarmony: outfitResult.data.explanation.colorHarmony || 'Balanced tones',
-        silhouette: 'Proportional fit',
-        weatherSuitability: weather
-          ? `Suitable for ${formatWeatherTemperature(weather.temperatureCelsius, temperatureUnit)} • ${weather.condition}`
-          : 'Suitable for current conditions',
-        versatilityNote: 'High pairing versatility'
-      },
-      saved: true,
-      dateCreated: new Date().toISOString()
-    };
+    try {
+      const currentWeather = weatherRef.current;
+      const newOutfit: Outfit = {
+        id: `outfit-${Date.now()}`,
+        title: outfitResult.data.title,
+        occasion: selectedOccasion,
+        vibe: outfitResult.data.vibe,
+        formalityLabel: 'Smart Casual',
+        // Real reading when we have one (rounded, canonical Celsius — the
+        // Outfit type's `temperature` field is not itself unit-aware); never
+        // invented when weather is unavailable, since this field isn't shown
+        // anywhere in the mobile UI (only `weatherSuitability` below is), so
+        // there is nothing user-facing to fabricate either way.
+        temperature: currentWeather ? Math.round(currentWeather.temperatureCelsius) : 0,
+        items: resolvedGarments,
+        styleScore: outfitResult.data.styleScore,
+        explanation: {
+          summary: outfitResult.data.explanation.summary,
+          colorHarmony: outfitResult.data.explanation.colorHarmony || 'Balanced tones',
+          silhouette: 'Proportional fit',
+          weatherSuitability: currentWeather
+            ? `Suitable for ${formatWeatherTemperature(currentWeather.temperatureCelsius, temperatureUnitRef.current)} • ${currentWeather.condition}`
+            : 'Suitable for current conditions',
+          versatilityNote: 'High pairing versatility'
+        },
+        saved: true,
+        dateCreated: new Date().toISOString()
+      };
 
-    const updatedSaved = await saveOutfitToStorage(newOutfit);
-    setSavedOutfits(updatedSaved);
-    await recordRecentOutfit(resolvedGarments.map((i) => i.id));
-  }, [outfitResult, resolvedGarments, selectedOccasion, temperatureUnit, weather]);
+      const updatedSaved = await saveOutfitToStorage(newOutfit);
+      setSavedOutfits(updatedSaved);
+      await recordRecentOutfit(resolvedGarments.map((i) => i.id));
+    } finally {
+      savingRef.current = false;
+    }
+  }, [outfitResult, resolvedGarments, selectedOccasion]);
 
   return (
     <ScrollView

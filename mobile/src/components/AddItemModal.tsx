@@ -16,6 +16,7 @@ import { Camera, Image as ImageIcon, Sparkles, X, Check, RefreshCw } from 'lucid
 import { COLORS, RADIUS } from '../theme';
 import { GarmentItem, GarmentCategory, WardrobeProfile } from '../../../src/types/wardrobe';
 import { analyzeGarmentImageMobile, VisionAnalysisResult } from '../services/visionAnalysis';
+import { optimizeGarmentImage } from '../services/imageOptimizer';
 
 const { width } = Dimensions.get('window');
 
@@ -88,26 +89,34 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({
         }
       }
 
+      // base64: false here deliberately — the picker would otherwise encode
+      // the FULL-RESOLUTION original (often several MB on a modern phone
+      // camera) purely to be thrown away. optimizeGarmentImage() below does
+      // one resize+compress pass and produces the base64 CLOSIQ actually
+      // needs, from a file that's already the right size.
       const result = useCamera
         ? await ImagePicker.launchCameraAsync({
             mediaTypes: ['images'],
             allowsEditing: true,
             aspect: [1, 1],
-            quality: 0.8,
-            base64: true
+            quality: 1,
+            base64: false
           })
         : await ImagePicker.launchImageLibraryAsync({
             mediaTypes: ['images'],
             allowsEditing: true,
             aspect: [1, 1],
-            quality: 0.8,
-            base64: true
+            quality: 1,
+            base64: false
           });
 
       if (!result.canceled && result.assets && result.assets.length > 0) {
         const asset = result.assets[0];
-        setImageUri(asset.uri);
-        setBase64Data(asset.base64 || null);
+        // Still covered by the isPicking guard above (cleared in `finally`
+        // below), so the source buttons stay disabled through this step too.
+        const optimized = await optimizeGarmentImage(asset.uri);
+        setImageUri(optimized.uri);
+        setBase64Data(optimized.base64 || null);
         setStep('preview');
       }
     } catch (err) {

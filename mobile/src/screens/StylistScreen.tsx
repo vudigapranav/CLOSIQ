@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
   StyleSheet,
   View,
@@ -57,6 +57,21 @@ export const StylistScreen: React.FC<StylistScreenProps> = ({
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [weather, setWeather] = useState<WeatherData | null>(null);
 
+  // See the identical note in TodayScreen.tsx: mirrors for
+  // handleRegenerateOutfit/handleSaveOutfit to read without being a
+  // useCallback dependency, so OutfitResultCard (React.memo) doesn't
+  // re-render the instant weather resolves from null to a real reading.
+  const weatherRef = useRef(weather);
+  useEffect(() => {
+    weatherRef.current = weather;
+  }, [weather]);
+  const userProfileRef = useRef(userProfile);
+  useEffect(() => {
+    userProfileRef.current = userProfile;
+  }, [userProfile]);
+  // Pure in-flight lock for Save — never itself triggers a render.
+  const savingRef = useRef(false);
+
   // Reuses M14's shared weather service (with its own cache/throttle) — no
   // second weather-fetching implementation, and no visible UI added here
   // (the weather strip is Today's alone); this only makes the reading
@@ -91,7 +106,7 @@ export const StylistScreen: React.FC<StylistScreenProps> = ({
   }, [profile]);
 
   const handleGenerateStylistOutfit = async () => {
-    if (wardrobe.length === 0) return;
+    if (loading || swapping || wardrobe.length === 0) return;
 
     setLoading(true);
     setErrorMessage(null);
@@ -122,7 +137,7 @@ export const StylistScreen: React.FC<StylistScreenProps> = ({
   // brief textarea below, and that memo only holds if the handlers passed
   // to it keep a stable identity across those unrelated re-renders.
   const handleRegenerateOutfit = useCallback(async () => {
-    if (!outfitResult || wardrobe.length === 0) return;
+    if (!outfitResult || wardrobe.length === 0 || loading || swapping) return;
 
     setLoading(true);
     setErrorMessage(null);
@@ -131,8 +146,8 @@ export const StylistScreen: React.FC<StylistScreenProps> = ({
     const recent = await buildRecentOutfitContext(savedOutfits);
     const excludeIds = Array.from(new Set([...outfitResult.data.garmentIds, ...recent.excludeGarmentIds]));
     const personalization = {
-      userProfileContext: buildUserStyleContext(profile, layeringPreference, userProfile),
-      weatherContext: buildWeatherContext(weather, userProfile?.temperatureUnit || 'celsius'),
+      userProfileContext: buildUserStyleContext(profile, layeringPreference, userProfileRef.current),
+      weatherContext: buildWeatherContext(weatherRef.current, userProfileRef.current?.temperatureUnit || 'celsius'),
       recentOutfitContext: recent.context
     };
 
@@ -151,10 +166,10 @@ export const StylistScreen: React.FC<StylistScreenProps> = ({
     } else {
       setErrorMessage(res.error || 'Unable to regenerate look.');
     }
-  }, [outfitResult, wardrobe, promptText, layeringPreference, savedOutfits, profile, userProfile, weather]);
+  }, [outfitResult, wardrobe, promptText, layeringPreference, savedOutfits, profile, loading, swapping]);
 
   const handleSwapGarment = async (garment: GarmentItem) => {
-    if (!outfitResult) return;
+    if (!outfitResult || swapping || loading) return;
 
     setSelectedGarmentForSwap(null);
     setSwapping(true);
@@ -216,31 +231,36 @@ export const StylistScreen: React.FC<StylistScreenProps> = ({
   );
 
   const handleSaveOutfit = useCallback(async () => {
-    if (!outfitResult || resolvedGarments.length === 0) return;
+    if (!outfitResult || resolvedGarments.length === 0 || savingRef.current) return;
+    savingRef.current = true;
 
-    const newOutfit: Outfit = {
-      id: `outfit-stylist-${Date.now()}`,
-      title: outfitResult.data.title,
-      occasion: promptText.trim() || 'AI Stylist Look',
-      vibe: outfitResult.data.vibe,
-      formalityLabel: 'Smart Casual',
-      temperature: 72,
-      items: resolvedGarments,
-      styleScore: outfitResult.data.styleScore,
-      explanation: {
-        summary: outfitResult.data.explanation.summary,
-        colorHarmony: outfitResult.data.explanation.colorHarmony || 'Balanced tones',
-        silhouette: 'Proportional fit',
-        weatherSuitability: 'Suitable for current climate',
-        versatilityNote: 'High styling versatility'
-      },
-      saved: true,
-      dateCreated: new Date().toISOString()
-    };
+    try {
+      const newOutfit: Outfit = {
+        id: `outfit-stylist-${Date.now()}`,
+        title: outfitResult.data.title,
+        occasion: promptText.trim() || 'AI Stylist Look',
+        vibe: outfitResult.data.vibe,
+        formalityLabel: 'Smart Casual',
+        temperature: 72,
+        items: resolvedGarments,
+        styleScore: outfitResult.data.styleScore,
+        explanation: {
+          summary: outfitResult.data.explanation.summary,
+          colorHarmony: outfitResult.data.explanation.colorHarmony || 'Balanced tones',
+          silhouette: 'Proportional fit',
+          weatherSuitability: 'Suitable for current climate',
+          versatilityNote: 'High styling versatility'
+        },
+        saved: true,
+        dateCreated: new Date().toISOString()
+      };
 
-    const updatedSaved = await saveOutfitToStorage(newOutfit);
-    setSavedOutfits(updatedSaved);
-    await recordRecentOutfit(resolvedGarments.map((i) => i.id));
+      const updatedSaved = await saveOutfitToStorage(newOutfit);
+      setSavedOutfits(updatedSaved);
+      await recordRecentOutfit(resolvedGarments.map((i) => i.id));
+    } finally {
+      savingRef.current = false;
+    }
   }, [outfitResult, resolvedGarments, promptText]);
 
   return (
