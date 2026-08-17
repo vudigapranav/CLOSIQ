@@ -1,0 +1,47 @@
+{
+  "expo": {
+    "name": "CLOSIQ",
+    "slug": "closiq",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/closiq-logo.png",
+    "scheme": "closiq",
+    "userInterfaceStyle": "light",
+    "backgroundColor": "#F7F2E9",
+    "splash": {
+      "image": "./assets/closiq-logo.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#F7F2E9"
+    },
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.closiq.app"
+    },
+    "android": {
+      "package": "com.closiq.app",
+      "adaptiveIcon": {
+        "backgroundColor": "#F7F2E9",
+        "foregroundImage": "./assets/closiq-logo.png"
+      }
+    },
+    "web": {
+      "favicon": "./assets/closiq-logo.png"
+    },
+    "plugins": [
+      [
+        "expo-image-picker",
+        {
+          "cameraPermission": "CLOSIQ uses your camera to capture photos of clothing you own.",
+          "photosPermission": "CLOSIQ uses your photo library to catalog clothing you already own."
+        }
+      ],
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "CLOSIQ uses your location to provide local weather and improve outfit recommendations."
+        }
+      ],
+      "@react-native-community/datetimepicker"
+    ]
+  }
+}

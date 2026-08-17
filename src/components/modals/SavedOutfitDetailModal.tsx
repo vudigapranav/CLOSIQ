@@ -1,9 +1,8 @@
-import React from 'react';
-import { X, Sparkles, Heart, AlertTriangle, Check, Trash2, ArrowRight } from 'lucide-react';
+import React, { useEffect } from 'react';
+import { X, Sparkles, AlertTriangle, Trash2, ArrowRight, Shirt } from 'lucide-react';
 import { GarmentItem, Outfit } from '../../types/wardrobe';
 import { GarmentImage } from '../ui/GarmentImage';
 import { PrimaryButton } from '../ui/PrimaryButton';
-import { SecondaryButton } from '../ui/SecondaryButton';
 
 interface SavedOutfitDetailModalProps {
   outfit: Outfit | null;
@@ -20,6 +19,17 @@ export const SavedOutfitDetailModal: React.FC<SavedOutfitDetailModalProps> = ({
   onWearAgain,
   onRemoveSaved
 }) => {
+  // Listen for Escape key to close modal
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [onClose]);
+
   if (!outfit) return null;
 
   // Resolve saved outfit items against current active wardrobe
@@ -60,7 +70,7 @@ export const SavedOutfitDetailModal: React.FC<SavedOutfitDetailModalProps> = ({
       onClick={onClose}
       role="dialog"
       aria-modal="true"
-      aria-labelledby="saved-outfit-title"
+      aria-labelledby="saved-outfit-modal-title"
     >
       <div
         style={{
@@ -75,14 +85,14 @@ export const SavedOutfitDetailModal: React.FC<SavedOutfitDetailModalProps> = ({
           boxShadow: 'var(--shadow-lg)',
           border: '1px solid var(--color-border)'
         }}
-        className="animate-slide-up"
+        className="animate-slide-up hide-scrollbar"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header Bar */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
           <span
             className="text-metadata"
-            style={{ color: 'var(--color-primary)', display: 'inline-flex', alignItems: 'center', gap: 4 }}
+            style={{ color: 'var(--color-primary)', display: 'inline-flex', alignItems: 'center', gap: 6 }}
           >
             <Sparkles size={13} />
             <span>Saved Look • {outfit.occasion}</span>
@@ -91,8 +101,18 @@ export const SavedOutfitDetailModal: React.FC<SavedOutfitDetailModalProps> = ({
           <button
             onClick={onClose}
             aria-label="Close saved look details"
-            title="Close"
-            style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-text-muted)' }}
+            title="Close details (Esc)"
+            style={{
+              background: 'none',
+              border: 'none',
+              cursor: 'pointer',
+              color: 'var(--color-text-muted)',
+              padding: 4,
+              borderRadius: 'var(--radius-pill)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center'
+            }}
           >
             <X size={22} />
           </button>
@@ -100,8 +120,8 @@ export const SavedOutfitDetailModal: React.FC<SavedOutfitDetailModalProps> = ({
 
         {/* Title & Style Match Badge */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, marginBottom: 16 }}>
-          <div>
-            <h2 id="saved-outfit-title" className="text-screen-heading" style={{ fontSize: '1.5rem', marginBottom: 2 }}>
+          <div style={{ minWidth: 0, flex: 1 }}>
+            <h2 id="saved-outfit-modal-title" className="text-screen-heading" style={{ fontSize: '1.5rem', marginBottom: 2 }}>
               {outfit.title}
             </h2>
             <p
@@ -116,19 +136,23 @@ export const SavedOutfitDetailModal: React.FC<SavedOutfitDetailModalProps> = ({
             </p>
           </div>
 
-          <div
-            style={{
-              backgroundColor: 'var(--color-primary-alpha)',
-              color: 'var(--color-primary)',
-              padding: '5px 12px',
-              borderRadius: 'var(--radius-pill)',
-              fontSize: '0.78rem',
-              fontWeight: 700,
-              whiteSpace: 'nowrap',
-              flexShrink: 0
-            }}
-          >
-            {outfit.styleScore}% Match
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4, flexShrink: 0 }}>
+            <div
+              style={{
+                backgroundColor: 'var(--color-primary-alpha)',
+                color: 'var(--color-primary)',
+                padding: '5px 12px',
+                borderRadius: 'var(--radius-pill)',
+                fontSize: '0.78rem',
+                fontWeight: 700,
+                whiteSpace: 'nowrap'
+              }}
+            >
+              {outfit.styleScore}% Match
+            </div>
+            <span className="text-caption" style={{ fontSize: '0.7rem' }}>
+              {validItems.length} of {outfit.items.length} pieces owned
+            </span>
           </div>
         </div>
 
@@ -136,7 +160,7 @@ export const SavedOutfitDetailModal: React.FC<SavedOutfitDetailModalProps> = ({
         {missingItems.length > 0 && (
           <div
             style={{
-              padding: 12,
+              padding: 14,
               borderRadius: 'var(--radius-md)',
               backgroundColor: 'var(--color-surface-subtle)',
               border: '1px solid var(--color-border)',
@@ -148,18 +172,19 @@ export const SavedOutfitDetailModal: React.FC<SavedOutfitDetailModalProps> = ({
             }}
           >
             <AlertTriangle size={18} color="var(--color-danger)" style={{ flexShrink: 0 }} />
-            <p className="text-caption" style={{ fontSize: '0.8rem', color: 'var(--color-text-primary)' }}>
+            <p className="text-caption" style={{ fontSize: '0.8rem', color: 'var(--color-text-primary)', lineHeight: 1.4 }}>
               {missingItems.length === 1
-                ? `1 item (${missingItems[0].name}) is no longer in your wardrobe.`
-                : `${missingItems.length} items from this look are no longer in your wardrobe.`}
+                ? `1 item (${missingItems[0].name}) was removed from your wardrobe.`
+                : `${missingItems.length} items from this look were removed from your wardrobe.`}
             </p>
           </div>
         )}
 
         {/* Garment Grid */}
         <div style={{ marginBottom: 20 }}>
-          <div className="text-metadata" style={{ marginBottom: 10 }}>
-            Outfit Pieces ({validItems.length} available)
+          <div className="text-metadata" style={{ marginBottom: 10, display: 'flex', alignItems: 'center', gap: 6 }}>
+            <Shirt size={13} color="var(--color-primary)" />
+            <span>Garment Composition</span>
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 10 }}>
@@ -178,7 +203,8 @@ export const SavedOutfitDetailModal: React.FC<SavedOutfitDetailModalProps> = ({
                     display: 'flex',
                     alignItems: 'center',
                     gap: 10,
-                    opacity: isMissing ? 0.6 : 1
+                    opacity: isMissing ? 0.6 : 1,
+                    position: 'relative'
                   }}
                 >
                   <div
@@ -188,7 +214,8 @@ export const SavedOutfitDetailModal: React.FC<SavedOutfitDetailModalProps> = ({
                       borderRadius: 'var(--radius-sm)',
                       overflow: 'hidden',
                       flexShrink: 0,
-                      backgroundColor: 'var(--color-surface)'
+                      backgroundColor: 'var(--color-surface)',
+                      border: '1px solid var(--color-border)'
                     }}
                   >
                     <GarmentImage
@@ -212,8 +239,17 @@ export const SavedOutfitDetailModal: React.FC<SavedOutfitDetailModalProps> = ({
                     >
                       {item.name}
                     </div>
-                    <div className="text-caption" style={{ fontSize: '0.72rem' }}>
-                      {isMissing ? 'Removed from wardrobe' : `${item.color} · ${item.category}`}
+                    <div
+                      className="text-caption"
+                      style={{
+                        fontSize: '0.72rem',
+                        color: isMissing ? 'var(--color-danger)' : 'var(--color-text-muted)',
+                        whiteSpace: 'nowrap',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis'
+                      }}
+                    >
+                      {isMissing ? 'Removed from closet' : `${item.color} · ${item.category}`}
                     </div>
                   </div>
                 </div>
@@ -232,7 +268,8 @@ export const SavedOutfitDetailModal: React.FC<SavedOutfitDetailModalProps> = ({
             marginBottom: 24
           }}
         >
-          <div className="text-metadata" style={{ color: 'var(--color-primary)', marginBottom: 4 }}>
+          <div className="text-metadata" style={{ color: 'var(--color-primary)', marginBottom: 4, display: 'flex', alignItems: 'center', gap: 4 }}>
+            <Sparkles size={13} />
             Why it works
           </div>
           <p className="text-body" style={{ fontSize: '0.84rem', lineHeight: 1.45, color: 'var(--color-text-primary)' }}>
@@ -244,7 +281,8 @@ export const SavedOutfitDetailModal: React.FC<SavedOutfitDetailModalProps> = ({
         <div style={{ display: 'flex', gap: 10 }}>
           <button
             onClick={handleRemoveClick}
-            aria-label="Remove saved look"
+            aria-label={`Remove saved look ${outfit.title}`}
+            title="Remove saved look"
             style={{
               padding: '12px 16px',
               borderRadius: 'var(--radius-pill)',
@@ -256,7 +294,8 @@ export const SavedOutfitDetailModal: React.FC<SavedOutfitDetailModalProps> = ({
               cursor: 'pointer',
               display: 'flex',
               alignItems: 'center',
-              gap: 6
+              gap: 6,
+              transition: 'background-color 0.2s ease'
             }}
           >
             <Trash2 size={16} />

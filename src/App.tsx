@@ -57,6 +57,9 @@ export function App() {
     return saved ? JSON.parse(saved) : false;
   });
 
+  // Active restored outfit state for Today screen
+  const [activeTodayOutfit, setActiveTodayOutfit] = useState<Outfit | null>(null);
+
   // Modal States
   const [selectedDetailItem, setSelectedDetailItem] = useState<GarmentItem | null>(null);
   const [isAddItemOpen, setIsAddItemOpen] = useState<boolean>(false);
@@ -127,6 +130,12 @@ export function App() {
     );
   };
 
+  const handleWearAgainOutfit = (outfit: Outfit) => {
+    handleWearOutfit(outfit);
+    setActiveTodayOutfit(outfit);
+    setActiveTab('today');
+  };
+
   const handleUpdatePlanLabel = (day: WeekDay, label: string) => {
     setWeeklyPlan((prev) => prev.map((entry) => (entry.day === day ? { ...entry, label } : entry)));
   };
@@ -191,6 +200,7 @@ export function App() {
             wardrobe={visibleWardrobe}
             savedOutfits={savedOutfits}
             layeringPreference={layeringPreference}
+            externalOutfit={activeTodayOutfit}
             onSaveOutfit={handleSaveOutfit}
             onUnsaveOutfit={handleUnsaveOutfit}
             onWearOutfit={handleWearOutfit}
@@ -235,6 +245,7 @@ export function App() {
             wardrobe={visibleWardrobe}
             savedOutfits={savedOutfits}
             onRemoveSavedOutfit={handleRemoveSavedOutfit}
+            onWearAgainOutfit={handleWearAgainOutfit}
             wardrobeProfile={wardrobeProfile}
             onChangeWardrobeProfile={handleChangeProfile}
             layeringPreference={layeringPreference}
