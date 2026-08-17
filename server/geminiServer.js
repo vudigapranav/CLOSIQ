@@ -42,7 +42,13 @@ STRICT STYLING RULES:
 4. WARDROBE FEASIBILITY: When a wardrobeSummary is provided, its formalityCoverage tells you, per formality tier, how many items actually exist and a rough tier (none/weak/moderate/strong). Use it honestly. If the occasion calls for a formality tier the wardrobe covers weakly or not at all, do NOT claim or imply the result meets that tier anyway — select the closest formality the wardrobe genuinely has, still produce the best possible outfit from owned items, and say so plainly in whyItWorks (e.g. that the wardrobe doesn't currently have formal or evening pieces, so this is the most polished option available). Never invent the impression of tailoring, formality, or polish the actual garments don't have.
 5. Ensure color harmony, fit compatibility, category balance, and appropriate formality for the occasion.
 6. Provide a contextual, genuine explanation in whyItWorks detailing why these specific pieces work together for this exact occasion — including the honest feasibility note from rule 4 when it applies.
-7. Return structured JSON matching the requested schema.`;
+7. Return structured JSON matching the requested schema.
+
+PERSONALIZATION CONTEXT (all of the following may be null — when a field is null, simply skip that consideration entirely; never fabricate a value for a null field or claim to have used context that wasn't provided):
+8. USER STYLE CONTEXT: When userProfileContext is provided, treat stylePreferences as a blended set of preference SIGNALS to interpret into one coherent look — not a checklist of hard constraints and not separate outfits per preference (e.g. "Minimal" + "Streetwear" + "Smart Casual" together should read as one tasteful, coherent interpretation of all three, not three unrelated outfits). When bodyType is provided, use it only for proportion, silhouette, balance, and fit guidance (e.g. favoring a silhouette that flatters the general proportions of that body type) — never state or imply that the user "cannot," "should not," or "must not" wear something because of body type; the user retains full freedom of choice regardless. When skinTone is provided, use it only for color harmony, contrast, and complementary color suggestions — never as a hard restriction; the user's own requested colors and style always take priority over a skin-tone suggestion.
+9. WEATHER CONTEXT: When weatherContext is provided, factor the real, practical conditions into the selection using only owned pieces — favor breathable/lighter pieces in hot conditions, practical footwear and weather-appropriate outerwear in rain, and additional layering in cold conditions. Weather guidance must still respect layeringPreference: never introduce a base_layer to address cold weather if layeringPreference is "avoid" and the user did not explicitly request one. If the wardrobe cannot fully satisfy the ideal weather requirement, select the closest owned pieces and say so honestly in whyItWorks — the same honesty standard as rule 4's formality feasibility, never implying a weather-fit the actual garments don't have.
+10. PLANNER CONTEXT: When plannerContext is provided, treat its title/occasion/notes as the specific real-world event driving this request, and reason about it the same way you reason about the free-text request in the OCCASION REASONING section above — a real, specific occasion, not a flat label.
+11. RECENT OUTFIT VARIETY: When recentOutfitContext is provided, treat recentGarmentIdCombinations as a soft signal to favor a genuinely different combination from what was very recently shown, and treat savedLookVibes (if present) as loose inspiration for the user's demonstrated taste — never as pieces that must be reused or a combination that is permanently forbidden. A small wardrobe reusing a piece from recent history is expected and completely fine; never sacrifice a correct, occasion-appropriate outfit just to force variety. excludedGarmentIds (outside this context) remains the only hard exclusion — everything in recentOutfitContext is a preference, not a rule.`;
 
 /**
  * Endpoint 1: POST /api/ai/analyze-garment
@@ -127,6 +133,14 @@ export async function handleGenerateOutfitServer(body) {
       excludedGarmentIds: body.excludeGarmentIds || [],
       wardrobeCount: body.wardrobe?.length || 0,
       wardrobeSummary: body.wardrobeSummary || null,
+      // Sprint M15: optional personalization context. Each defaults to null
+      // (not omitted) so the prompt's own "may be null" instruction always
+      // has an explicit field to reason about — a request that doesn't send
+      // any of these (every pre-M15 caller) behaves identically to before.
+      userProfileContext: body.userProfileContext || null,
+      weatherContext: body.weatherContext || null,
+      plannerContext: body.plannerContext || null,
+      recentOutfitContext: body.recentOutfitContext || null,
       wardrobe: body.wardrobe
     };
 

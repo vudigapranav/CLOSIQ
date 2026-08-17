@@ -6,8 +6,103 @@ This document tracks the live implementation status of **CLOSIQ**. It is updated
 
 ## Current Phase
 
-* **Phase**: Mobile Sprint M14 — Real Weather + Location
-* **Status**: Today's weather strip had been a 100% hardcoded `"72°F • Clear & Comfortable"` string since before M10's own audit flagged it as fake (and M12's polish pass only made the *number formatting* honest, never the underlying value — see M12 Polish Fix #4). This sprint replaced it with real device-aware weather: `mobile/src/services/weatherService.ts` resolves location permission live (never trusting the one-time onboarding snapshot, which can go stale the moment a user changes it in system Settings), fetches current conditions from Open-Meteo (zero API key required — see Weather Provider below for why that specifically fits this architecture), and caches the last successful reading via a new `weatherCacheStorage.ts` so a network/permission/location failure falls back to "last known conditions" instead of either fabricating a number or leaving Today broken. Reused, not duplicated: the existing `expo-location` dependency (already installed in M12, previously only used for a one-time onboarding ask) and the existing `userProfile.temperatureUnit` preference (already stored, already threaded into `TodayScreen` — this sprint only changed what number gets formatted, not where the preference lives). Zero new dependencies, zero server/Gemini changes, zero web app changes. Full details in "Mobile Sprint M14" below.
+* **Phase**: Mobile Sprint M15 — AI Personalization Engine
+* **Status**: CLOSIQ already collected far more about the user than `generateOutfitMobile()` ever sent to Gemini — body type, skin tone, style preferences, and (since M14) real weather were all stored but invisible to the AI; only `prompt`/`layeringPreference`/`excludeGarmentIds`/`wardrobe` ever reached the server. This sprint connects those existing signals into the existing pipeline via one new composition module, `mobile/src/services/personalizationContext.ts`, which reads from (and duplicates none of) the onboarding profile, M14's weather service, M13's planner events, and M10's outfit history, and shapes them into four small, optional request fields (`userProfileContext`, `weatherContext`, `plannerContext`, `recentOutfitContext`). `generateOutfitMobile()` gained one new optional 5th parameter carrying this bundle — every pre-M15 call site still produces byte-identical request bodies, since `JSON.stringify` drops `undefined` fields. `server/geminiServer.js`'s `handleGenerateOutfitServer` accepts the same four fields (defaulting to `null`, not required) and forwards them to Gemini under seven new general, non-hardcoded reasoning rules appended to `SYSTEM_PROMPT` — no "if X occasion then wear Y" logic anywhere. The garment-ownership validator (`generateOutfitMobile()`'s `validIds` filter) was read and confirmed byte-for-byte unchanged. Live Gemini verification was attempted but blocked by two consecutive `503 UNAVAILABLE` (Google-side capacity, not quota) — stopped after the established one-retry precedent rather than continuing to spend requests against a currently-unavailable model; this sprint's correctness claims are therefore source-verified, not live-Gemini-verified. Full details in "Mobile Sprint M15" below.
+
+---
+
+# MOBILE SPRINT M15 — AI PERSONALIZATION ENGINE
+
+## Audit (Part 1)
+Traced all ten values before writing any code, not assumed:
+
+| Value | Storage | Type | Read path | Today access? | Stylist access? |
+|---|---|---|---|---|---|
+| bodyType | `@closiq_user_profile` (`userProfileStorage.ts`) | `UserProfileData.bodyType` | `App.tsx` loads once on launch → `userProfile` state | **No** — only `userName`/`temperatureUnit` were individually passed | **No** — no `userProfile`-shaped prop existed at all |
+| skinTone | same key | `UserProfileData.skinTone` | same | No | No |
+| stylePreferences | same key | `UserProfileData.stylePreferences` | same | No | No |
+| layeringPreference | `@closiq_profile_settings` (`profileSettingsStorage.ts`) | `LayeringPreference` | `App.tsx` state, already prop-drilled | **Yes** (already used in prompt/fallback) | **Yes** |
+| temperatureUnit | `@closiq_user_profile` | `UserProfileData.temperatureUnit` | same as bodyType | **Yes** (M14) | No |
+| currentWeather | in-memory `WeatherData` from `fetchCurrentWeather()` (M14), cached at `@closiq_weather_cache` | `WeatherData` | Fetched per-screen-mount | **Yes** (M14, display only — never sent to Gemini before this sprint) | No |
+| activeProfile (Men/Women) | `@closiq_profile_settings` | `WardrobeProfile` | `App.tsx` state | Yes | Yes |
+| planner events | `@closiq_planner_events` (`plannerStorage.ts`, M13) | `PlannerEvent[]` | `PlannerScreen.tsx` only | N/A (Today has no event concept) | N/A |
+| outfit history | `@closiq_recent_outfit_signatures` (`outfitHistoryStorage.ts`, M10) | `string[]` (sorted-ID signatures) | Read via `getMostRecentExcludedGarmentIds()` — **only the single most-recent combo, used only as a hard exclude, never sent as any kind of "recent history" signal** | Yes (hard-exclude only) | Yes (hard-exclude only) |
+| saved outfits | `@closiq_saved_outfits` (`savedOutfitsStorage.ts`) | `Outfit[]` | Both screens already load this for their own "is this saved" check | Yes (unused for AI) | Yes (unused for AI) |
+
+Confirmed: every one of these already had exactly one storage location and one TypeScript type — no field required a new key or a second representation. The only genuine gaps were (a) `bodyType`/`skinTone`/`stylePreferences`/full `weather` were never threaded as props into Today/Stylist at all, and (b) outfit history was only ever consulted as a hard-exclude, never as the "recent window" signal Part 5 asks for.
+
+## User Profile Context
+`PASS`. New `buildUserStyleContext(profile, layeringPreference, userProfile)` in `personalizationContext.ts` — shapes exactly the structure the brief specified (`{ profile, bodyType?, skinTone?, stylePreferences?, layeringPreference }`), reading straight from the existing `UserProfileData`/`WardrobeProfile`/`LayeringPreference` types with zero new fields added to any of them. `TodayScreen`, `StylistScreen`, and `PlannerScreen` all gained a new `userProfile?: UserProfileData | null` prop (wired from `App.tsx`'s already-loaded `userProfile` state — no new load) and call this builder on every generate/regenerate.
+
+## Style Preferences
+`PASS`. Forwarded as `userProfileContext.stylePreferences` (the full array, e.g. `["minimal", "streetwear"]`) — only included when non-empty (`buildUserStyleContext` omits the field entirely otherwise, never sends `[]`). `SYSTEM_PROMPT` rule 8 explicitly instructs Gemini to blend multiple selections into "one coherent look... not a checklist of hard constraints and not separate outfits per preference," directly addressing Part 12's example (Minimal + Streetwear + Smart Casual → one interpretation).
+
+## Body Type
+`PASS`. Forwarded as `userProfileContext.bodyType` only when set and not `'prefer_not_to_say'` (that value is a real answer meaning "omit this," not missing data — checked explicitly, not just falsy-checked). `SYSTEM_PROMPT` rule 8 restricts its use to "proportion, silhouette, balance, and fit guidance" and explicitly forbids "cannot/should not/must not" framing, matching Part 10's requirement verbatim. No restrictive-claim example was hardcoded into the prompt — the instruction is a principle, not a template.
+
+## Skin Tone
+`PASS`. Same pattern as Body Type — forwarded only when set and meaningful, `SYSTEM_PROMPT` rule 8 restricts it to "color harmony, contrast, and complementary color suggestions" and explicitly states "the user's own requested colors and style always take priority," matching Part 11.
+
+## Weather Context
+`PASS` for Today (real M14 data, already fetched for the strip — zero new fetch). `PARTIAL` → `PASS` for Stylist and Planner, with one deliberate scoping decision: `StylistScreen` now also calls `fetchCurrentWeather()` (M14's shared, cached service — confirmed by reading `weatherService.ts` again this sprint that it is NOT a second implementation, just a second caller of the same cached function) so its generations are weather-aware too, silently (no new UI — Today alone owns the visible weather strip, per M14's own scope). `PlannerScreen` also fetches it, but **only attaches `weatherContext` when the planned event's date equals today** (`planningEvent.date === todayLocalDate()`) — `weatherService.ts` only ever returns *current* conditions, no forecast, so attaching "today's weather" to a future-dated event would be a real, specific misrepresentation (the number itself wouldn't be fabricated, but its relevance to that day would be false). This is a deliberate, documented scope decision, not an oversight. When weather is unavailable (any of M14's failure states), `buildWeatherContext()` returns `undefined` and the field is simply omitted — confirmed no fallback number is ever invented.
+
+## Planner Context
+`PASS`. `buildPlannerContext(event)` is only ever called from `PlannerScreen.tsx`'s `runGenerate()`, passed the exact `planningEvent` the user is actively generating for (title/occasion/date/time/notes) — never a historical or unrelated event, and never called at all from Today or Stylist (neither imports `buildPlannerContext`, confirmed by grep). This satisfies Part 4's "prefer the currently selected/upcoming event" and Part 15's "do NOT inject arbitrary planner data" when there's no selected event — there is structurally no code path that could send planner context without an active `planningEvent`.
+
+## Outfit History
+`PASS`. Root cause found before writing any code: `getMostRecentExcludedGarmentIds()` (M10) only ever returned the single most-recent combination, used solely as a hard exclude — there was no "small recent window" signal at all prior to this sprint, so Part 5 was a real, not cosmetic, gap. New `buildRecentOutfitContext(savedOutfits)` reads `loadRecentOutfitSignatures()` **once** and derives both: the unchanged hard-exclude (`excludeGarmentIds`, still just the single most-recent combo — deliberately not widened, to avoid over-constraining a small wardrobe, exactly M10's original reasoning) and a new soft window (`recentGarmentIdCombinations`, last 3 signatures) forwarded as context Gemini is told (`SYSTEM_PROMPT` rule 11) to treat as "a soft signal to favor a genuinely different combination... never as pieces that must be reused or a combination that is permanently forbidden." The old `getMostRecentExcludedGarmentIds()` function was deleted (not left as dead code) once every call site (Today, Stylist, Planner) was migrated to the combined reader — confirmed zero remaining references by grep.
+
+## Saved / Worn Looks
+`PASS`. Traced Wear Again (`App.tsx`'s `handleWearAgain`) and confirmed it already calls `recordRecentOutfit()` — meaning "recently worn" was already folded into the exact same outfit-history signal "recently generated" uses, unified by construction, not something this sprint needed to build separately (Part 6's "recently worn looks → lower priority" was already true before this sprint; this sprint's job was making that signal visible to Gemini, which `recentOutfitContext` now does). Genuinely new this sprint: `savedLookVibes` (up to 2 saved-outfit `vibe` strings, reusing `savedOutfits` state Today/Stylist already had loaded — zero new storage read) riding along in `recentOutfitContext` as loose inspiration, matching Part 6's "available as inspiration / context where appropriate" without treating any saved look as forbidden or required. Wear Again itself (`onUseForToday` prop, unchanged since M13) was not touched — confirmed still calls the identical `App.tsx` function.
+
+## Layering Preference
+`PASS`. Unchanged storage/read path (`profileSettingsStorage.ts`), still the same value passed as `layeringPreference` at the top level of the request (existing field, not new) AND now also echoed inside `userProfileContext.layeringPreference` for the AI's blended-context reasoning. `SYSTEM_PROMPT`'s pre-existing rule 2 ("If layeringPreference is 'avoid', do NOT automatically include base_layer garments... unless explicitly requested") is unmodified; new rule 9 explicitly reinforces it for the weather-driven case specifically ("never introduce a base_layer to address cold weather if layeringPreference is 'avoid'"), closing the one realistic way weather-awareness could have silently overridden an explicit preference.
+
+## Profile Isolation
+`PASS` for what this sprint touches; **pre-existing, documented, unchanged** for the one boundary that was never wardrobe-related. Wardrobe/garment isolation (`@closiq_user_wardrobe_men`/`_women`) was not modified this sprint — confirmed by diff, `wardrobeStorage.ts` was not touched — so a Men↔Women switch still cannot leak garments, unchanged since M10. `UserProfileData` (bodyType/skinTone/stylePreferences) remains, as it always has been (M12's own documented architecture, re-confirmed this sprint rather than assumed), a single **device-global** record not split by Men/Women — so switching profiles changes which wardrobe/`profile` label is sent, but not which style-context accompanies it. This is not a regression introduced by M15; it is the pre-existing single-profile-per-device architecture every prior sprint has documented, now simply visible to the AI for the first time. Not redesigned, per instruction.
+
+## Validator
+`PASS`. `outfitStylist.ts`'s `validIds = resData.data.garmentIds.filter((id) => wardrobe.some((item) => item.id === id))` — the mobile app's actual ownership boundary (there is no separate `validator.ts` in `mobile/`, confirmed by a fresh directory check this sprint) — was read line-by-line before and after this sprint's edits and is byte-for-byte identical; the only change to `outfitStylist.ts` was adding the 5th optional parameter and four new (all-optional) request-body fields above this filter, nothing below it. Source-verified with valid IDs, profile switching (unaffected — wardrobe passed to `generateOutfitMobile` is still whatever `loadUserWardrobe(profile)` returned, unchanged), uploaded garments (same `GarmentItem[]` array, no special-casing), exclusion IDs (still computed and passed the same way, just now also sourced from the consolidated `buildRecentOutfitContext` read), and personalization context (the four new fields are additive to the request body and play no role in the response-validation filter at all — confirmed by re-reading the function, the filter only ever references `wardrobe`, never the new context fields).
+
+## Fallback
+`PASS`. `generateOutfitMobile()`'s deterministic fallback path (lines following the `try/catch` around the `fetch()` call) references `wardrobe`/`excludeGarmentIds`/`layeringPreference`/`prompt` only — it was not modified this sprint and never reads any of the four new personalization fields, so a Gemini failure (network error, `503`, malformed response) degrades exactly as before regardless of whether weather/planner/body-type/style-preference context was present or absent. Explicitly confirmed by re-reading the fallback block fresh: missing weather, missing planner, missing body type, missing style preferences all fall through identically, because the fallback code path never touches `personalization` at all — it's not a case-by-case "missing X still works" patchwork, it's structurally impossible for missing personalization to affect the fallback since that code has zero reference to it.
+
+## Gemini
+`NOT TESTED — 503 UNAVAILABLE (Google-side capacity, not quota)`. Before attempting anything live, checked for a running server (found and correctly ignored an unrelated process already on port 3000, confirmed via a GET request returning `404` instead of `apiRouter.js`'s expected `405` — the tell that it wasn't CLOSIQ's own router) and started the real server on a scratch port (`PORT=3900 npm run start`), confirming `Gemini mode: LIVE (GEMINI_API_KEY configured)`. Confirmed method-gating still correct post-changes (GET → `405`, malformed body → generic `500`, both with zero quota spent) before attempting anything real. Attempted Test 1 ("Personalized casual outfit" — full `userProfileContext`/`weatherContext`/`recentOutfitContext`, six realistic wardrobe items from the actual catalog) twice (one retry, per this project's own established `503`-gets-exactly-one-retry precedent from the Backend AI Live Verification session): both attempts returned `503 UNAVAILABLE` ("high demand"), never a `429`. Per instruction not to burn quota chasing an already-unavailable model, stopped after the second `503` rather than continuing toward Tests 2–4 — a working baseline was never established, so proceeding further would have been guessing, not verifying. Quota status itself remains genuinely unknown (neither confirmed exhausted nor confirmed available) — this is a distinct, honestly-reported outcome from both "LIVE VERIFIED" and "NOT TESTED — QUOTA", and is reported as such rather than rounded to either.
+
+## Physical Device
+`NOT TESTED`. No physical iPhone was available this sprint; the iOS Simulator remains blocked on the same user-side permission grant flagged in M13/M14 and was not re-attempted (nothing about that state would have changed on its own). Everything above is source-level reasoning plus one server-level live-request attempt (blocked by `503`, see Gemini) — no personalized outfit has actually been seen rendered on a screen, no body-type/skin-tone/weather-aware Gemini response has been read, and no Men/Women switch was exercised on a running app this sprint.
+
+## TypeScript
+`PASS` — `cd mobile && npx tsc --noEmit`, 0 errors, checked after every file added/edited this sprint including after the `getMostRecentExcludedGarmentIds` deletion.
+
+## iOS Bundle
+`PASS` — `npx expo export --platform ios`, 2516 modules (up from M14's 2515: the new `personalizationContext.ts`). Real `.hbc` bundle produced.
+
+## Android Bundle
+`PASS` — `npx expo export --platform android`, 2522 modules, real `.hbc` bundle produced. Run explicitly, not skipped in favor of `tsc`/iOS alone.
+
+## Web Build
+`PASS` — `npm run build`, 0 errors. `src/` (the web app) was not modified this sprint — confirmed by `git status`, changes are confined to `mobile/` and `server/geminiServer.js`.
+
+## Web Lint
+`PASS` — `oxlint` (repo-wide), 0 errors, 0 warnings — checked after every edit, including after the dead-code deletion.
+
+## P0
+None found.
+
+## P1
+1. **Zero live-Gemini confirmation that the new prompt rules actually change model behavior** — the `503`s blocked every planned live test (personalized casual, weather-aware, planner-aware, recent-outfit differentiation). The prompt rules are principle-based and reviewed carefully against Parts 9–15's constraints, but "the prompt reads correctly" and "Gemini reliably follows it" are different claims, and only the first is verified this sprint.
+2. **Zero physical-device/Simulator confirmation** — same recurring gap M13/M14 already flagged, now also covering whether the new `userProfile` prop plumbing and Stylist's new (silent) weather fetch behave correctly on an actual running app rather than just compiling and bundling cleanly.
+3. **Quota status is unknown, not confirmed available or exhausted** — worth a deliberate retry later specifically because the two `503`s this sprint were never a `429`; a future session could get a clean result on the very first attempt.
+
+## P2
+1. `StylistScreen.tsx`'s and `PlannerScreen.tsx`'s own `handleSaveOutfit`/`handleSaveToEvent` still hardcode `temperature: 72` and a generic `weatherSuitability` string (unlike `TodayScreen`, which M14 already made real) — noticed while wiring Stylist's new weather state, deliberately left untouched this sprint since M15's scope is the generation *request*, not every screen's save-time rationale text; a natural small follow-up now that both screens have `weather` in scope.
+2. `mobile/AGENTS.md` still points at SDK-57 docs (flagged since M9, still out of scope for this sprint specifically).
+3. `wardrobeSummary` (a pre-existing, already-server-supported field referenced by `SYSTEM_PROMPT` rule 4) is still never sent by the mobile client — noticed during the server-side audit, out of scope for this sprint (Part 7's target request shape didn't include it), but a real, separate gap from anything M15 was asked to fix.
+
+## NEXT SINGLE TASK
+`Retry the Gemini live-verification pass from a fresh session (Test 1 "Personalized casual outfit" first, as a quota/availability probe, stopping immediately on 429 exactly as this sprint did on 503) — the two 503s this sprint were Google-side capacity, not a code defect, so a clean retry is the highest-value next step before anything else, including physical-device testing (which needs a working live path to be worth exercising with real Gemini responses rather than only the fallback engine).` Do not start a new feature sprint on top of a personalization pipeline that has never actually been seen influencing a real Gemini response.
 
 ---
 

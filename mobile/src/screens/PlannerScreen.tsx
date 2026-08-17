@@ -14,11 +14,20 @@ import { COLORS, RADIUS } from '../theme';
 import { GarmentItem, WardrobeProfile, LayeringPreference, Outfit } from '../../../src/types/wardrobe';
 import { loadUserWardrobe } from '../services/wardrobeStorage';
 import { generateOutfitMobile, swapGarmentMobile, MobileOutfitResult } from '../services/outfitStylist';
-import { recordRecentOutfit, getMostRecentExcludedGarmentIds } from '../services/outfitHistoryStorage';
+import { recordRecentOutfit } from '../services/outfitHistoryStorage';
 import { OutfitResultCard } from '../components/OutfitResultCard';
 import { AddEventModal, EventFormData } from '../components/AddEventModal';
 import { EventDetailModal } from '../components/EventDetailModal';
 import { PlannerEvent } from '../types/planner';
+import { UserProfileData } from '../types/onboarding';
+import { WeatherData } from '../types/weather';
+import { fetchCurrentWeather } from '../services/weatherService';
+import {
+  buildUserStyleContext,
+  buildWeatherContext,
+  buildPlannerContext,
+  buildRecentOutfitContext
+} from '../services/personalizationContext';
 import {
   loadPlannerEvents,
   addPlannerEvent,
@@ -31,6 +40,7 @@ import {
 interface PlannerScreenProps {
   profile: WardrobeProfile;
   layeringPreference?: LayeringPreference;
+  userProfile?: UserProfileData | null;
   onUseForToday: (outfit: Outfit) => void;
   onNavigateToCollection?: () => void;
 }
@@ -38,6 +48,7 @@ interface PlannerScreenProps {
 export const PlannerScreen: React.FC<PlannerScreenProps> = ({
   profile,
   layeringPreference = 'avoid',
+  userProfile,
   onUseForToday,
   onNavigateToCollection
 }) => {
@@ -57,9 +68,26 @@ export const PlannerScreen: React.FC<PlannerScreenProps> = ({
   const [planError, setPlanError] = useState<string | null>(null);
   const [selectedGarmentForSwap, setSelectedGarmentForSwap] = useState<GarmentItem | null>(null);
   const [swapping, setSwapping] = useState(false);
+  const [weather, setWeather] = useState<WeatherData | null>(null);
 
   useEffect(() => {
     loadPlannerEvents().then(setEvents);
+  }, []);
+
+  // Reuses M14's shared weather service/cache — not a second weather
+  // system. Only ever used as personalization context for an event dated
+  // TODAY (see runGenerate below): the service only ever returns CURRENT
+  // conditions, not a forecast, so attaching it to a future-dated event
+  // would misrepresent tomorrow's weather as today's — omitted there
+  // instead of sent misleadingly.
+  useEffect(() => {
+    let cancelled = false;
+    fetchCurrentWeather().then((res) => {
+      if (!cancelled) setWeather(res.weather);
+    });
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   // Events are device-level, not profile-scoped (see plannerStorage.ts) —
@@ -130,9 +158,24 @@ export const PlannerScreen: React.FC<PlannerScreenProps> = ({
       setPlanError(null);
 
       const prompt = `${planningEvent.occasion}: ${planningEvent.title}`;
-      const recentExclude = await getMostRecentExcludedGarmentIds();
-      const excludeIds = Array.from(new Set([...recentExclude, ...excludeExtra]));
-      const res = await generateOutfitMobile(prompt, wardrobe, layeringPreference, excludeIds);
+      const recent = await buildRecentOutfitContext();
+      const excludeIds = Array.from(new Set([...recent.excludeGarmentIds, ...excludeExtra]));
+
+      // weatherService only ever returns CURRENT conditions (no forecast —
+      // out of M14's scope), so only attach it when the event is actually
+      // today; a future-dated event gets no weatherContext rather than a
+      // misleading "today's weather" stand-in for a different day.
+      const isEventToday = planningEvent.date === todayLocalDate();
+      const personalization = {
+        userProfileContext: buildUserStyleContext(profile, layeringPreference, userProfile),
+        weatherContext: isEventToday
+          ? buildWeatherContext(weather, userProfile?.temperatureUnit || 'celsius')
+          : undefined,
+        plannerContext: buildPlannerContext(planningEvent),
+        recentOutfitContext: recent.context
+      };
+
+      const res = await generateOutfitMobile(prompt, wardrobe, layeringPreference, excludeIds, personalization);
 
       setPlanLoading(false);
       if (res.ok && res.data && res.data.garmentIds.length > 0) {
@@ -142,7 +185,7 @@ export const PlannerScreen: React.FC<PlannerScreenProps> = ({
         setPlanError(res.error || 'CLOSIQ couldn’t build a look right now. Try again.');
       }
     },
-    [planningEvent, wardrobe, layeringPreference]
+    [planningEvent, wardrobe, layeringPreference, profile, userProfile, weather]
   );
 
   const resolvedGarments: GarmentItem[] = useMemo(

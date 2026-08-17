@@ -1,5 +1,6 @@
 import { GarmentItem, GarmentCategory, LayeringPreference } from '../../../src/types/wardrobe';
 import { API_BASE_URL } from '../config';
+import { OutfitPersonalizationContext } from './personalizationContext';
 
 export interface MobileOutfitResult {
   title: string;
@@ -23,7 +24,8 @@ export async function generateOutfitMobile(
   prompt: string,
   wardrobe: GarmentItem[],
   layeringPreference: LayeringPreference = 'avoid',
-  excludeGarmentIds: string[] = []
+  excludeGarmentIds: string[] = [],
+  personalization?: OutfitPersonalizationContext
 ): Promise<{ ok: boolean; mode: 'gemini' | 'fallback'; data: MobileOutfitResult; error?: string }> {
   if (!wardrobe || wardrobe.length === 0) {
     return {
@@ -66,7 +68,15 @@ export async function generateOutfitMobile(
         prompt,
         layeringPreference,
         excludeGarmentIds,
-        wardrobe: formattedWardrobe
+        wardrobe: formattedWardrobe,
+        // Undefined fields are dropped by JSON.stringify, so calling this
+        // function without a 5th argument (every pre-M15 call site) sends
+        // the exact same body as before — this is additive, not a breaking
+        // change to the request shape.
+        userProfileContext: personalization?.userProfileContext,
+        weatherContext: personalization?.weatherContext,
+        plannerContext: personalization?.plannerContext,
+        recentOutfitContext: personalization?.recentOutfitContext
       })
     });
 

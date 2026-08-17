@@ -43,18 +43,3 @@ export async function recordRecentOutfit(garmentIds: string[]): Promise<void> {
   }
 }
 
-/**
- * Garment IDs from only the single most-recently-seen combination, for use
- * as `excludeGarmentIds` on a fresh generate. Deliberately NOT the union of
- * the full history (last 5-10 combos) — that would over-constrain a small
- * wardrobe fast (a 2-top/2-bottom minimum wardrobe has almost no room left
- * once several past combinations are all excluded at once). This is a
- * "don't immediately repeat what I just saw" signal, not an exhaustive
- * memory — which matches the product rule that a past outfit should become
- * eligible again after enough other recommendations, not be banned forever.
- */
-export async function getMostRecentExcludedGarmentIds(): Promise<string[]> {
-  const signatures = await loadRecentOutfitSignatures();
-  if (signatures.length === 0) return [];
-  return signatures[0].split('|').filter(Boolean);
-}

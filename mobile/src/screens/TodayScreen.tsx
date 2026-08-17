@@ -18,11 +18,12 @@ import { GarmentItem, WardrobeProfile, LayeringPreference, Outfit } from '../../
 import { loadUserWardrobe } from '../services/wardrobeStorage';
 import { generateOutfitMobile, swapGarmentMobile, MobileOutfitResult } from '../services/outfitStylist';
 import { loadSavedOutfits, saveOutfitToStorage, isSameOutfitItems } from '../services/savedOutfitsStorage';
-import { recordRecentOutfit, getMostRecentExcludedGarmentIds } from '../services/outfitHistoryStorage';
+import { recordRecentOutfit } from '../services/outfitHistoryStorage';
 import { OutfitResultCard } from '../components/OutfitResultCard';
-import { TemperatureUnit } from '../types/onboarding';
+import { TemperatureUnit, UserProfileData } from '../types/onboarding';
 import { WeatherData, WeatherFetchStatus } from '../types/weather';
 import { fetchCurrentWeather, celsiusToFahrenheit } from '../services/weatherService';
+import { buildUserStyleContext, buildWeatherContext, buildRecentOutfitContext } from '../services/personalizationContext';
 
 const { width } = Dimensions.get('window');
 
@@ -59,6 +60,7 @@ interface TodayScreenProps {
   wearAgainOutfit?: Outfit | null;
   userName?: string;
   temperatureUnit?: TemperatureUnit;
+  userProfile?: UserProfileData | null;
   onNavigateToCollection?: () => void;
 }
 
@@ -68,6 +70,7 @@ export const TodayScreen: React.FC<TodayScreenProps> = ({
   wearAgainOutfit,
   userName,
   temperatureUnit = 'celsius',
+  userProfile,
   onNavigateToCollection
 }) => {
   const [selectedOccasion, setSelectedOccasion] = useState('College');
@@ -153,11 +156,17 @@ export const TodayScreen: React.FC<TodayScreenProps> = ({
     setErrorMessage(null);
 
     const promptText = customPrompt.trim() || `${selectedOccasion} occasion`;
-    // Lightweight anti-repeat memory: exclude whatever combination was most
-    // recently shown (persisted, so this holds across app restarts — the
-    // in-memory-only version of this only ever protected a single session).
-    const recentExclude = await getMostRecentExcludedGarmentIds();
-    const res = await generateOutfitMobile(promptText, wardrobe, layeringPreference, recentExclude);
+    // Lightweight anti-repeat memory: hard-exclude whatever combination was
+    // most recently shown (persisted, so this holds across app restarts),
+    // plus a small soft "recently seen" window forwarded as personalization
+    // context — one AsyncStorage read serves both, see buildRecentOutfitContext.
+    const recent = await buildRecentOutfitContext(savedOutfits);
+    const personalization = {
+      userProfileContext: buildUserStyleContext(profile, layeringPreference, userProfile),
+      weatherContext: buildWeatherContext(weather, temperatureUnit),
+      recentOutfitContext: recent.context
+    };
+    const res = await generateOutfitMobile(promptText, wardrobe, layeringPreference, recent.excludeGarmentIds, personalization);
 
     setLoading(false);
     if (res.ok && res.data && res.data.garmentIds.length > 0) {
@@ -182,10 +191,15 @@ export const TodayScreen: React.FC<TodayScreenProps> = ({
     setErrorMessage(null);
 
     const promptText = customPrompt.trim() || `${selectedOccasion} occasion`;
-    const recentExclude = await getMostRecentExcludedGarmentIds();
-    const excludeIds = Array.from(new Set([...outfitResult.data.garmentIds, ...recentExclude]));
+    const recent = await buildRecentOutfitContext(savedOutfits);
+    const excludeIds = Array.from(new Set([...outfitResult.data.garmentIds, ...recent.excludeGarmentIds]));
+    const personalization = {
+      userProfileContext: buildUserStyleContext(profile, layeringPreference, userProfile),
+      weatherContext: buildWeatherContext(weather, temperatureUnit),
+      recentOutfitContext: recent.context
+    };
 
-    const res = await generateOutfitMobile(promptText, wardrobe, layeringPreference, excludeIds);
+    const res = await generateOutfitMobile(promptText, wardrobe, layeringPreference, excludeIds, personalization);
 
     setLoading(false);
     if (res.ok && res.data && res.data.garmentIds.length > 0) {
@@ -201,7 +215,7 @@ export const TodayScreen: React.FC<TodayScreenProps> = ({
     } else {
       setErrorMessage(res.error || 'Unable to regenerate look.');
     }
-  }, [outfitResult, wardrobe, customPrompt, selectedOccasion, layeringPreference]);
+  }, [outfitResult, wardrobe, customPrompt, selectedOccasion, layeringPreference, savedOutfits, profile, userProfile, weather, temperatureUnit]);
 
   const handleSwapGarment = async (garment: GarmentItem) => {
     if (!outfitResult) return;

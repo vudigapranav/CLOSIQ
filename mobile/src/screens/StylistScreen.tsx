@@ -16,8 +16,12 @@ import { GarmentItem, WardrobeProfile, LayeringPreference, Outfit } from '../../
 import { loadUserWardrobe } from '../services/wardrobeStorage';
 import { generateOutfitMobile, swapGarmentMobile, MobileOutfitResult } from '../services/outfitStylist';
 import { loadSavedOutfits, saveOutfitToStorage, isSameOutfitItems } from '../services/savedOutfitsStorage';
-import { recordRecentOutfit, getMostRecentExcludedGarmentIds } from '../services/outfitHistoryStorage';
+import { recordRecentOutfit } from '../services/outfitHistoryStorage';
 import { OutfitResultCard } from '../components/OutfitResultCard';
+import { UserProfileData } from '../types/onboarding';
+import { WeatherData } from '../types/weather';
+import { fetchCurrentWeather } from '../services/weatherService';
+import { buildUserStyleContext, buildWeatherContext, buildRecentOutfitContext } from '../services/personalizationContext';
 
 const PROMPT_SUGGESTIONS = [
   'Date Night Minimal',
@@ -30,12 +34,14 @@ const PROMPT_SUGGESTIONS = [
 interface StylistScreenProps {
   profile?: WardrobeProfile;
   layeringPreference?: LayeringPreference;
+  userProfile?: UserProfileData | null;
   onNavigateToCollection?: () => void;
 }
 
 export const StylistScreen: React.FC<StylistScreenProps> = ({
   profile = 'men',
   layeringPreference = 'avoid',
+  userProfile,
   onNavigateToCollection
 }) => {
   const [promptText, setPromptText] = useState('');
@@ -49,6 +55,21 @@ export const StylistScreen: React.FC<StylistScreenProps> = ({
     data: MobileOutfitResult;
   } | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [weather, setWeather] = useState<WeatherData | null>(null);
+
+  // Reuses M14's shared weather service (with its own cache/throttle) — no
+  // second weather-fetching implementation, and no visible UI added here
+  // (the weather strip is Today's alone); this only makes the reading
+  // available as personalization context for Stylist's own generations.
+  useEffect(() => {
+    let cancelled = false;
+    fetchCurrentWeather().then((res) => {
+      if (!cancelled) setWeather(res.weather);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   // Load ONLY the current user's own wardrobe (uploads) on profile change —
   // see the identical note in TodayScreen.tsx (Mobile Sprint M10, Issue 3):
@@ -76,8 +97,13 @@ export const StylistScreen: React.FC<StylistScreenProps> = ({
     setErrorMessage(null);
 
     const query = promptText.trim() || 'Date Night Minimal';
-    const recentExclude = await getMostRecentExcludedGarmentIds();
-    const res = await generateOutfitMobile(query, wardrobe, layeringPreference, recentExclude);
+    const recent = await buildRecentOutfitContext(savedOutfits);
+    const personalization = {
+      userProfileContext: buildUserStyleContext(profile, layeringPreference, userProfile),
+      weatherContext: buildWeatherContext(weather, userProfile?.temperatureUnit || 'celsius'),
+      recentOutfitContext: recent.context
+    };
+    const res = await generateOutfitMobile(query, wardrobe, layeringPreference, recent.excludeGarmentIds, personalization);
 
     setLoading(false);
     if (res.ok && res.data && res.data.garmentIds.length > 0) {
@@ -102,10 +128,15 @@ export const StylistScreen: React.FC<StylistScreenProps> = ({
     setErrorMessage(null);
 
     const query = promptText.trim() || 'Custom Stylist Look';
-    const recentExclude = await getMostRecentExcludedGarmentIds();
-    const excludeIds = Array.from(new Set([...outfitResult.data.garmentIds, ...recentExclude]));
+    const recent = await buildRecentOutfitContext(savedOutfits);
+    const excludeIds = Array.from(new Set([...outfitResult.data.garmentIds, ...recent.excludeGarmentIds]));
+    const personalization = {
+      userProfileContext: buildUserStyleContext(profile, layeringPreference, userProfile),
+      weatherContext: buildWeatherContext(weather, userProfile?.temperatureUnit || 'celsius'),
+      recentOutfitContext: recent.context
+    };
 
-    const res = await generateOutfitMobile(query, wardrobe, layeringPreference, excludeIds);
+    const res = await generateOutfitMobile(query, wardrobe, layeringPreference, excludeIds, personalization);
 
     setLoading(false);
     if (res.ok && res.data && res.data.garmentIds.length > 0) {
@@ -120,7 +151,7 @@ export const StylistScreen: React.FC<StylistScreenProps> = ({
     } else {
       setErrorMessage(res.error || 'Unable to regenerate look.');
     }
-  }, [outfitResult, wardrobe, promptText, layeringPreference]);
+  }, [outfitResult, wardrobe, promptText, layeringPreference, savedOutfits, profile, userProfile, weather]);
 
   const handleSwapGarment = async (garment: GarmentItem) => {
     if (!outfitResult) return;

@@ -161,6 +161,7 @@ export default function App() {
             wearAgainOutfit={wearAgainOutfit}
             userName={userProfile.name}
             temperatureUnit={userProfile.temperatureUnit}
+            userProfile={userProfile}
             onNavigateToCollection={() => setActiveTab('collection')}
           />
         )}
@@ -169,6 +170,7 @@ export default function App() {
           <PlannerScreen
             profile={profile}
             layeringPreference={layeringPreference}
+            userProfile={userProfile}
             onUseForToday={handleWearAgain}
             onNavigateToCollection={() => setActiveTab('collection')}
           />
@@ -177,6 +179,7 @@ export default function App() {
           <StylistScreen
             profile={profile}
             layeringPreference={layeringPreference}
+            userProfile={userProfile}
             onNavigateToCollection={() => setActiveTab('collection')}
           />
         )}
