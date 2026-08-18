@@ -1,7 +1,8 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { PlannerEvent } from '../types/planner';
+import { userScopedKey } from './authSession';
 
-const STORAGE_KEY = '@closiq_planner_events';
+const BASE_STORAGE_KEY = '@closiq_planner_events';
 
 /**
  * Local-timezone-safe date/time formatting and parsing.
@@ -57,7 +58,7 @@ export function formatEventTimeLabel(timeStr: string): string {
 
 export async function loadPlannerEvents(): Promise<PlannerEvent[]> {
   try {
-    const raw = await AsyncStorage.getItem(STORAGE_KEY);
+    const raw = await AsyncStorage.getItem(userScopedKey(BASE_STORAGE_KEY));
     if (!raw) return [];
     const parsed = JSON.parse(raw);
     return Array.isArray(parsed) ? (parsed as PlannerEvent[]) : [];
@@ -68,7 +69,7 @@ export async function loadPlannerEvents(): Promise<PlannerEvent[]> {
 }
 
 async function persist(events: PlannerEvent[]): Promise<PlannerEvent[]> {
-  await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(events));
+  await AsyncStorage.setItem(userScopedKey(BASE_STORAGE_KEY), JSON.stringify(events));
   return events;
 }
 

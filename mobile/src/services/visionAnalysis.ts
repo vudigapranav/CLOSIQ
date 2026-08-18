@@ -1,5 +1,6 @@
 import { GarmentCategory, FormalityLevel, LayeringRole } from '../../../src/types/wardrobe';
 import { API_BASE_URL } from '../config';
+import { getAuthHeader } from './authService';
 
 export interface VisionAnalysisResult {
   name: string;
@@ -28,7 +29,7 @@ export async function analyzeGarmentImageMobile(
   try {
     const response = await fetch(SERVER_URL, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...(await getAuthHeader()) },
       body: JSON.stringify({
         imageData: base64Data,
         mimeType,

@@ -3,6 +3,7 @@ import {
   handleGenerateOutfitServer,
   handleSwapGarmentServer
 } from './geminiServer.js';
+import { getAuthenticatedUserId } from './authVerify.js';
 
 /**
  * Shared /api/ai/* request dispatch — the one place that knows how to turn a
@@ -57,6 +58,20 @@ export async function handleApiRequest(req, res) {
   if (!handler) {
     res.statusCode = 404;
     res.end(JSON.stringify({ ok: false, error: 'Endpoint not found' }));
+    return true;
+  }
+
+  // Sprint M17: every /api/ai/* call must carry a valid Supabase session.
+  // The user id itself isn't used below (these three endpoints are
+  // stateless Gemini proxies with nothing server-side to scope by) — this
+  // is purely an authentication gate, verified from the token itself, never
+  // from anything the client claims. Fails closed: a request with no
+  // token, an invalid token, or a server with Supabase unconfigured are all
+  // rejected the same way, never treated as "unauthenticated = allowed."
+  const authenticatedUserId = await getAuthenticatedUserId(req);
+  if (!authenticatedUserId) {
+    res.statusCode = 401;
+    res.end(JSON.stringify({ ok: false, error: 'Authentication required' }));
     return true;
   }
 

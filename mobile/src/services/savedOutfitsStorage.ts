@@ -1,11 +1,12 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Outfit } from '../../../src/types/wardrobe';
+import { userScopedKey } from './authSession';
 
-const STORAGE_KEY = '@closiq_saved_outfits';
+const BASE_STORAGE_KEY = '@closiq_saved_outfits';
 
 export async function loadSavedOutfits(): Promise<Outfit[]> {
   try {
-    const raw = await AsyncStorage.getItem(STORAGE_KEY);
+    const raw = await AsyncStorage.getItem(userScopedKey(BASE_STORAGE_KEY));
     if (!raw) return [];
     return JSON.parse(raw) as Outfit[];
   } catch (err) {
@@ -27,7 +28,7 @@ export async function saveOutfitToStorage(outfit: Outfit): Promise<Outfit[]> {
     }
 
     const updated = [{ ...outfit, saved: true }, ...existing];
-    await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+    await AsyncStorage.setItem(userScopedKey(BASE_STORAGE_KEY), JSON.stringify(updated));
     return updated;
   } catch (err) {
     console.warn('Failed to save outfit to storage:', err);
@@ -39,7 +40,7 @@ export async function removeSavedOutfitFromStorage(id: string): Promise<Outfit[]
   try {
     const existing = await loadSavedOutfits();
     const updated = existing.filter((o) => o.id !== id);
-    await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+    await AsyncStorage.setItem(userScopedKey(BASE_STORAGE_KEY), JSON.stringify(updated));
     return updated;
   } catch (err) {
     console.warn('Failed to remove saved outfit from storage:', err);

@@ -7,13 +7,12 @@ import {
   TouchableOpacity,
   TextInput,
   Modal,
-  Image
+  Image,
+  Alert
 } from 'react-native';
-import { User, Layers, Heart, Sparkles, Shirt, ChevronRight, Bookmark, Pencil, X, Check } from 'lucide-react-native';
+import { User, Layers, Heart, Sparkles, Shirt, ChevronRight, Bookmark, Pencil, X, Check, LogOut, Mail } from 'lucide-react-native';
 import { COLORS, RADIUS } from '../theme';
 import { WardrobeProfile, LayeringPreference, Outfit, GarmentItem } from '../../../src/types/wardrobe';
-import { loadUserWardrobe } from '../services/wardrobeStorage';
-import { loadSavedOutfits, removeSavedOutfitFromStorage } from '../services/savedOutfitsStorage';
 import { SavedLookDetailModal } from '../components/SavedLookDetailModal';
 import { BodyTypeOptionCard } from '../components/BodyTypeOptionCard';
 import {
@@ -36,6 +35,11 @@ interface ProfileScreenProps {
   onNavigateToToday: () => void;
   userProfile: UserProfileData;
   onUpdateUserProfile: (partial: Partial<UserProfileData>) => Promise<void>;
+  wardrobe: GarmentItem[];
+  savedOutfits: Outfit[];
+  onDeleteSavedOutfit: (id: string) => Promise<void>;
+  userEmail: string | null;
+  onLogout: () => Promise<void>;
 }
 
 const BODY_TYPE_LABEL: Record<string, string> = Object.fromEntries(
@@ -56,35 +60,32 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
   onWearAgain,
   onNavigateToToday,
   userProfile,
-  onUpdateUserProfile
+  onUpdateUserProfile,
+  wardrobe,
+  savedOutfits,
+  onDeleteSavedOutfit,
+  userEmail,
+  onLogout
 }) => {
-  const [savedOutfits, setSavedOutfits] = useState<Outfit[]>([]);
-  const [activeWardrobe, setActiveWardrobe] = useState<GarmentItem[]>([]);
   const [selectedOutfit, setSelectedOutfit] = useState<Outfit | null>(null);
   const [showEditProfile, setShowEditProfile] = useState(false);
 
-  // Load saved outfits and the user's OWN wardrobe (uploads only — never the
-  // seed/reference catalog, see TodayScreen.tsx's identical note) for the
-  // active profile. "Cataloged Garments" below must count what the user
-  // actually owns, not the reference catalog riding along invisibly.
-  useEffect(() => {
-    async function loadData() {
-      const saved = await loadSavedOutfits();
-      setSavedOutfits(saved);
-
-      const user = await loadUserWardrobe(profile);
-      setActiveWardrobe(user);
-    }
-    loadData();
-  }, [profile]);
-
-  const handleDeleteSavedOutfit = async (id: string) => {
-    const updated = await removeSavedOutfitFromStorage(id);
-    setSavedOutfits(updated);
+  const handleLogout = () => {
+    Alert.alert('Log Out', 'You can log back in anytime — your wardrobe and saved looks stay right where you left them.', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Log Out', style: 'destructive', onPress: () => onLogout() }
+    ]);
   };
 
+  // `wardrobe`/`savedOutfits` are lifted to App.tsx (Sprint M16) and arrive
+  // as props (uploads only — never the seed/reference catalog, see
+  // TodayScreen.tsx's identical note). "Cataloged Garments" below must
+  // count what the user actually owns, not the reference catalog riding
+  // along invisibly — unchanged from before this sprint, just no longer a
+  // separate AsyncStorage read of the same data Today/Stylist already load.
+
   // Wardrobe Insights Calculation
-  const categoryCounts = activeWardrobe.reduce((acc, item) => {
+  const categoryCounts = wardrobe.reduce((acc, item) => {
     acc[item.category] = (acc[item.category] || 0) + 1;
     return acc;
   }, {} as Record<string, number>);
@@ -107,7 +108,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
 
         <View style={{ flex: 1 }}>
           <Text style={styles.userName}>{userProfile.name || 'CLOSIQ Member'}</Text>
-          <Text style={styles.userRole}>CLOSIQ Wardrobe Member</Text>
+          <Text style={styles.userRole} numberOfLines={1}>{userEmail || 'CLOSIQ Wardrobe Member'}</Text>
         </View>
 
         <TouchableOpacity
@@ -309,7 +310,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
         <View style={styles.insightsCard}>
           <View style={styles.insightRow}>
             <Text style={styles.insightLabel}>Cataloged Garments</Text>
-            <Text style={styles.insightVal}>{activeWardrobe.length} Pieces</Text>
+            <Text style={styles.insightVal}>{wardrobe.length} Pieces</Text>
           </View>
 
           <View style={styles.insightRow}>
@@ -328,12 +329,30 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
         </View>
       </View>
 
+      {/* ACCOUNT */}
+      <View style={styles.section}>
+        <View style={styles.sectionHeaderRow}>
+          <Mail size={16} color={COLORS.primary} />
+          <Text style={styles.sectionTitle}>Account</Text>
+        </View>
+        <View style={styles.insightsCard}>
+          <View style={[styles.insightRow, { borderBottomWidth: 0, paddingBottom: 0 }]}>
+            <Text style={styles.insightLabel}>Signed in as</Text>
+            <Text style={styles.insightVal} numberOfLines={1}>{userEmail || '—'}</Text>
+          </View>
+        </View>
+        <TouchableOpacity style={styles.logoutBtn} activeOpacity={0.8} onPress={handleLogout}>
+          <LogOut size={15} color={COLORS.danger} style={{ marginRight: 8 }} />
+          <Text style={styles.logoutBtnText}>Log Out</Text>
+        </TouchableOpacity>
+      </View>
+
       {/* Saved Look Detail Sheet Modal */}
       <SavedLookDetailModal
         outfit={selectedOutfit}
         onClose={() => setSelectedOutfit(null)}
         onWearAgain={onWearAgain}
-        onDelete={handleDeleteSavedOutfit}
+        onDelete={onDeleteSavedOutfit}
       />
 
       <EditProfileModal
@@ -762,6 +781,22 @@ const styles = StyleSheet.create({
     color: COLORS.textMuted,
     fontStyle: 'italic',
     marginTop: 2
+  },
+  logoutBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 12,
+    paddingVertical: 13,
+    borderRadius: RADIUS.pill,
+    backgroundColor: COLORS.surface,
+    borderWidth: 1,
+    borderColor: 'rgba(168, 73, 59, 0.3)'
+  },
+  logoutBtnText: {
+    fontSize: 13.5,
+    fontWeight: '700',
+    color: COLORS.danger
   },
   editBtn: {
     width: 32,

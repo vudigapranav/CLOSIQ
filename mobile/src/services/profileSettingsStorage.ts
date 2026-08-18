@@ -1,7 +1,8 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { WardrobeProfile, LayeringPreference } from '../../../src/types/wardrobe';
+import { userScopedKey } from './authSession';
 
-const STORAGE_KEY = '@closiq_profile_settings';
+const BASE_STORAGE_KEY = '@closiq_profile_settings';
 
 export interface MobileProfileSettings {
   profile: WardrobeProfile;
@@ -15,7 +16,7 @@ const DEFAULT_SETTINGS: MobileProfileSettings = {
 
 export async function loadProfileSettings(): Promise<MobileProfileSettings> {
   try {
-    const raw = await AsyncStorage.getItem(STORAGE_KEY);
+    const raw = await AsyncStorage.getItem(userScopedKey(BASE_STORAGE_KEY));
     if (!raw) return DEFAULT_SETTINGS;
     const parsed = JSON.parse(raw);
     return {
@@ -34,7 +35,7 @@ export async function saveProfileSettings(
   try {
     const existing = await loadProfileSettings();
     const updated = { ...existing, ...partial };
-    await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+    await AsyncStorage.setItem(userScopedKey(BASE_STORAGE_KEY), JSON.stringify(updated));
     return updated;
   } catch (err) {
     console.warn('Failed to save profile settings to storage:', err);

@@ -15,9 +15,8 @@ import {
 import { Sparkles, Calendar, Thermometer, Shirt, ArrowRight, AlertCircle, RefreshCw } from 'lucide-react-native';
 import { COLORS, RADIUS } from '../theme';
 import { GarmentItem, WardrobeProfile, LayeringPreference, Outfit } from '../../../src/types/wardrobe';
-import { loadUserWardrobe } from '../services/wardrobeStorage';
 import { generateOutfitMobile, swapGarmentMobile, MobileOutfitResult } from '../services/outfitStylist';
-import { loadSavedOutfits, saveOutfitToStorage, isSameOutfitItems } from '../services/savedOutfitsStorage';
+import { isSameOutfitItems } from '../services/savedOutfitsStorage';
 import { recordRecentOutfit } from '../services/outfitHistoryStorage';
 import { OutfitResultCard } from '../components/OutfitResultCard';
 import { TemperatureUnit, UserProfileData } from '../types/onboarding';
@@ -61,6 +60,9 @@ interface TodayScreenProps {
   userName?: string;
   temperatureUnit?: TemperatureUnit;
   userProfile?: UserProfileData | null;
+  wardrobe: GarmentItem[];
+  savedOutfits: Outfit[];
+  onSaveOutfit: (outfit: Outfit) => Promise<Outfit[]>;
   onNavigateToCollection?: () => void;
 }
 
@@ -71,15 +73,16 @@ export const TodayScreen: React.FC<TodayScreenProps> = ({
   userName,
   temperatureUnit = 'celsius',
   userProfile,
+  wardrobe,
+  savedOutfits,
+  onSaveOutfit,
   onNavigateToCollection
 }) => {
   const [selectedOccasion, setSelectedOccasion] = useState('College');
   const [customPrompt, setCustomPrompt] = useState('');
-  const [wardrobe, setWardrobe] = useState<GarmentItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [swapping, setSwapping] = useState(false);
   const [selectedGarmentForSwap, setSelectedGarmentForSwap] = useState<GarmentItem | null>(null);
-  const [savedOutfits, setSavedOutfits] = useState<Outfit[]>([]);
   const [outfitResult, setOutfitResult] = useState<{
     mode: 'gemini' | 'fallback';
     data: MobileOutfitResult;
@@ -148,24 +151,16 @@ export const TodayScreen: React.FC<TodayScreenProps> = ({
     }
   }, [wearAgainOutfit]);
 
-  // Load ONLY the current user's own wardrobe (uploads) on profile change — the
-  // seed/reference catalog is deliberately never merged in here. It used to be
-  // (`[...userItems, ...seedItems]`), which meant Today could generate real
-  // outfits from garments that never appeared as "owned" in Collection (which
-  // only ever shows uploads) — a confirmed product bug, not a display quirk.
-  // Also clears any outfit currently on screen: it may reference garments from
-  // the profile being switched away from, which would otherwise survive the
-  // switch and render with missing images once resolved against the new
-  // wardrobe (see Mobile Sprint M10, Issue 2).
+  // `wardrobe`/`savedOutfits` are lifted to App.tsx (Sprint M16) and arrive
+  // as props — this screen no longer loads its own copy. What DOES still
+  // need to happen locally on a profile change: clear any outfit currently
+  // on screen, since it may reference garments from the profile being
+  // switched away from, which would otherwise survive the switch and render
+  // with missing images once resolved against the new wardrobe (Mobile
+  // Sprint M10, Issue 2) — the seed/reference catalog is still deliberately
+  // never merged into `wardrobe` (that stays App.tsx's `loadUserWardrobe`
+  // call, unchanged from before this sprint).
   useEffect(() => {
-    async function loadData() {
-      const userItems = await loadUserWardrobe(profile);
-      setWardrobe(userItems);
-
-      const saved = await loadSavedOutfits();
-      setSavedOutfits(saved);
-    }
-    loadData();
     setOutfitResult(null);
     setErrorMessage(null);
     setSelectedGarmentForSwap(null);
@@ -342,13 +337,12 @@ export const TodayScreen: React.FC<TodayScreenProps> = ({
         dateCreated: new Date().toISOString()
       };
 
-      const updatedSaved = await saveOutfitToStorage(newOutfit);
-      setSavedOutfits(updatedSaved);
+      await onSaveOutfit(newOutfit);
       await recordRecentOutfit(resolvedGarments.map((i) => i.id));
     } finally {
       savingRef.current = false;
     }
-  }, [outfitResult, resolvedGarments, selectedOccasion]);
+  }, [outfitResult, resolvedGarments, selectedOccasion, onSaveOutfit]);
 
   return (
     <ScrollView

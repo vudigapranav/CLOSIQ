@@ -1,6 +1,7 @@
 import { GarmentItem, GarmentCategory, LayeringPreference } from '../../../src/types/wardrobe';
 import { API_BASE_URL } from '../config';
 import { OutfitPersonalizationContext } from './personalizationContext';
+import { getAuthHeader } from './authService';
 
 export interface MobileOutfitResult {
   title: string;
@@ -61,9 +62,14 @@ export async function generateOutfitMobile(
   const SERVER_URL = `${API_BASE_URL}/api/ai/generate-outfit`;
 
   try {
+    // Sprint M17: the server now requires a verified Supabase session on
+    // every /api/ai/* call (server/apiRouter.js). A 401 here just means
+    // `response.ok` is false below, same as any other non-2xx — it falls
+    // through to the local deterministic engine exactly like "server
+    // offline" already did. Nothing new to special-case.
     const response = await fetch(SERVER_URL, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...(await getAuthHeader()) },
       body: JSON.stringify({
         prompt,
         layeringPreference,
@@ -171,7 +177,7 @@ export async function swapGarmentMobile(
   try {
     const response = await fetch(SERVER_URL, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...(await getAuthHeader()) },
       body: JSON.stringify({
         currentOutfitGarmentIds,
         targetGarmentIdToSwap,

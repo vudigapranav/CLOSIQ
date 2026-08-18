@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import {
   StyleSheet,
   View,
@@ -12,7 +12,6 @@ import {
 import { Shirt, Plus } from 'lucide-react-native';
 import { COLORS, RADIUS } from '../theme';
 import { GarmentItem, WardrobeProfile } from '../../../src/types/wardrobe';
-import { loadUserWardrobe, saveUserGarment, removeUserGarment } from '../services/wardrobeStorage';
 import { AddItemModal } from '../components/AddItemModal';
 import { GarmentDetailModal } from '../components/GarmentDetailModal';
 
@@ -29,6 +28,9 @@ const CATEGORIES: { key: string; label: string }[] = [
 
 interface CollectionScreenProps {
   profile: WardrobeProfile;
+  wardrobe: GarmentItem[];
+  onGarmentAdded: (garment: GarmentItem) => void;
+  onGarmentRemoved: (id: string) => void;
 }
 
 interface GarmentCardProps {
@@ -66,34 +68,24 @@ const GarmentCard = React.memo<GarmentCardProps>(({ item, onPress }) => (
   </TouchableOpacity>
 ));
 
-export const CollectionScreen: React.FC<CollectionScreenProps> = ({ profile }) => {
+export const CollectionScreen: React.FC<CollectionScreenProps> = ({
+  profile,
+  wardrobe,
+  onGarmentAdded,
+  onGarmentRemoved
+}) => {
   const [selectedCategory, setSelectedCategory] = useState<string>('All');
-  const [userGarments, setUserGarments] = useState<GarmentItem[]>([]);
   const [showAddModal, setShowAddModal] = useState(false);
   const [selectedGarment, setSelectedGarment] = useState<GarmentItem | null>(null);
 
-  // Load user-uploaded garments from AsyncStorage on profile change
-  useEffect(() => {
-    loadUserWardrobe(profile).then(setUserGarments);
-  }, [profile]);
-
-  const handleGarmentAdded = async (garment: GarmentItem) => {
-    const updated = await saveUserGarment(garment, profile);
-    setUserGarments(updated);
-  };
-
-  const handleGarmentRemoved = async (id: string) => {
-    const updated = await removeUserGarment(id, profile);
-    setUserGarments(updated);
-  };
-
-  // Filter items by category
+  // Filter items by category. `wardrobe` is lifted to App.tsx (Sprint
+  // M16) — this screen no longer loads its own copy from AsyncStorage.
   const filteredGarments = useMemo(
     () =>
       selectedCategory === 'All'
-        ? userGarments
-        : userGarments.filter((g) => g.category === selectedCategory),
-    [userGarments, selectedCategory]
+        ? wardrobe
+        : wardrobe.filter((g) => g.category === selectedCategory),
+    [wardrobe, selectedCategory]
   );
 
   const handleSelectGarment = useCallback((item: GarmentItem) => setSelectedGarment(item), []);
@@ -110,7 +102,7 @@ export const CollectionScreen: React.FC<CollectionScreenProps> = ({ profile }) =
         <View>
           <Text style={styles.screenTitle}>Your Wardrobe</Text>
           <Text style={styles.screenSubtitle}>
-            {userGarments.length} cataloged item{userGarments.length === 1 ? '' : 's'} ({profile.toUpperCase()} Profile)
+            {wardrobe.length} cataloged item{wardrobe.length === 1 ? '' : 's'} ({profile.toUpperCase()} Profile)
           </Text>
         </View>
 
@@ -190,14 +182,14 @@ export const CollectionScreen: React.FC<CollectionScreenProps> = ({ profile }) =
         visible={showAddModal}
         profile={profile}
         onClose={() => setShowAddModal(false)}
-        onGarmentAdded={handleGarmentAdded}
+        onGarmentAdded={onGarmentAdded}
       />
 
       {/* Garment Detail Modal */}
       <GarmentDetailModal
         item={selectedGarment}
         onClose={() => setSelectedGarment(null)}
-        onRemove={handleGarmentRemoved}
+        onRemove={onGarmentRemoved}
       />
     </View>
   );

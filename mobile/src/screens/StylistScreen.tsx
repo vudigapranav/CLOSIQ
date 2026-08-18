@@ -13,9 +13,8 @@ import {
 import { Wand2, Sparkles, RefreshCw, Shirt, ArrowRight, AlertCircle } from 'lucide-react-native';
 import { COLORS, RADIUS } from '../theme';
 import { GarmentItem, WardrobeProfile, LayeringPreference, Outfit } from '../../../src/types/wardrobe';
-import { loadUserWardrobe } from '../services/wardrobeStorage';
 import { generateOutfitMobile, swapGarmentMobile, MobileOutfitResult } from '../services/outfitStylist';
-import { loadSavedOutfits, saveOutfitToStorage, isSameOutfitItems } from '../services/savedOutfitsStorage';
+import { isSameOutfitItems } from '../services/savedOutfitsStorage';
 import { recordRecentOutfit } from '../services/outfitHistoryStorage';
 import { OutfitResultCard } from '../components/OutfitResultCard';
 import { UserProfileData } from '../types/onboarding';
@@ -35,6 +34,9 @@ interface StylistScreenProps {
   profile?: WardrobeProfile;
   layeringPreference?: LayeringPreference;
   userProfile?: UserProfileData | null;
+  wardrobe: GarmentItem[];
+  savedOutfits: Outfit[];
+  onSaveOutfit: (outfit: Outfit) => Promise<Outfit[]>;
   onNavigateToCollection?: () => void;
 }
 
@@ -42,11 +44,12 @@ export const StylistScreen: React.FC<StylistScreenProps> = ({
   profile = 'men',
   layeringPreference = 'avoid',
   userProfile,
+  wardrobe,
+  savedOutfits,
+  onSaveOutfit,
   onNavigateToCollection
 }) => {
   const [promptText, setPromptText] = useState('');
-  const [wardrobe, setWardrobe] = useState<GarmentItem[]>([]);
-  const [savedOutfits, setSavedOutfits] = useState<Outfit[]>([]);
   const [loading, setLoading] = useState(false);
   const [swapping, setSwapping] = useState(false);
   const [selectedGarmentForSwap, setSelectedGarmentForSwap] = useState<GarmentItem | null>(null);
@@ -86,20 +89,11 @@ export const StylistScreen: React.FC<StylistScreenProps> = ({
     };
   }, []);
 
-  // Load ONLY the current user's own wardrobe (uploads) on profile change —
-  // see the identical note in TodayScreen.tsx (Mobile Sprint M10, Issue 3):
-  // the seed/reference catalog must never be silently treated as owned.
-  // Also clears any outfit on screen, since it may reference garments from
-  // the profile being switched away from (Issue 2).
+  // `wardrobe`/`savedOutfits` are lifted to App.tsx (Sprint M16) and arrive
+  // as props. What still needs to happen locally on a profile change:
+  // clear any outfit on screen, since it may reference garments from the
+  // profile being switched away from (Mobile Sprint M10, Issue 2).
   useEffect(() => {
-    async function loadData() {
-      const user = await loadUserWardrobe(profile);
-      setWardrobe(user);
-
-      const saved = await loadSavedOutfits();
-      setSavedOutfits(saved);
-    }
-    loadData();
     setOutfitResult(null);
     setErrorMessage(null);
     setSelectedGarmentForSwap(null);
@@ -255,13 +249,12 @@ export const StylistScreen: React.FC<StylistScreenProps> = ({
         dateCreated: new Date().toISOString()
       };
 
-      const updatedSaved = await saveOutfitToStorage(newOutfit);
-      setSavedOutfits(updatedSaved);
+      await onSaveOutfit(newOutfit);
       await recordRecentOutfit(resolvedGarments.map((i) => i.id));
     } finally {
       savingRef.current = false;
     }
-  }, [outfitResult, resolvedGarments, promptText]);
+  }, [outfitResult, resolvedGarments, promptText, onSaveOutfit]);
 
   return (
     <ScrollView

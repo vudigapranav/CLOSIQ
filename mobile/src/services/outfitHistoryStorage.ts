@@ -1,6 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { userScopedKey } from './authSession';
 
-const STORAGE_KEY = '@closiq_recent_outfit_signatures';
+const BASE_STORAGE_KEY = '@closiq_recent_outfit_signatures';
 /** Keep a reasonable recent history, not an ever-growing exclusion list. */
 const MAX_HISTORY = 8;
 
@@ -13,7 +14,7 @@ export function buildOutfitSignature(garmentIds: string[]): string {
 
 export async function loadRecentOutfitSignatures(): Promise<string[]> {
   try {
-    const raw = await AsyncStorage.getItem(STORAGE_KEY);
+    const raw = await AsyncStorage.getItem(userScopedKey(BASE_STORAGE_KEY));
     if (!raw) return [];
     const parsed = JSON.parse(raw);
     return Array.isArray(parsed) ? parsed : [];
@@ -37,7 +38,7 @@ export async function recordRecentOutfit(garmentIds: string[]): Promise<void> {
     const existing = await loadRecentOutfitSignatures();
     const withoutDuplicate = existing.filter((s) => s !== signature);
     const updated = [signature, ...withoutDuplicate].slice(0, MAX_HISTORY);
-    await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+    await AsyncStorage.setItem(userScopedKey(BASE_STORAGE_KEY), JSON.stringify(updated));
   } catch (err) {
     console.warn('Failed to record recent outfit:', err);
   }

@@ -1,3 +1,7 @@
+// Must be the very first import — Supabase's client needs a real URL/crypto
+// polyfill in the Hermes/React Native runtime, before anything else (auth
+// session restoration in particular) touches it.
+import 'react-native-url-polyfill/auto';
 import { registerRootComponent } from 'expo';
 
 import App from './App';

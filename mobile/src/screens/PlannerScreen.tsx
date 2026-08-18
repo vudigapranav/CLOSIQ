@@ -12,7 +12,6 @@ import {
 import { CalendarDays, Plus, Clock, ChevronDown, ChevronUp, Shirt, AlertCircle, X, ArrowRight } from 'lucide-react-native';
 import { COLORS, RADIUS } from '../theme';
 import { GarmentItem, WardrobeProfile, LayeringPreference, Outfit } from '../../../src/types/wardrobe';
-import { loadUserWardrobe } from '../services/wardrobeStorage';
 import { generateOutfitMobile, swapGarmentMobile, MobileOutfitResult } from '../services/outfitStylist';
 import { recordRecentOutfit } from '../services/outfitHistoryStorage';
 import { OutfitResultCard } from '../components/OutfitResultCard';
@@ -41,6 +40,7 @@ interface PlannerScreenProps {
   profile: WardrobeProfile;
   layeringPreference?: LayeringPreference;
   userProfile?: UserProfileData | null;
+  wardrobe: GarmentItem[];
   onUseForToday: (outfit: Outfit) => void;
   onNavigateToCollection?: () => void;
 }
@@ -49,11 +49,11 @@ export const PlannerScreen: React.FC<PlannerScreenProps> = ({
   profile,
   layeringPreference = 'avoid',
   userProfile,
+  wardrobe,
   onUseForToday,
   onNavigateToCollection
 }) => {
   const [events, setEvents] = useState<PlannerEvent[]>([]);
-  const [wardrobe, setWardrobe] = useState<GarmentItem[]>([]);
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingEvent, setEditingEvent] = useState<PlannerEvent | null>(null);
   const [selectedEvent, setSelectedEvent] = useState<PlannerEvent | null>(null);
@@ -105,12 +105,9 @@ export const PlannerScreen: React.FC<PlannerScreenProps> = ({
     };
   }, []);
 
-  // Events are device-level, not profile-scoped (see plannerStorage.ts) —
-  // only the wardrobe used to plan an outfit needs to follow the active
-  // Men/Women profile, same as every other screen's loadUserWardrobe call.
-  useEffect(() => {
-    loadUserWardrobe(profile).then(setWardrobe);
-  }, [profile]);
+  // Events are device-level, not profile-scoped (see plannerStorage.ts).
+  // `wardrobe` is lifted to App.tsx (Sprint M16) and already follows the
+  // active Men/Women profile there — no separate load needed here.
 
   const today = todayLocalDate();
 
