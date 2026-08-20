@@ -4,12 +4,12 @@ import {
   View,
   Text,
   TouchableOpacity,
-  Image,
   Dimensions
 } from 'react-native';
 import { Sparkles, RefreshCw, RefreshCcw, Bookmark, BookmarkCheck } from 'lucide-react-native';
 import { COLORS, RADIUS } from '../theme';
 import { GarmentItem } from '../../../src/types/wardrobe';
+import { GarmentImage } from './GarmentImage';
 
 const { width } = Dimensions.get('window');
 
@@ -76,7 +76,7 @@ export const OutfitResultCard = React.memo<OutfitResultCardProps>(({
             onPress={() => onSelectGarmentForSwap(garment)}
           >
             <View style={styles.garmentImgFrame}>
-              <Image source={{ uri: garment.imageUrl }} style={styles.garmentImg} resizeMode="cover" />
+              <GarmentImage uri={garment.imageUrl} style={styles.garmentImg} iconSize={20} />
               <View style={styles.catTag}>
                 <Text style={styles.catTagText}>{garment.category.slice(0, 4)}</Text>
               </View>

@@ -5,12 +5,12 @@ import {
   Text,
   Modal,
   TouchableOpacity,
-  Image,
   ScrollView
 } from 'react-native';
 import { X, Trash2, Sparkles, Shirt } from 'lucide-react-native';
 import { COLORS, RADIUS } from '../theme';
 import { GarmentItem } from '../../../src/types/wardrobe';
+import { GarmentImage } from './GarmentImage';
 
 interface GarmentDetailModalProps {
   item: GarmentItem | null;
@@ -49,7 +49,7 @@ export const GarmentDetailModal: React.FC<GarmentDetailModalProps> = ({
           <ScrollView showsVerticalScrollIndicator={false}>
             {/* Garment Image */}
             <View style={styles.imageFrame}>
-              <Image source={{ uri: item.imageUrl }} style={styles.garmentImg} resizeMode="cover" />
+              <GarmentImage uri={item.imageUrl} style={styles.garmentImg} iconSize={28} />
             </View>
 
             {/* Title & Style Archetype */}

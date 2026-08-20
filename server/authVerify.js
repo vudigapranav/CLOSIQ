@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
+import ws from 'ws';
 
 /**
  * Server-side bearer-token verification (Sprint M17).
@@ -13,12 +14,21 @@ import { createClient } from '@supabase/supabase-js';
  * returned user id comes only from Supabase's own verification of the
  * token, never from a request body/header value the client could set to
  * anything.
+ *
+ * `realtime.transport: ws` — this server never uses Realtime (only
+ * `auth.getUser`), but `createClient()` unconditionally constructs a
+ * RealtimeClient, which throws at startup on Node < 22 (no native
+ * WebSocket) unless given a WebSocket implementation explicitly. This is
+ * the fix Supabase's own error message documents; it does not change any
+ * auth behavior.
  */
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY;
 
 const authClient =
-  SUPABASE_URL && SUPABASE_ANON_KEY ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY) : null;
+  SUPABASE_URL && SUPABASE_ANON_KEY
+    ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY, { realtime: { transport: ws } })
+    : null;
 
 /**
  * Returns the verified user id for a request's `Authorization: Bearer

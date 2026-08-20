@@ -7,14 +7,14 @@ import {
   TouchableOpacity,
   TextInput,
   Modal,
-  Image,
   Alert
 } from 'react-native';
-import { User, Layers, Heart, Sparkles, Shirt, ChevronRight, Bookmark, Pencil, X, Check, LogOut, Mail } from 'lucide-react-native';
+import { User, Layers, Heart, Sparkles, ChevronRight, Bookmark, Pencil, X, Check, LogOut, Mail } from 'lucide-react-native';
 import { COLORS, RADIUS } from '../theme';
 import { WardrobeProfile, LayeringPreference, Outfit, GarmentItem } from '../../../src/types/wardrobe';
 import { SavedLookDetailModal } from '../components/SavedLookDetailModal';
 import { BodyTypeOptionCard } from '../components/BodyTypeOptionCard';
+import { GarmentImage } from '../components/GarmentImage';
 import {
   UserProfileData,
   BodyType,
@@ -276,13 +276,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                 <View style={styles.savedThumbnailsRow}>
                   {outfit.items.slice(0, 3).map((item, idx) => (
                     <View key={`${item.id}-${idx}`} style={styles.savedThumbFrame}>
-                      {item.imageUrl ? (
-                        <Image source={{ uri: item.imageUrl }} style={styles.savedThumbImg} />
-                      ) : (
-                        <View style={styles.savedThumbMissing}>
-                          <Shirt size={14} color={COLORS.textMuted} />
-                        </View>
-                      )}
+                      <GarmentImage uri={item.imageUrl} style={styles.savedThumbImg} iconSize={14} />
                     </View>
                   ))}
                 </View>

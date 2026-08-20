@@ -6,8 +6,236 @@ This document tracks the live implementation status of **CLOSIQ**. It is updated
 
 ## Current Phase
 
-* **Phase**: Mobile Sprint M17 — Real Authentication + User Data Isolation
-* **Status**: Converted CLOSIQ from a single local-device profile into real, isolated user accounts. Audit first (per the brief's own mandate): confirmed via fresh repo-wide grep and direct file reads that zero authentication or database infrastructure existed anywhere — `server/index.js` is a bare Node `http` server with no framework, `mobile/`'s six storage services were 100% AsyncStorage, device-global or split only by Men/Women. **Provider: Supabase Auth**, using only its built-in `auth.users` — no custom Postgres schema was created, because per-user app data (wardrobe, saved looks, planner, profile, onboarding, outfit history) stays exactly where it already lived, in AsyncStorage, just now keyed by the authenticated user's ID via one new `userScopedKey()` helper (`authSession.ts`) that all six storage modules call internally — zero call-site changes were needed anywhere in Today/Stylist/Planner/Collection/Profile, since M16's prop-lifting already centralized most of the mutation call sites in `App.tsx`. New `LoginScreen.tsx` (login/signup/demo, internal mode toggle, matching the app's established step-state pattern). `App.tsx` now gates the whole app on session state before the existing onboarding gate, and reloads every per-user record fresh whenever the authenticated user changes — critical for the "previous user's wardrobe must not leak" requirement. Server-side, `/api/ai/*` now requires a verified Supabase bearer token (new `server/authVerify.js`, using only the public anon key — no service-role secret anywhere) before ever reaching the Gemini handlers; **live-tested this locally** (server started, curled all three endpoints with no/garbage tokens, got 401 with zero Gemini calls logged) — this is real, not just source-reasoned. The one thing I could not do myself: provision an actual Supabase project. Everything is built and wired against `EXPO_PUBLIC_SUPABASE_URL`/`EXPO_PUBLIC_SUPABASE_ANON_KEY` (mobile) and `SUPABASE_URL`/`SUPABASE_ANON_KEY` (server) exactly like `GEMINI_API_KEY`'s existing pattern, but without real project credentials, Login/Create Account cannot complete a live round trip — this is flagged clearly below, not glossed over. Full details in "Mobile Sprint M17" below.
+* **Phase**: Image Serving Fix — **COMPLETE**
+* **Status**: A forensic audit (prior turn, no fixes) traced broken garment images to `server/index.js` (serves `/wardrobe/*` static assets on port 3000) not running. This session actually started it and found the REAL reason it wasn't running: `npm run start` crashed immediately — `@supabase/supabase-js` 2.109.0 unconditionally constructs a Realtime client, which throws on Node < 22 (no native WebSocket) unless given a WebSocket implementation. Fixed with a 2-line change to `server/authVerify.js` (pass the already-installed `ws` package as the realtime transport) — no auth behavior change, confirmed by the fact `authVerify.js` never uses Realtime at all, only `auth.getUser()`. Server now starts and stays up; live-curled the exact demo garment URL and a second asset, both returned real image data (HTTP 200, correct `image/webp`, valid WebP bytes). Also fixed a genuine silent-failure gap in the new-user upload path (`wardrobeStorage.saveUserGarment`'s Storage-upload catch block only logged to console, unlike every other failure path in the same function) and added a shared `GarmentImage` component with `onError` handling + dev-mode logging to the 6 real garment-image render sites app-wide, replacing raw `<Image>` calls that failed silently. Full details in "Mobile Sprint M19" below (unchanged from the prior entry) and "IMAGE SERVING FIX" further below.
+
+---
+
+# IMAGE SERVING FIX
+
+Follows directly from the prior Image Pipeline Forensic Audit (report-only, no fixes — see that turn's transcript; not separately filed here since it produced no code changes). This session fixed exactly what the audit found, verified the fix live, fixed one adjacent silent-failure bug the audit flagged as worth checking, and added the minimal error-handling the audit noted was entirely absent. No image architecture migration, no Gemini/auth/Expo changes.
+
+## Root Cause
+Two layered causes, both confirmed, not assumed:
+1. (Known from the audit) Seed/demo garment images resolve client-side to `http://192.168.31.215:3000/wardrobe/...` — correct by design for LAN physical-device development — but nothing was listening on port 3000.
+2. (New this session) *Why* nothing was listening: `npm run start` crashed on launch. `server/authVerify.js`'s `createClient()` call (added in M17, used only for `auth.getUser(token)`) unconditionally makes `@supabase/supabase-js` construct a Realtime client, which throws `Error: Node.js 20 detected without native WebSocket support` on this machine's Node v20.20.2 (native WebSocket landed in Node 22; this project's own `package.json` `engines` field targets `>=20.6.0`, so upgrading Node was not the right fix). The M17/M18 sessions' own "started the server locally and curled it" claims were true at the time — this is most likely a dependency version drift since (`@supabase/supabase-js` isn't pinned to an exact version), not a regression either of those sessions introduced.
+
+**Fix**: `server/authVerify.js` now passes `{ realtime: { transport: ws } }` to `createClient()` — the exact mitigation Supabase's own error message documents. `ws` was already present as a transitive dependency (confirmed via `node_modules/ws`); added it as an explicit direct dependency in root `package.json` (`^8.21.3`, matching the installed version) and ran `npm install --package-lock-only` to sync the lockfile. Zero change to auth verification behavior — `authVerify.js` never subscribes to Realtime, this only satisfies the client constructor's startup requirement.
+
+## Seed Images
+`PASS` — live-verified. With the server running, `curl http://192.168.31.215:3000/wardrobe/men/tops/charcoal_art_tee.webp` → `HTTP 200`, `content-type: image/webp`, 20138 bytes, confirmed via `file` to be genuine WebP image data (1000×545, VP8), not an error page. A second, different asset (women's category) also returned `HTTP 200`. Both the LAN IP and `localhost` variants work.
+
+## Static Serving
+`PASS`. `server/index.js` serves `dist/wardrobe/...` (Vite's build copies `public/wardrobe/...` into `dist/` automatically) via plain `fs.createReadStream`, correct `Content-Type` per extension (`.webp` → `image/webp` already present in its MIME map — no change needed there). Confirmed the server is bound to all interfaces (`*:3000`, not just loopback), which is what LAN reachability from a physical device requires.
+
+## Mobile URI
+`PASS`. `mobile/.env.local`'s `EXPO_PUBLIC_API_URL=http://192.168.31.215:3000` matches the Mac's actual current LAN IP (`ipconfig getifaddr en0` → `192.168.31.215`) exactly — not stale. No Gemini key, no service-role key, no Supabase secret present in this file — only the two `EXPO_PUBLIC_` values already established as public/RLS-protected in M17/M18.
+
+## Upload Pipeline
+`SOURCE VERIFIED` (no real upload exists in this Supabase project to device-test against — same limitation the forensic audit already disclosed; not fabricated here either). Traced the full path fresh and found one concrete bug matching Part 4's "confirm errors are surfaced rather than silently swallowed" instruction: `wardrobeStorage.ts`'s `saveUserGarment()` already alerts the user honestly when the `garments` DB insert fails, but the separate Supabase Storage image-upload step (the one immediately upstream) only did `console.warn` on failure — a real inconsistency, and the single most likely explanation for "metadata looks fine, photo never shows up later." Fixed: the function now tracks `imageUploadFailed` and, if the upload fails but the garment metadata still saves successfully, shows `Alert.alert('Item saved', "The details saved, but the photo couldn't upload — it'll only show on this device until you try adding the photo again.")` — accurate to what actually happened, distinct from the existing "you're offline, nothing synced" wording (which would be false in this specific combination). No architecture change: still local-optimistic-write → Storage upload → DB insert, same as M18.
+
+## Error Handling
+`PASS` — gap closed. The forensic audit found zero `onError` handling on any of the app's `<Image>` components — a dead URI and a missing file were visually identical (blank space, nothing logged). Added `mobile/src/components/GarmentImage.tsx`: a drop-in wrapper (`uri`, `style`, `resizeMode`, `iconSize` props) that renders the same placeholder every screen already used for a genuinely-missing `imageUrl` (a centered `Shirt` icon, matching `ProfileScreen`'s `savedThumbMissing`/`SavedLookDetailModal`'s `missingImgBox` conventions) on either an empty `uri` OR a real load failure, and logs the failed URI via `console.warn` gated on `__DEV__` only. Swapped all 6 real garment/outfit-piece `<Image>` render sites app-wide: `CollectionScreen.tsx`, `GarmentDetailModal.tsx`, `SavedLookDetailModal.tsx` (consolidated its existing manual missing-image conditional into the shared component), `ProfileScreen.tsx` (same consolidation), `EventDetailModal.tsx`, `OutfitResultCard.tsx`. Deliberately did NOT touch `TodayScreen.tsx`'s `<Image>` (the CLOSIQ logo, a local bundled asset, not a remote garment image) or `LoginScreen.tsx`/`AddItemModal.tsx`'s local-picker-preview images (never fetched over network, not the failure mode in scope). Same size/layout in every case — `style` is applied identically whether the image loads or not, no visual redesign.
+
+## Gemini
+`NOT TESTED — QUOTA PRESERVED`. Zero Gemini calls made. `server/geminiServer.js` untouched; the fix is entirely in `authVerify.js`, which Gemini handlers don't import from beyond the existing auth gate.
+
+## Physical Device
+`NOT TESTED`. Per this project's standing preference (see memory), no simulator/device was opened this session. Everything above was verified via direct `curl`/`lsof`/`file` checks from the Mac — real network-level evidence, not source-reading, but not the same as confirming a physical iPhone on the same Wi-Fi can actually load these images inside the running app. **Documented per Part 6: the backend (`npm run start`) must be running on port 3000 for the duration of any LAN physical-device testing session** — it is running now (left up deliberately, PID visible via `lsof -i :3000`) but will need restarting after any Mac reboot or terminal/process cleanup.
+
+## Build
+`PASS` — `npm run build` (root), 0 errors, 914ms.
+
+## Lint
+`PASS` — `oxlint` (repo-wide, covers the `server/authVerify.js` fix too), 0 errors, 0 warnings.
+
+## TypeScript
+`PASS` — `cd mobile && npx tsc --noEmit`, 0 errors, after the `GarmentImage.tsx` addition, 6 call-site swaps, and the `saveUserGarment` alert fix.
+
+## iOS / Android Bundles
+`PASS` — `npx expo export --platform ios` (2578 modules, +1 from `GarmentImage.tsx`, 4.71 MB) and `--platform android` (2584 modules, 4.73 MB) both exported cleanly.
+
+## Remaining Issues
+- **P1**: New-user upload still has no device-level confirmation that a real photo, uploaded from a real device, actually persists and redisplays correctly across a session restart — same gap the forensic audit already flagged, not closed by this session (no real upload exists in the project to inspect, and physical-device testing wasn't performed here per standing preference).
+- **P2**: The underlying LAN-IP dependency for seed/catalog images is inherently fragile for physical-device demos (server must be manually kept running, IP must not change) — the forensic audit's own suggested durable fix (migrate catalog images into the public/Storage layer) was explicitly out of scope for both that audit and this fix session; still worth a deliberate decision in a future sprint, not an accident to routinely work around.
+- **P2**: `@supabase/supabase-js` is not pinned to an exact version (`^2.109.0`) — a future `npm install` could pull a version with a similar new startup requirement. Not fixing this now (pinning is a policy decision, not a bug fix) but worth knowing.
+
+---
+
+# MOBILE SPRINT M19 — CLOUD AUTH + DATA INTEGRATION QA
+
+This is a QA sprint over M18's Supabase cloud integration — no new features, no schema changes, no RLS changes, no Gemini changes, no Expo upgrade. Every item below distinguishes SOURCE VERIFIED (read the code), LIVE VERIFIED (real request against the live Supabase project), and DEVICE VERIFIED (observed running on a simulator/device) — a TypeScript pass is never treated as proof of runtime behavior, and source-reading is never relabeled as live or device verification.
+
+## Authentication
+`PASS — SOURCE VERIFIED`. Traced the complete flow fresh: Login/Signup/Demo all route through `authService.ts`'s thin wrapper over `supabase.auth.*` (`signInWithPassword`/`signUp`/`signInDemo`), `App.tsx`'s single `onAuthStateChange` subscription is the only place session state is derived, and `authSession.ts`'s `currentUserId` is explicitly documented and confirmed as "a synchronous mirror of Supabase's own session, not a second auth mechanism." Grepped for competing auth state: none found. There is exactly one source of truth (Supabase Auth) — confirmed by re-reading, not assumed from M18's prior conclusion.
+
+## Demo Login
+`PASS — LIVE VERIFIED`. Fresh full cycle this session against the real project: `signInWithPassword('demo.account@closiq.app', ...)` → same stable user id (`c1599f7f-...`) as M18 → `garments` count 58 (36 men / 22 women, matches M18 exactly, confirming the seed-if-empty check correctly no-ops) → `profiles` row correct (`name: "Demo"`, `onboarding_completed: true`, `is_demo: true`) → `POST /auth/v1/logout` (204, session revoked) → re-login succeeds → wardrobe count still 58 after the full cycle. All nine of the brief's Demo Account checklist items are covered by this one live sequence.
+
+## Signup
+`PARTIAL — SOURCE VERIFIED for the code path, LIVE VERIFIED for account creation + isolation, NOT VERIFIED end-to-end`. `signUp()` correctly detects the "Confirm email" project setting (no session returned) and surfaces an honest info message rather than treating it as success or failure — confirmed by re-reading `authService.ts`/`LoginScreen.tsx`. What's live-verified: a real signup does create a genuine `auth.users` row and (via what is evidently a database trigger) auto-provisions empty-default `profiles`/`user_preferences` rows, with zero `garments`/`saved_outfits`/`planner_events` — re-confirmed this session are unchanged from M18. What's NOT verified: the actual "user clicks the confirmation email link → returns → logs in → reaches onboarding" leg. This needs either a real inbox or a project-level "Confirm email" toggle change, neither of which happened this session (directly confirming a test account's email via SQL was attempted and correctly blocked by this environment's own permission classifier, same as M18 — a deliberate guardrail against mutating Supabase's auth schema, not worked around). Do not read this as "signup works" — it's "signup creates correct, isolated data; the confirmation click-through itself remains unobserved."
+
+## Session Persistence
+`PASS — SOURCE VERIFIED, NOT DEVICE VERIFIED`. `persistSession: true`/`autoRefreshToken: true` (AsyncStorage-backed) and `App.tsx`'s `getCurrentSession()` + `onAuthStateChange` restoration pattern, unchanged since M17/M18. A force-quit/reopen was not observed this session (see Physical Device) — this remains the one claim resting on Supabase's documented behavior rather than direct observation.
+
+## Logout
+`PASS — LIVE VERIFIED`. `POST /auth/v1/logout` with a real access token returned 204 and the token was confirmed revoked (a subsequent re-login was required to get a new one). `authService.signOut()` calls exactly this, nothing else — confirmed by reading it fresh, no server-side data touched.
+
+## Profile Cloud Persistence
+`PASS — LIVE VERIFIED + fixed one gap`. Demo's real `profiles` row round-tripped correctly this session. Additionally fixed: `userProfileStorage.loadUserProfile()` previously fell back to `DEFAULT_USER_PROFILE` silently on a genuine cloud failure with no cache — now alerts the user honestly in that specific case (never on the legitimate "brand-new account, no row yet" path, which is structurally distinguished in the code, not guessed). `tsc --noEmit` reconfirmed 0 errors after this change.
+
+## Wardrobe Cloud Persistence
+`PASS — LIVE VERIFIED + fixed one gap`. Fresh RLS re-verification: `garments` table's SELECT/INSERT/UPDATE/DELETE policies all present and unchanged (`pg_policies` query, see User Isolation below). Same read-failure gap fixed as Profile above, applied to `wardrobeStorage.loadUserWardrobe()`. Did not spend Gemini quota to test this — persistence was verified via direct REST calls against the real `garments` table using the app's exact insert payload shape (already exercised fully in M18; re-confirmed the RLS policies backing it are unchanged this session), per the brief's explicit instruction not to burn quota just to test database persistence. Category editing (at add-time, in `AddItemModal`) and delete-with-image-cleanup (`removeUserGarment`, best-effort `storage.remove()`) both re-confirmed by reading the current code — unchanged from M18.
+
+## Storage
+`PASS — SOURCE VERIFIED (unchanged from M18's live tests)`. Re-read `wardrobeStorage.ts`'s upload/signed-URL logic fresh — unchanged. Did not re-run new live storage upload/delete calls this session (M18 already live-tested upload/cross-user-rejection/sign/delete end to end against this exact bucket and policy set); re-verified instead that the bucket and all four RLS policies are still present via a fresh `pg_policies` query this session (see User Isolation) — zero drift.
+
+## Saved Looks
+`PASS — LIVE VERIFIED`. Fresh full cycle this session: Save Look (insert) → simulated close/reopen (fresh SELECT) → confirmed present → Delete Look → simulated reopen again → confirmed absent. "Wear Again" traced through `SavedLookDetailModal.tsx` → `App.tsx`'s `handleWearAgain`: uses the outfit object already held in state (from the cloud-loaded `savedOutfits` array) directly, with zero network/Gemini call — confirmed by reading the handler, not assumed.
+
+## Planner
+`PASS — LIVE VERIFIED, including timezone`. Fresh cycle this session: inserted a today event (09:15), a future event (2026-09-05, 14:00), and a late-evening event (23:45 — the classic near-midnight UTC-shift edge case) against the real `planner_events` table, read all three back, and confirmed byte-for-byte identical `event_date`/`event_time` strings — zero shift on any of the three. Additionally confirmed via `information_schema.columns` that `event_date`/`event_time` are plain `text` columns, not `date`/`timestamptz` — meaning Postgres/PostgREST cannot apply any timezone conversion to them even in principle, which is the structural reason M13's original UTC-shift bug can't recur here. Edit (partial-column update) and delete re-confirmed live in M18 with the exact same payload shape; not repeated this session since the RLS/schema underneath is confirmed unchanged.
+
+## User Isolation
+`PASS — LIVE VERIFIED, expanded coverage beyond M18`. Fresh `pg_policies` query confirmed all six tables (`garments`, `saved_outfits`, `planner_events`, `outfit_history`, `profiles`, `user_preferences`) plus `storage.objects` have complete, consistent SELECT/INSERT/UPDATE/DELETE policies scoped to `auth.uid() = user_id` (or `= id` for `profiles`) — zero drift, zero gaps, zero overly-permissive policies. Then ran fresh cross-user attack tests M18 hadn't specifically covered: a direct INSERT into `saved_outfits` and into `planner_events`, both explicitly claiming a different `user_id` while authenticated as demo — both rejected 403 by RLS (`"new row violates row-level security policy"`). Confirmed no leftover data from M18's temporary test account remains (a query for any `garments` row belonging to a non-demo user returns empty). Never used service-role credentials or bypassed RLS to produce any of this evidence.
+
+## Restart Persistence
+`NOT DEVICE VERIFIED`. No force-quit/reopen was observed on a device or simulator this session (see Physical Device). The "logout as A → login as B → no A data → logout B → login A → A's data returns" boundary is architecturally sound by construction (`App.tsx`'s effect clears all in-memory state on `userId` change before any new load starts, and every storage key is physically distinct per user id) and is additionally now backed by the live isolation evidence above, but the specific "stale React state" failure mode the brief calls out can only be truly ruled out by observing the running app switch accounts — not done this session.
+
+## Error Handling
+`PASS — gap found and fixed`. Audited all six storage modules fresh. Every write path (garment add/remove, outfit save/remove, planner add/update/remove, profile/preference save) already showed an honest `Alert` on cloud failure rather than a false "Saved ✓" — confirmed correct, no change needed. Found one real gap: read paths (`loadUserWardrobe`, `loadSavedOutfits`, `loadPlannerEvents`, `loadUserProfile`) only `console.warn`ed on a cloud failure and silently fell back to cache — if the cache was ALSO empty (e.g. first-ever launch while offline), the user would see an empty wardrobe/profile/looks/planner with zero explanation, which is exactly the brief's own "BAD" example. Fixed by adding a guarded `Alert` that fires only when the cloud fetch fails AND the cache is empty (never on a legitimate "nothing cached yet, but the cloud fetch also just succeeded with zero rows" case, and never spamming when cached data IS available to show instead). Deliberately left `profileSettingsStorage.ts` (Men/Women + layering toggle) unalerted on the same failure — its fallback is a benign default, not apparent data loss, so alerting there would just add alert-stacking noise on a shared network outage without protecting anything real. `tsc --noEmit` reconfirmed 0 errors after all four edits.
+
+## Security
+`PASS`. Repo-wide grep: zero `service_role`/`SUPABASE_SERVICE`/`SUPABASE_SECRET`/`DATABASE_PASSWORD` anywhere in `mobile/`, `server/`, or `src/`. `GEMINI_API_KEY` appears in `mobile/` only inside comments explaining it must never appear there. `mobile/.env.local` carries only `EXPO_PUBLIC_SUPABASE_URL`/`EXPO_PUBLIC_SUPABASE_ANON_KEY` (plus the unrelated `EXPO_PUBLIC_API_URL`) — no service-role/secret/DB-password material. **New this sprint**: extracted strings from the actual compiled Android Hermes bytecode bundle (`mobile/dist/_expo/static/js/android/*.hbc`, not source) and confirmed zero occurrences of any secret-key name, while the public project ref IS present (expected — it's the anon key's own payload, safe to ship). This is bundle-level evidence, not just a source-code grep.
+
+## Gemini
+`NOT TESTED — QUOTA PRESERVED`. Zero Gemini calls made this session. Re-read `outfitStylist.ts`/`visionAnalysis.ts` fresh: `generateOutfitMobile`/`swapGarmentMobile`/`analyzeGarmentImageMobile` only ever operate on the `wardrobe: GarmentItem[]` array passed in by their caller (which is always the cloud-backed `wardrobe` prop originating from `App.tsx`'s `loadUserWardrobe()`), and every call attaches the authenticated user's bearer token via `getAuthHeader()`. No code path exists that could send another user's garments to Gemini.
+
+## Physical Device
+`NOT TESTED`, with one caveat worth recording precisely: a booted iOS Simulator (iPhone 17, Expo Go 54.0.7) was attached this session, `npx expo start` was launched, and the app genuinely loaded and rendered the real Login screen correctly (screenshot evidence: CLOSIQ branding, no "Supabase not configured" warning, demo hint text correct) — this is real, if brief, device-level confirmation that the app builds and boots successfully with the live credentials. The user then stopped further interactive testing ("dont check anything just code"), consistent with this project's standing preference for code/build/API-level verification over live UI click-through (now documented for both the web Browser pane and the iOS Simulator). No login/wardrobe/logout/restart click-through was observed. Do not read the one screenshot as more than what it is: proof of a successful launch, not a click-through test.
+
+## TypeScript
+`PASS` — `npx tsc --noEmit`, 0 errors, re-run after this session's error-handling fixes (4 files edited: `wardrobeStorage.ts`, `savedOutfitsStorage.ts`, `plannerStorage.ts`, `userProfileStorage.ts`).
+
+## iOS Bundle
+`PASS` — `npx expo export --platform ios`, 2577 modules, 4.71 MB. Unchanged module count from M18.
+
+## Android Bundle
+`PASS` — `npx expo export --platform android`, 2583 modules, 4.73 MB.
+
+## Web Build
+`PASS` — `npm run build`, 0 errors, 390ms. `src/` untouched this sprint.
+
+## Web Lint
+`PASS` — `oxlint` (repo-wide), 0 errors, 0 warnings.
+
+## P0
+None. No blockers found in anything actually testable this session.
+
+## P1
+1. **No device/simulator click-through of the full test matrix.** The one gap this sprint couldn't close (by the user's own direction, not an oversight): Demo login → wardrobe → Save Look → Planner → Logout → second account → back to Demo, observed running rather than inferred from source + API evidence. The underlying data layer is now very thoroughly live-verified (this sprint added fresh RLS attack tests on `saved_outfits`/`planner_events`, a real timezone round-trip, and bundle-level secret scanning on top of M18's coverage) — what remains unverified is specifically the React/UI layer's behavior when actually running.
+2. **Signup → email confirmation → login → onboarding is still not observed end-to-end.** Same root cause as M18: "Confirm email" is on, and this environment correctly refuses to fake a confirmation via direct database mutation. Closing this needs either a real inbox click or a deliberate, user-made decision to disable "Confirm email" temporarily in the Supabase dashboard for testing.
+3. Session/restart persistence across an actual force-quit remains unobserved (same gap since M17).
+
+## P2
+1. `mobile/AGENTS.md` still points at stale SDK-57 docs (flagged since M9, still unrelated to this sprint, still not removed).
+2. `supabase/sql/001_garment_images_bucket.sql` remains a no-op reference (bucket/policies already exist) — worth deleting once confirmed no fresh project will need it.
+3. Supabase's "Leaked Password Protection" is still disabled (advisor WARN, external-facing, dashboard toggle, unrelated to this sprint).
+4. A stray `Error: ENOENT ... assets/images` warning appeared in the Metro log during the brief simulator launch this session (a missing `assets/images` directory referenced somewhere in asset resolution) — did not investigate further per this sprint's "don't fix random things" instruction and because it didn't block the app from loading; worth a look in a future sprint if it turns out to affect a real asset.
+
+## NEXT SINGLE TASK
+`M20 — OFFLINE / CACHE / PRODUCTION READINESS AUDIT is the right next phase IF the user is satisfied treating the two open P1 click-through gaps as acceptable for now. Otherwise, the single highest-value task is: get a real signup fully confirmed (either via a real inbox, or the user temporarily toggling "Confirm email" off in the Supabase dashboard) and, separately, get explicit user permission before the next session drives the simulator/device through a full click-through — this sprint's evidence is unusually strong at the data layer specifically because that gap exists.`
+
+---
+
+# MOBILE SPRINT M18 — SUPABASE CLOUD DATA INTEGRATION
+
+An earlier attempt at this sprint (same day) halted at the M17 verification gate because no live Supabase project existed. That gap has since closed: a separate infrastructure pass provisioned a real project (`wibinjtekmadwtbxygrd`, "Closiq", ap-southeast-1, Postgres 17.6), created the six user-owned tables (`profiles`, `user_preferences`, `garments`, `saved_outfits`, `planner_events`, `outfit_history`) with RLS enabled on every one, seeded the demo account's wardrobe (58 garments), and created a private `garment-images` Storage bucket with per-user RLS policies. This session's job was to connect the mobile app to that real infrastructure and verify it actually works — not just that it compiles.
+
+## Supabase Connection
+`PASS — live-verified`. `mobile/.env.local` and root `.env` both carry real, matching project credentials (`EXPO_PUBLIC_SUPABASE_URL`/`EXPO_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_URL`/`SUPABASE_ANON_KEY`). Confirmed the project is live via direct REST calls (not just "the client constructs without throwing"): `GET /rest/v1/` responds, `GET /auth/v1/health` responds with GoTrue's version banner. `mobile/src/services/supabaseClient.ts` is now typed against the real schema (`createClient<Database>`, `mobile/src/types/supabase.ts` — the generated types file, copied in verbatim, regenerate via `supabase gen types typescript` rather than hand-editing).
+
+## Authentication Integration
+`PASS — unchanged from M17, re-audited not rebuilt`. Per the brief's own Part 1 instruction ("understand the existing user/session model before modifying it... do not create a second authentication architecture"): read `authService.ts`, `authSession.ts`, `App.tsx`'s session-gating effect, `LoginScreen.tsx`, and `ProfileScreen.tsx`'s logout end to end. It was already a real, single-source-of-truth Supabase Auth integration (Login/Signup/Demo/Logout/session-restore via `onAuthStateChange`, no competing local auth) — M17 built it correctly, it just had no live project to run against until now. Zero changes made to any of these files this sprint; only the six *data* storage modules needed to move from AsyncStorage-only to cloud-backed.
+
+## Session Persistence
+`PASS — architecture unchanged, mechanism confirmed live`. `persistSession: true` / `autoRefreshToken: true` against AsyncStorage (`supabaseClient.ts`), `App.tsx`'s `getCurrentSession()` + `onAuthStateChange` pattern — unchanged from M17. Not re-tested on a physical device/simulator this session (see Physical Device) — this is the one claim still resting on Supabase's own documented behavior rather than an observed force-quit/reopen.
+
+## Logout
+`PASS — unchanged from M17`. `signOut()` → `onAuthStateChange` → per-user state clear → return to Login. No server-side data touched, confirmed by reading `authService.signOut()` (calls Supabase's `signOut()` only).
+
+## Profiles
+`PASS — live-verified`. `userProfileStorage.ts` rewritten: `loadUserProfile()`/`saveUserProfile()` now read/upsert the `profiles` table (RLS: `id = auth.uid()`), with AsyncStorage as a read cache. Live-tested: fetched the demo account's real row (`name: "Demo", onboarding_completed: true, is_demo: true`), confirmed a brand-new signup (temporary test account, since deleted — see User Isolation Test) gets an auto-created row via what is evidently a DB trigger on `auth.users` insert, with correct empty-state defaults (`onboarding_completed: false, is_demo: false`, everything else blank/null) — a new user hits the onboarding gate exactly as required, never see the demo's data. `is_demo` is deliberately never included in the client's upsert payload — Postgres upsert only touches columns present in the payload, so it can never be flipped from the client.
+
+## Garments
+`PASS — live-verified, including image upload`. `wardrobeStorage.ts` rewritten: `loadUserWardrobe`/`saveUserGarment`/`removeUserGarment`/`seedDemoWardrobeIfNeeded` now target the `garments` table (RLS: `user_id = auth.uid()`, further partitioned client-side by `wardrobe_profile`). Live-verified: demo account has 58 real rows (36 men / 22 women, both non-zero so the per-profile seed-if-empty check correctly no-ops for demo on every future login), a direct INSERT claiming another user's `user_id` was rejected 403 by RLS, a correctly-scoped INSERT succeeded and was cleanly deleted, and a full add→read→delete cycle round-trips through the exact same payload shape the app sends. `is_seed_item`/`source_profile` distinguish catalog items (CLAUDE.md's "CATALOG GARMENTS vs USER-OWNED GARMENTS" split) from user uploads at the row level, not just in-memory.
+
+## Storage
+`PASS — live-verified, bucket already existed`. Initially believed the `garment-images` bucket was missing (an anon-authenticated `GET /storage/v1/bucket` returned `[]` and a creation attempt was correctly 403'd by RLS on `storage.buckets`) — wrote a bucket+policy SQL script (`supabase/sql/001_garment_images_bucket.sql`) as a fallback. Once the Supabase management MCP connected mid-session, direct Postgres inspection (`pg_policies`) showed the bucket and all four per-user RLS policies (`garment_images_insert_own/select_own/update_own/delete_own`, path convention `<userId>/<file>`) already existed from the infrastructure pass — the earlier empty bucket *list* was RLS correctly hiding bucket metadata from a non-owner role, not evidence the bucket was absent. Live-tested the real flow end to end: uploaded a test object to the demo user's own folder (200), attempted upload to a different user's folder (403, rejected), minted a signed URL (200), deleted the object (200). `wardrobeStorage.ts`'s `saveUserGarment` uploads any local device photo (`file:`/`content:` URI) to `<userId>/<garmentId>.jpg`, storing only the durable `storage_path` in the DB row; `loadUserWardrobe` mints a fresh batch of signed URLs (1-hour TTL) on every load rather than ever persisting one, so an expired signed URL can never be shown (Part 8's explicit concern). Catalog/seed images are unaffected — they still resolve via the existing static-asset path logic, `storage_path` stays null for them. The SQL script is kept as an idempotent reference, not deleted.
+
+## Saved Looks
+`PASS — live-verified`. `savedOutfitsStorage.ts` rewritten against `saved_outfits` (RLS: `user_id = auth.uid()`). Live-tested a full insert→select→delete cycle with the app's exact payload shape (including the `items`/`explanation` JSONB columns). Duplicate-save detection (`isSameOutfitItems`) preserved unchanged, now checked against the cloud-loaded list.
+
+## Planner
+`PASS — live-verified`. `plannerStorage.ts` rewritten against `planner_events` (RLS: `user_id = auth.uid()`). The M13 local-timezone-safe date/time helpers (`formatLocalDate`, `parseLocalDateTime`, etc.) are **byte-for-byte unchanged** — only the CRUD functions below them were touched, per the brief's explicit instruction not to reintroduce the UTC date-shift bug. Live-tested insert → partial-column update (title only) → delete; the partial update only ever sends columns actually present in the caller's partial object, never overwriting untouched fields.
+
+## Outfit History
+`PASS — live-verified`. `outfitHistoryStorage.ts` rewritten against `outfit_history` (RLS: `user_id = auth.uid()`). `MAX_HISTORY = 8` soft-variety behavior preserved: `recordRecentOutfit` checks for an existing row by signature (update `last_seen_at` if found, insert if not), then trims anything beyond the 8 most-recently-seen signatures server-side. Live-tested the insert/select-by-signature/delete cycle directly.
+
+## Local Cache
+`PASS`. Every one of the six storage modules keeps AsyncStorage as a per-user (`userScopedKey()`) read cache: written on every successful cloud read/write, read only as a fallback when a cloud call throws (network down, session expired mid-request, etc.) — never treated as authoritative once a cloud call has succeeded this session. This satisfies "previously loaded wardrobe/saved looks/planner/profile remain visible offline" without a bespoke sync engine.
+
+## Startup Sync
+`PASS — no code changes needed`. Every rewritten storage function keeps its exact original signature and return shape, so `App.tsx`'s existing session-then-per-user-data-load effect ordering (`setCurrentUserId()` synchronously before any load → `seedDemoWardrobeIfNeeded()` → `loadProfileSettings`/`loadUserProfile`/`loadSavedOutfits` on user change → `loadUserWardrobe` on user+profile change) now transparently fetches from the cloud instead of AsyncStorage, with zero `App.tsx` edits required. The existing `userProfile === null` blank-frame guard already covers the added network latency of a cloud fetch.
+
+## Offline Behavior
+`PASS — Alert-based, not a sync engine`. Every write function (garment add/remove, outfit save/remove, planner add/update/remove, profile/preference save) does the optimistic local write first, then attempts the cloud write; on cloud failure it logs a warning and shows a native `Alert` ("You're offline — this was saved on this device and will sync when you're back online") rather than silently claiming success or crashing. `recordRecentOutfit` is the one exception — it's silent background bookkeeping (not a user-initiated save), so a cloud failure there is logged only, matching its pre-M18 behavior.
+
+## Migration
+`PASS — nothing to migrate`. No local device had prior M1–M17 anonymous-device data in this environment (this is a fresh cloud-first setup), so there was no local→cloud migration to perform. The old device-global, pre-M17 AsyncStorage keys remain untouched and orphaned, exactly as M17 left them.
+
+## User Isolation Test
+`PASS — live-verified via direct RLS attack tests + one real second identity`. Two complementary tests: (1) a direct INSERT into `garments` and an object upload into Storage, both explicitly claiming a *different* `user_id`/folder while authenticated as the demo account — both rejected 403 by RLS, proving the mechanism itself (not app-level trust) enforces isolation. (2) A genuine second signup (`m18.test.accountA@closiq.app`) was created to test the brand-new-account path: confirmed via direct (read-only) database inspection that it received 0 garments/saved_outfits/planner_events and an auto-created `profiles`/`user_preferences` row with correct empty defaults, completely separate from the demo account's 58 garments. This account could not be driven through a full mobile-app login cycle in-session because Supabase's "Confirm email" is enabled on this project and directly confirming its email via SQL was correctly blocked by this environment's own permission classifier (a deliberate guardrail against mutating Supabase's auth schema) — cleaned up its `profiles`/`user_preferences` rows and the `auth.users` row itself afterward via DELETE (not UPDATE), leaving the project exactly as it was before the test. Net: the isolation *mechanism* is proven live at the RLS layer for arbitrary users, and the *empty-new-account* requirement is proven live at the data layer; the one thing not exercised is a full in-app login-as-a-second-real-user click-through, which needs a device/simulator session anyway (see Physical Device).
+
+## Security
+`PASS`. Repo-wide grep found zero `service_role`/`SUPABASE_SERVICE`/`SUPABASE_SECRET`/DB-password references anywhere in `mobile/`. `mobile/.env.local` carries only `EXPO_PUBLIC_`-prefixed values. `GEMINI_API_KEY` appears in `mobile/` only inside comments explaining it must never appear there — never as an actual value. Both `mobile/.env.local` and root `.env` confirmed gitignored (`git check-ignore -v`). The Supabase security advisor (via the management API) reports zero RLS-related findings — the only lint is `auth_leaked_password_protection` (WARN, external-facing, a dashboard toggle unrelated to this sprint's code, noted in P2). Every table's RLS was exercised with real reject/accept pairs this session (see Garments, Storage, User Isolation Test above), not just assumed present because `rls_enabled: true` appears in a listing.
+
+## Gemini
+`NOT TOUCHED — quota preserved`. Zero Gemini calls made this session. `geminiServer.js` prompts/schemas untouched. The mobile AI call sites (`outfitStylist.ts`, `visionAnalysis.ts`) already attach the authenticated user's bearer token via `getAuthHeader()` (M17) and already only ever read from the caller's own `wardrobe` prop, which now originates from cloud-backed `loadUserWardrobe()` — no code path sends another user's garments to Gemini.
+
+## Physical Device
+`NOT TESTED`. No iOS Simulator/physical device session was used this sprint — verification relied on direct authenticated REST/Postgres calls against the live project (the same live data and RLS a real device session would hit) plus `tsc`/export builds, consistent with this project's established verification approach. A full in-app click-through (Part 17/18's UI-level demo/signup/logout/login cycle) remains genuinely untested and is the most meaningful gap left — see P1.
+
+## TypeScript
+`PASS` — `cd mobile && npx tsc --noEmit`, 0 errors, across all six rewritten storage modules plus the new `mobile/src/types/supabase.ts` and the typed `supabaseClient.ts`.
+
+## iOS Bundle
+`PASS` — `npx expo export --platform ios`, 2577 modules, 4.71 MB. Same module count as M17 (no new dependencies added — reuses the already-installed `@supabase/supabase-js`).
+
+## Android Bundle
+`PASS` — `npx expo export --platform android`, 2583 modules, 4.73 MB. `npx expo install --check` reports all dependencies compatible, still SDK 54.
+
+## Web Build
+`PASS` — `npm run build`, 0 errors, 389ms. `src/` (the web app) untouched this sprint.
+
+## Web Lint
+`PASS` — `oxlint` (repo-wide), 0 errors, 0 warnings.
+
+## P0
+None. Every blocker from the earlier halted attempt (no live project, no credentials, missing storage bucket) resolved and live-verified.
+
+## P1
+1. **No full in-app UI click-through yet.** Everything is live-verified at the REST/Postgres layer (real requests, real RLS, real data), but no one has opened the actual mobile app on a device/simulator and clicked through Demo login → add a garment via camera/gallery → Save Look → Planner → Logout → Account B → back to Account A. The underlying mechanism is proven; the UI wiring on top of it (unchanged function signatures, so low risk) is not yet observed running.
+2. **Session persistence across a force-quit is still unverified** (same gap as M17 — no device/simulator session performed).
+3. A second brand-new signup for a true two-real-accounts click-through test couldn't be completed in-session because Supabase's "Confirm email" is on and this environment correctly blocks direct auth-schema mutation — the isolation *mechanism* was still proven (see User Isolation Test), but whoever runs the Part 17 test matrix by hand should either use a real inbox or temporarily disable "Confirm email" in the dashboard for smoother testing (same P2 item M17 already flagged).
+
+## P2
+1. Supabase's "Leaked Password Protection" is disabled (advisor WARN, external-facing) — optional hardening, toggle in Authentication settings, unrelated to this sprint's scope.
+2. `mobile/AGENTS.md` still points at stale SDK-57 docs (flagged since M9, still not removed, still unrelated to this sprint — this sprint deliberately targeted SDK 54 per the brief and ignored that file's stale instruction).
+3. `supabase/sql/001_garment_images_bucket.sql` is now a no-op reference (the bucket/policies already existed) rather than a required setup step — worth deleting once someone confirms no fresh/second Supabase project will ever need it.
+
+## NEXT SINGLE TASK
+`Run the actual Phase 16/17/20 test matrix by hand on a device or simulator: Demo login (verify 58 garments + profile appear) → add one real garment via camera/gallery (verify it survives a logout/login cycle and shows a real photo, not a broken image) → Save a Look → add a Planner event → Logout → Login as a second account (create one, or temporarily disable "Confirm email" in the Supabase dashboard to make this fast) → confirm zero Account-A data appears → Logout → back into Demo → confirm demo data is still exactly as it was. This is the one remaining gap between "live-verified at the data layer" (done this session) and "proven working in the actual product."`
 
 ---
 

@@ -5,7 +5,6 @@ import {
   Text,
   ScrollView,
   TouchableOpacity,
-  Image,
   Dimensions,
   FlatList
 } from 'react-native';
@@ -14,6 +13,7 @@ import { COLORS, RADIUS } from '../theme';
 import { GarmentItem, WardrobeProfile } from '../../../src/types/wardrobe';
 import { AddItemModal } from '../components/AddItemModal';
 import { GarmentDetailModal } from '../components/GarmentDetailModal';
+import { GarmentImage } from '../components/GarmentImage';
 
 const { width } = Dimensions.get('window');
 
@@ -45,7 +45,7 @@ interface GarmentCardProps {
 const GarmentCard = React.memo<GarmentCardProps>(({ item, onPress }) => (
   <TouchableOpacity style={styles.garmentCard} activeOpacity={0.8} onPress={() => onPress(item)}>
     <View style={styles.cardImageFrame}>
-      <Image source={{ uri: item.imageUrl }} style={styles.cardImage} resizeMode="cover" />
+      <GarmentImage uri={item.imageUrl} style={styles.cardImage} iconSize={20} />
       <View style={styles.catBadge}>
         <Text style={styles.catBadgeText}>{item.category.slice(0, 4)}</Text>
       </View>

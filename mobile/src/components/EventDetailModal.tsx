@@ -1,9 +1,10 @@
 import React from 'react';
-import { StyleSheet, View, Text, Modal, TouchableOpacity, Image, ScrollView, Alert } from 'react-native';
+import { StyleSheet, View, Text, Modal, TouchableOpacity, ScrollView, Alert } from 'react-native';
 import { X, Trash2, Pencil, CalendarDays, Clock, Tag, Sparkles, Sun } from 'lucide-react-native';
 import { COLORS, RADIUS } from '../theme';
 import { PlannerEvent } from '../types/planner';
 import { formatEventDateLabel, formatEventTimeLabel } from '../services/plannerStorage';
+import { GarmentImage } from './GarmentImage';
 
 interface EventDetailModalProps {
   event: PlannerEvent | null;
@@ -79,7 +80,7 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
                 <View style={styles.outfitThumbRow}>
                   {event.outfit.items.slice(0, 4).map((item, idx) => (
                     <View key={`${item.id}-${idx}`} style={styles.outfitThumbFrame}>
-                      <Image source={{ uri: item.imageUrl }} style={styles.outfitThumbImg} resizeMode="cover" />
+                      <GarmentImage uri={item.imageUrl} style={styles.outfitThumbImg} iconSize={16} />
                     </View>
                   ))}
                 </View>

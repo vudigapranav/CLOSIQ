@@ -5,13 +5,13 @@ import {
   Text,
   Modal,
   TouchableOpacity,
-  Image,
   ScrollView,
   Alert
 } from 'react-native';
-import { X, Sparkles, Trash2, ArrowRight, Shirt } from 'lucide-react-native';
+import { X, Sparkles, Trash2, ArrowRight } from 'lucide-react-native';
 import { COLORS, RADIUS } from '../theme';
 import { Outfit } from '../../../src/types/wardrobe';
+import { GarmentImage } from './GarmentImage';
 
 interface SavedLookDetailModalProps {
   outfit: Outfit | null;
@@ -87,13 +87,7 @@ export const SavedLookDetailModal: React.FC<SavedLookDetailModalProps> = ({
               {outfit.items.map((item) => (
                 <View key={item.id} style={styles.garmentCard}>
                   <View style={styles.garmentImgFrame}>
-                    {item.imageUrl ? (
-                      <Image source={{ uri: item.imageUrl }} style={styles.garmentImg} resizeMode="cover" />
-                    ) : (
-                      <View style={styles.missingImgBox}>
-                        <Shirt size={20} color={COLORS.textMuted} />
-                      </View>
-                    )}
+                    <GarmentImage uri={item.imageUrl} style={styles.garmentImg} iconSize={20} />
                     <View style={styles.catBadge}>
                       <Text style={styles.catBadgeText}>{item.category.slice(0, 4)}</Text>
                     </View>
