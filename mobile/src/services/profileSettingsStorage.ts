@@ -1,7 +1,12 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Alert } from 'react-native';
 import { WardrobeProfile, LayeringPreference } from '../../../src/types/wardrobe';
-import { userScopedKey, getCurrentUserId } from './authSession';
+import {
+  SessionScope,
+  captureSession,
+  isSessionCurrent,
+  userScopedKeyFor
+} from './authSession';
+import { runCloudWrite } from './cloudWriteFeedback';
 import { supabase } from './supabaseClient';
 import type { Tables } from '../types/supabase';
 
@@ -29,9 +34,9 @@ function rowToSettings(row: Tables<'user_preferences'>): MobileProfileSettings {
   };
 }
 
-async function readCache(): Promise<MobileProfileSettings | null> {
+async function readCache(scope: SessionScope): Promise<MobileProfileSettings | null> {
   try {
-    const raw = await AsyncStorage.getItem(userScopedKey(BASE_STORAGE_KEY));
+    const raw = await AsyncStorage.getItem(userScopedKeyFor(scope.userId, BASE_STORAGE_KEY));
     if (!raw) return null;
     const parsed = JSON.parse(raw);
     return {
@@ -44,16 +49,18 @@ async function readCache(): Promise<MobileProfileSettings | null> {
   }
 }
 
-async function writeCache(settings: MobileProfileSettings): Promise<void> {
+async function writeCache(scope: SessionScope, settings: MobileProfileSettings): Promise<void> {
   try {
-    await AsyncStorage.setItem(userScopedKey(BASE_STORAGE_KEY), JSON.stringify(settings));
+    await AsyncStorage.setItem(userScopedKeyFor(scope.userId, BASE_STORAGE_KEY), JSON.stringify(settings));
   } catch (err) {
     console.warn('Failed to cache profile settings:', err);
   }
 }
 
 export async function loadProfileSettings(): Promise<MobileProfileSettings> {
-  const userId = getCurrentUserId();
+  // Session captured once, up front — see authSession.ts (Sprint M19).
+  const scope = captureSession();
+  const userId = scope.userId;
   if (!userId) return DEFAULT_SETTINGS;
 
   try {
@@ -63,15 +70,22 @@ export async function loadProfileSettings(): Promise<MobileProfileSettings> {
       .eq('user_id', userId)
       .maybeSingle();
     if (error) throw error;
+    if (!isSessionCurrent(scope)) {
+      // Would otherwise flip the new user into the previous user's
+      // Men/Women wardrobe profile, which then drives the wardrobe read.
+      console.warn('Discarding preferences read that resolved after a session change.');
+      return DEFAULT_SETTINGS;
+    }
     if (data) {
       const mapped = rowToSettings(data);
-      await writeCache(mapped);
+      await writeCache(scope, mapped);
       return mapped;
     }
     return DEFAULT_SETTINGS;
   } catch (err) {
     console.warn('Cloud profile-settings fetch failed, falling back to local cache:', err);
-    const cached = await readCache();
+    const cached = await readCache(scope);
+    if (!isSessionCurrent(scope)) return DEFAULT_SETTINGS;
     return cached ?? DEFAULT_SETTINGS;
   }
 }
@@ -79,31 +93,33 @@ export async function loadProfileSettings(): Promise<MobileProfileSettings> {
 export async function saveProfileSettings(
   partial: Partial<MobileProfileSettings>
 ): Promise<MobileProfileSettings> {
-  const userId = getCurrentUserId();
-  const existing = (await readCache()) ?? DEFAULT_SETTINGS;
+  const scope = captureSession();
+  const userId = scope.userId;
+  const existing = (await readCache(scope)) ?? DEFAULT_SETTINGS;
   const updated = { ...existing, ...partial };
 
-  await writeCache(updated);
+  await writeCache(scope, updated);
 
   if (!userId) return updated;
 
-  try {
-    const { error } = await supabase.from('user_preferences').upsert(
-      {
-        user_id: userId,
-        wardrobe_profile: updated.profile,
-        layering_preference: updated.layeringPreference
-      },
-      { onConflict: 'user_id' }
-    );
-    if (error) throw error;
-  } catch (err) {
-    console.warn('Failed to sync profile settings to cloud:', err);
-    Alert.alert(
-      "You're offline",
-      "This preference was saved on this device and will sync when you're back online."
-    );
-  }
+  await runCloudWrite({
+    scope,
+    title: 'Preference not saved to your account',
+    message:
+      "This preference wasn't saved to your account. It's in effect on this device for now, but your saved preferences will replace it the next time they load — try again to keep it.",
+    run: async () => {
+      const { error } = await supabase.from('user_preferences').upsert(
+        {
+          user_id: userId,
+          wardrobe_profile: updated.profile,
+          layering_preference: updated.layeringPreference
+        },
+        { onConflict: 'user_id' }
+      );
+      if (error) throw error;
+    }
+  });
 
+  if (!isSessionCurrent(scope)) return DEFAULT_SETTINGS;
   return updated;
 }

@@ -24,6 +24,8 @@ interface OutfitResultCardProps {
     colorHarmony?: string;
   };
   isSaved: boolean;
+  /** Why the local engine was used instead of Gemini (Sprint M20). */
+  notice?: string;
   onSelectGarmentForSwap: (garment: GarmentItem) => void;
   onRegenerate: () => void;
   onSave: () => void;
@@ -41,6 +43,7 @@ export const OutfitResultCard = React.memo<OutfitResultCardProps>(({
   garments,
   explanation,
   isSaved,
+  notice,
   onSelectGarmentForSwap,
   onRegenerate,
   onSave
@@ -60,10 +63,19 @@ export const OutfitResultCard = React.memo<OutfitResultCardProps>(({
           <Text style={styles.resultVibe}>{vibe}</Text>
         </View>
 
-        <View style={styles.matchScoreBadge}>
-          <Text style={styles.matchScoreText}>{styleScore}% Match</Text>
-        </View>
+        {/* A match score is only meaningful when the AI actually evaluated
+            the outfit. When a failed AI request fell back to the local
+            engine (the only case that carries a `notice`), its pick is a
+            simple category fill — "90% Match" was an invented score
+            (Sprint M20). A re-shown saved look keeps its original score. */}
+        {!(mode === 'fallback' && notice) && (
+          <View style={styles.matchScoreBadge}>
+            <Text style={styles.matchScoreText}>{styleScore}% Match</Text>
+          </View>
+        )}
       </View>
+
+      {mode === 'fallback' && !!notice && <Text style={styles.noticeText}>{notice}</Text>}
 
       {/* Garment Cards Grid */}
       <Text style={styles.piecesTitle}>Selected Pieces (Tap piece to Swap)</Text>
@@ -160,6 +172,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 4,
     marginBottom: 2
+  },
+  noticeText: {
+    fontSize: 12,
+    color: COLORS.textSecondary,
+    lineHeight: 17,
+    marginBottom: 12
   },
   modeText: {
     fontSize: 11,

@@ -15,6 +15,7 @@ import { COLORS, RADIUS } from '../theme';
 import { GarmentItem, WardrobeProfile, LayeringPreference, Outfit } from '../../../src/types/wardrobe';
 import { generateOutfitMobile, swapGarmentMobile, MobileOutfitResult } from '../services/outfitStylist';
 import { isSameOutfitItems } from '../services/savedOutfitsStorage';
+import { isSyncPending } from '../services/cloudWriteFeedback';
 import { recordRecentOutfit } from '../services/outfitHistoryStorage';
 import { OutfitResultCard } from '../components/OutfitResultCard';
 import { UserProfileData } from '../types/onboarding';
@@ -55,6 +56,7 @@ export const StylistScreen: React.FC<StylistScreenProps> = ({
   const [selectedGarmentForSwap, setSelectedGarmentForSwap] = useState<GarmentItem | null>(null);
   const [outfitResult, setOutfitResult] = useState<{
     mode: 'gemini' | 'fallback';
+    notice?: string;
     data: MobileOutfitResult;
   } | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -118,6 +120,7 @@ export const StylistScreen: React.FC<StylistScreenProps> = ({
     if (res.ok && res.data && res.data.garmentIds.length > 0) {
       setOutfitResult({
         mode: res.mode,
+        notice: res.notice,
         data: res.data
       });
       await recordRecentOutfit(res.data.garmentIds);
@@ -154,6 +157,7 @@ export const StylistScreen: React.FC<StylistScreenProps> = ({
       }
       setOutfitResult({
         mode: res.mode,
+        notice: res.notice,
         data: res.data
       });
       await recordRecentOutfit(res.data.garmentIds);
@@ -187,6 +191,7 @@ export const StylistScreen: React.FC<StylistScreenProps> = ({
 
       setOutfitResult({
         mode: res.mode,
+        notice: res.notice,
         data: {
           ...outfitResult.data,
           title: res.data.outfitTitle || outfitResult.data.title,
@@ -219,7 +224,12 @@ export const StylistScreen: React.FC<StylistScreenProps> = ({
   const isCurrentOutfitSaved = useMemo(
     () =>
       outfitResult
-        ? savedOutfits.some((o) => isSameOutfitItems(o.items.map((i) => i.id), outfitResult.data.garmentIds))
+        ? savedOutfits.some(
+            (o) =>
+              // A look whose cloud save failed is not saved — showing "Saved ✓"
+              // for it was a false success, and hid the only retry path.
+              !isSyncPending(o) && isSameOutfitItems(o.items.map((i) => i.id), outfitResult.data.garmentIds)
+          )
         : false,
     [outfitResult, savedOutfits]
   );
@@ -362,6 +372,7 @@ export const StylistScreen: React.FC<StylistScreenProps> = ({
           {outfitResult && !loading && !swapping && (
             <OutfitResultCard
               mode={outfitResult.mode}
+              notice={outfitResult.notice}
               title={outfitResult.data.title}
               vibe={outfitResult.data.vibe}
               styleScore={outfitResult.data.styleScore}

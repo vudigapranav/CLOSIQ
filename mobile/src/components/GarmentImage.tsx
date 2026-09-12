@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { View, Image, StyleSheet, ImageStyle, StyleProp, ImageResizeMode } from 'react-native';
 import { Shirt } from 'lucide-react-native';
 import { COLORS } from '../theme';
+import { resignImageUrl, storagePathFromUrl } from '../services/garmentImages';
 
 interface GarmentImageProps {
   uri: string | undefined;
@@ -21,6 +22,12 @@ interface GarmentImageProps {
  * SavedLookDetailModal's `missingImgBox`) and a dev-only console warning
  * naming the failed URI. No layout/size change — `style` is applied
  * identically whether the image loads or not.
+ *
+ * Sprint M20: an uploaded photo's signed URL expires (1 hour). Every load
+ * path re-signs, but a screen left open past the expiry — or a durable
+ * reference that couldn't be signed while offline — still fails here. So a
+ * failing storage-backed URL is re-signed from its object path ONCE before
+ * falling back to the placeholder. One attempt per URI: no retry loop.
  */
 export const GarmentImage: React.FC<GarmentImageProps> = ({
   uri,
@@ -29,8 +36,32 @@ export const GarmentImage: React.FC<GarmentImageProps> = ({
   iconSize = 16
 }) => {
   const [failed, setFailed] = useState(false);
+  const [currentUri, setCurrentUri] = useState(uri);
+  const [resignAttempted, setResignAttempted] = useState(false);
 
-  if (!uri || failed) {
+  // A new garment/URI starts fresh.
+  useEffect(() => {
+    setCurrentUri(uri);
+    setFailed(false);
+    setResignAttempted(false);
+  }, [uri]);
+
+  const handleError = async (detail?: unknown) => {
+    if (!resignAttempted && storagePathFromUrl(currentUri)) {
+      setResignAttempted(true);
+      const fresh = currentUri ? await resignImageUrl(currentUri) : null;
+      if (fresh) {
+        setCurrentUri(fresh);
+        return;
+      }
+    }
+    if (__DEV__) {
+      console.warn('[CLOSIQ] Garment image failed to load:', currentUri, detail);
+    }
+    setFailed(true);
+  };
+
+  if (!currentUri || failed) {
     return (
       <View style={[style, styles.fallback]}>
         <Shirt size={iconSize} color={COLORS.textMuted} />
@@ -40,14 +71,11 @@ export const GarmentImage: React.FC<GarmentImageProps> = ({
 
   return (
     <Image
-      source={{ uri }}
+      source={{ uri: currentUri }}
       style={style}
       resizeMode={resizeMode}
       onError={(event) => {
-        if (__DEV__) {
-          console.warn('[CLOSIQ] Garment image failed to load:', uri, event.nativeEvent?.error);
-        }
-        setFailed(true);
+        void handleError(event.nativeEvent?.error);
       }}
     />
   );

@@ -2,8 +2,25 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Alert } from 'react-native';
 import { PlannerEvent } from '../types/planner';
 import { Outfit } from '../../../src/types/wardrobe';
-import { userScopedKey, getCurrentUserId } from './authSession';
+import {
+  SessionScope,
+  captureSession,
+  isSessionCurrent,
+  userScopedKeyFor
+} from './authSession';
+import { runCloudWrite, markPending, mergePendingLocal } from './cloudWriteFeedback';
 import { supabase } from './supabaseClient';
+import { refreshNestedGarmentImages } from './garmentImages';
+
+/** Same durable-image re-resolution as Saved Looks, for each event's
+ *  attached outfit (Sprint M20). The stored event is never rewritten. */
+function withFreshImages(events: PlannerEvent[]): Promise<PlannerEvent[]> {
+  return refreshNestedGarmentImages(
+    events,
+    (e) => e.outfit?.items,
+    (e, items) => (e.outfit ? { ...e, outfit: { ...e.outfit, items: items as Outfit['items'] } } : e)
+  );
+}
 import type { Tables } from '../types/supabase';
 
 const BASE_STORAGE_KEY = '@closiq_planner_events';
@@ -95,9 +112,9 @@ function eventPartialToRow(
   return row;
 }
 
-async function readCache(): Promise<PlannerEvent[]> {
+async function readCache(scope: SessionScope): Promise<PlannerEvent[]> {
   try {
-    const raw = await AsyncStorage.getItem(userScopedKey(BASE_STORAGE_KEY));
+    const raw = await AsyncStorage.getItem(userScopedKeyFor(scope.userId, BASE_STORAGE_KEY));
     if (!raw) return [];
     const parsed = JSON.parse(raw);
     return Array.isArray(parsed) ? (parsed as PlannerEvent[]) : [];
@@ -107,17 +124,15 @@ async function readCache(): Promise<PlannerEvent[]> {
   }
 }
 
-async function writeCache(events: PlannerEvent[]): Promise<PlannerEvent[]> {
-  await AsyncStorage.setItem(userScopedKey(BASE_STORAGE_KEY), JSON.stringify(events));
+async function writeCache(scope: SessionScope, events: PlannerEvent[]): Promise<PlannerEvent[]> {
+  await AsyncStorage.setItem(userScopedKeyFor(scope.userId, BASE_STORAGE_KEY), JSON.stringify(events));
   return events;
 }
 
-function offlineAlert(action: string) {
-  Alert.alert("You're offline", `This ${action} was saved on this device and will sync when you're back online.`);
-}
-
 export async function loadPlannerEvents(): Promise<PlannerEvent[]> {
-  const userId = getCurrentUserId();
+  // Session captured once, up front — see authSession.ts (Sprint M19).
+  const scope = captureSession();
+  const userId = scope.userId;
   if (!userId) return [];
 
   try {
@@ -128,11 +143,18 @@ export async function loadPlannerEvents(): Promise<PlannerEvent[]> {
       .order('created_at', { ascending: false });
     if (error) throw error;
     const mapped = (data || []).map(rowToEvent);
-    await writeCache(mapped);
-    return mapped;
+    if (!isSessionCurrent(scope)) {
+      console.warn('Discarding planner read that resolved after a session change.');
+      return [];
+    }
+    // Events whose cloud insert failed exist only in this cache — keep them.
+    const merged = await withFreshImages(mergePendingLocal(mapped, await readCache(scope)));
+    if (!isSessionCurrent(scope)) return [];
+    return writeCache(scope, merged);
   } catch (err) {
     console.warn('Cloud planner fetch failed, falling back to local cache:', err);
-    const cached = await readCache();
+    const cached = await withFreshImages(await readCache(scope));
+    if (!isSessionCurrent(scope)) return [];
     if (cached.length === 0) {
       Alert.alert(
         "Couldn't load your Planner",
@@ -146,78 +168,117 @@ export async function loadPlannerEvents(): Promise<PlannerEvent[]> {
 export async function addPlannerEvent(
   input: Omit<PlannerEvent, 'id' | 'createdAt'>
 ): Promise<PlannerEvent[]> {
-  const userId = getCurrentUserId();
-  try {
-    const existing = await readCache();
-    const newEvent: PlannerEvent = {
-      ...input,
-      id: `event-${Date.now()}`,
-      createdAt: new Date().toISOString()
-    };
-    const optimistic = await writeCache([newEvent, ...existing]);
+  const scope = captureSession();
+  const userId = scope.userId;
+  const existing = await readCache(scope);
+  const newEvent: PlannerEvent = {
+    ...input,
+    id: `event-${Date.now()}`,
+    createdAt: new Date().toISOString()
+  };
+  const optimistic = await writeCache(scope, [newEvent, ...existing]);
 
-    if (!userId) return optimistic;
+  if (!userId) return optimistic;
 
-    const { error } = await supabase.from('planner_events').insert({
-      user_id: userId,
-      event_id: newEvent.id,
-      title: newEvent.title,
-      event_date: newEvent.date,
-      event_time: newEvent.time,
-      occasion: newEvent.occasion,
-      notes: newEvent.notes || null,
-      outfit: (newEvent.outfit as unknown as never) || null
-    });
-    if (error) throw error;
-    return optimistic;
-  } catch (err) {
-    console.warn('Failed to add planner event:', err);
-    offlineAlert('event');
-    return readCache();
-  }
+  const cloudSynced = await runCloudWrite({
+    scope,
+    title: 'Event not saved to your account',
+    message:
+      "This event is on this device only. It won't appear on your other devices, and it does not upload later on its own — try again to save it to your account.",
+    run: async (attempt) => {
+      // A failed attempt may still have committed; never insert twice.
+      if (attempt > 1) {
+        const { data, error: existsError } = await supabase
+          .from('planner_events')
+          .select('id')
+          .eq('user_id', userId)
+          .eq('event_id', newEvent.id)
+          .limit(1);
+        if (existsError) throw existsError;
+        if ((data?.length ?? 0) > 0) return;
+      }
+      const { error } = await supabase.from('planner_events').insert({
+        user_id: userId,
+        event_id: newEvent.id,
+        title: newEvent.title,
+        event_date: newEvent.date,
+        event_time: newEvent.time,
+        occasion: newEvent.occasion,
+        notes: newEvent.notes || null,
+        outfit: (newEvent.outfit as unknown as never) || null
+      });
+      if (error) throw error;
+    }
+  });
+
+  // Kept locally either way — discarding the event the user just created
+  // would be the only genuinely destructive option here — but marked, so
+  // the next cloud read doesn't erase it.
+  if (!isSessionCurrent(scope)) return [];
+  if (cloudSynced) return optimistic;
+  return writeCache(scope, [markPending(newEvent), ...existing]);
 }
 
 export async function updatePlannerEvent(
   id: string,
   partial: Partial<Omit<PlannerEvent, 'id' | 'createdAt'>>
 ): Promise<PlannerEvent[]> {
-  const userId = getCurrentUserId();
-  try {
-    const existing = await readCache();
-    const updated = existing.map((e) => (e.id === id ? { ...e, ...partial } : e));
-    const optimistic = await writeCache(updated);
+  const scope = captureSession();
+  const userId = scope.userId;
+  const existing = await readCache(scope);
+  const updated = existing.map((e) => (e.id === id ? { ...e, ...partial } : e));
+  const optimistic = await writeCache(scope, updated);
 
-    if (!userId) return optimistic;
+  if (!userId) return optimistic;
 
-    const { error } = await supabase
-      .from('planner_events')
-      .update(eventPartialToRow(partial) as never)
-      .eq('user_id', userId)
-      .eq('event_id', id);
-    if (error) throw error;
-    return optimistic;
-  } catch (err) {
-    console.warn('Failed to update planner event:', err);
-    offlineAlert('change');
-    return readCache();
+  const cloudSynced = await runCloudWrite({
+    scope,
+    title: 'Change not saved to your account',
+    message:
+      "This change couldn't be saved to your account, so the event has been left as it was. Try again to save it.",
+    run: async () => {
+      const { error } = await supabase
+        .from('planner_events')
+        .update(eventPartialToRow(partial) as never)
+        .eq('user_id', userId)
+        .eq('event_id', id);
+      if (error) throw error;
+    }
+  });
+
+  if (!isSessionCurrent(scope)) return [];
+  // An edit that never landed is reverted locally rather than left showing
+  // a value the account doesn't have — unlike a create, nothing the user
+  // authored is destroyed by going back to the stored version.
+  if (!cloudSynced) {
+    return writeCache(scope, existing);
   }
+  return optimistic;
 }
 
 export async function deletePlannerEvent(id: string): Promise<PlannerEvent[]> {
-  const userId = getCurrentUserId();
-  try {
-    const existing = await readCache();
-    const updated = existing.filter((e) => e.id !== id);
-    const optimistic = await writeCache(updated);
+  const scope = captureSession();
+  const userId = scope.userId;
+  const existing = await readCache(scope);
+  const updated = existing.filter((e) => e.id !== id);
+  const optimistic = await writeCache(scope, updated);
 
-    if (!userId) return optimistic;
+  if (!userId) return optimistic;
 
-    const { error } = await supabase.from('planner_events').delete().eq('user_id', userId).eq('event_id', id);
-    if (error) throw error;
-    return optimistic;
-  } catch (err) {
-    console.warn('Failed to delete planner event:', err);
-    offlineAlert('removal');
-    return readCache();
+  const cloudDeleted = await runCloudWrite({
+    scope,
+    title: 'Event not removed',
+    message:
+      "This event couldn't be removed from your account, so it's still there and will come back next time your Planner loads. Try again to remove it for good.",
+    run: async () => {
+      const { error } = await supabase.from('planner_events').delete().eq('user_id', userId).eq('event_id', id);
+      if (error) throw error;
+    }
+  });
+
+  if (!isSessionCurrent(scope)) return [];
+  if (!cloudDeleted) {
+    return writeCache(scope, existing);
   }
+  return optimistic;
 }

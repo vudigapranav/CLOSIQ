@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import {
   StyleSheet,
   View,
@@ -14,7 +14,7 @@ import {
 import { Eye, EyeOff, AlertCircle, CheckCircle2, Sparkles } from 'lucide-react-native';
 import { COLORS, RADIUS } from '../theme';
 import { signIn, signUp, signInDemo, DEMO_DISPLAY_EMAIL, DEMO_DISPLAY_PASSWORD } from '../services/authService';
-import { isSupabaseConfigured } from '../services/supabaseClient';
+import { isSupabaseConfigured, supabaseConfigCheck } from '../services/supabaseClient';
 
 type Mode = 'login' | 'signup';
 
@@ -27,7 +27,12 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
  * unmounting this screen on its own. This screen only ever talks to
  * authService.ts, never touches session state directly.
  */
-export const LoginScreen: React.FC = () => {
+interface LoginScreenProps {
+  /** Shown when a saved session exists but couldn't be restored (Sprint M20). */
+  sessionNotice?: string | null;
+}
+
+export const LoginScreen: React.FC<LoginScreenProps> = ({ sessionNotice }) => {
   const [mode, setMode] = useState<Mode>('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -36,6 +41,10 @@ export const LoginScreen: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [infoMessage, setInfoMessage] = useState<string | null>(null);
+  // Login repair (2026-09-12): `loading` is React state, so two taps in the
+  // same tick both read `false` and both fire a request. A ref flips
+  // synchronously, so the second tap is rejected before any await.
+  const inFlightRef = useRef(false);
 
   const resetMessages = () => {
     setErrorMessage(null);
@@ -50,7 +59,7 @@ export const LoginScreen: React.FC = () => {
   };
 
   const handleSubmit = async () => {
-    if (loading) return;
+    if (inFlightRef.current) return;
     resetMessages();
 
     const trimmedEmail = email.trim();
@@ -76,9 +85,17 @@ export const LoginScreen: React.FC = () => {
       }
     }
 
+    inFlightRef.current = true;
     setLoading(true);
-    const result = mode === 'login' ? await signIn(trimmedEmail, password) : await signUp(trimmedEmail, password);
-    setLoading(false);
+    let result;
+    try {
+      result = mode === 'login' ? await signIn(trimmedEmail, password) : await signUp(trimmedEmail, password);
+    } finally {
+      // Always clears, even if authService itself throws — the spinner used
+      // to stay up forever in that case, with the form stuck disabled.
+      inFlightRef.current = false;
+      setLoading(false);
+    }
 
     if (!result.ok) {
       setErrorMessage(result.message || 'Something went wrong. Please try again.');
@@ -97,11 +114,17 @@ export const LoginScreen: React.FC = () => {
   };
 
   const handleDemoLogin = async () => {
-    if (loading) return;
+    if (inFlightRef.current) return;
     resetMessages();
+    inFlightRef.current = true;
     setLoading(true);
-    const result = await signInDemo();
-    setLoading(false);
+    let result;
+    try {
+      result = await signInDemo();
+    } finally {
+      inFlightRef.current = false;
+      setLoading(false);
+    }
     if (!result.ok) {
       setErrorMessage(result.message || 'Unable to sign into the demo account.');
     }
@@ -129,11 +152,19 @@ export const LoginScreen: React.FC = () => {
             : 'Just an email and password — the rest is a quick setup after this.'}
         </Text>
 
+        {!!sessionNotice && (
+          <View style={[styles.messageBox, styles.errorBox]}>
+            <AlertCircle size={16} color={COLORS.danger} style={{ marginRight: 8 }} />
+            <Text style={styles.messageText}>{sessionNotice}</Text>
+          </View>
+        )}
+
         {!isSupabaseConfigured && (
           <View style={[styles.messageBox, styles.errorBox]}>
             <AlertCircle size={16} color={COLORS.danger} style={{ marginRight: 8 }} />
             <Text style={styles.messageText}>
-              CLOSIQ's account service isn't configured yet on this build — login will not connect until it is.
+              {supabaseConfigCheck.message ??
+                "CLOSIQ's account service isn't configured in this build — signing in can't work until it is."}
             </Text>
           </View>
         )}

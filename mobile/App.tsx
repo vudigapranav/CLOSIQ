@@ -1,14 +1,19 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
+  Alert,
   StyleSheet,
   Text,
   View,
   Image,
-  SafeAreaView,
   StatusBar,
   Animated,
   Dimensions
 } from 'react-native';
+// SDK 55+ makes edge-to-edge mandatory on Android, where React Native's own
+// SafeAreaView is a no-op (and is now deprecated) — content would render under
+// the status bar and gesture navigation. react-native-safe-area-context is
+// Expo's documented replacement and behaves the same as before on iOS.
+import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import type { Session } from '@supabase/supabase-js';
 import { COLORS } from './src/theme';
 import { BottomNavigation, NavTab } from './src/components/BottomNavigation';
@@ -25,13 +30,13 @@ import { recordRecentOutfit } from './src/services/outfitHistoryStorage';
 import { loadUserProfile, saveUserProfile } from './src/services/userProfileStorage';
 import { loadUserWardrobe, saveUserGarment, removeUserGarment, seedDemoWardrobeIfNeeded } from './src/services/wardrobeStorage';
 import { loadSavedOutfits, saveOutfitToStorage, removeSavedOutfitFromStorage } from './src/services/savedOutfitsStorage';
-import { getCurrentSession, onAuthStateChange, signOut, isDemoUser } from './src/services/authService';
-import { setCurrentUserId } from './src/services/authSession';
+import { restoreSession, onAuthStateChange, signOut, isDemoUser } from './src/services/authService';
+import { setCurrentUserId, captureSession, isSessionCurrent } from './src/services/authSession';
 import { UserProfileData } from './src/types/onboarding';
 
 const { width } = Dimensions.get('window');
 
-export default function App() {
+function AppContent() {
   const [showSplash, setShowSplash] = useState(true);
   const [activeTab, setActiveTab] = useState<NavTab>('today');
   const [profile, setProfile] = useState<WardrobeProfile>('men');
@@ -47,6 +52,9 @@ export default function App() {
   // user's Supabase ID, which every per-user storage read below keys off.
   const [userId, setUserId] = useState<string | null | 'loading'>('loading');
   const [userEmail, setUserEmail] = useState<string | null>(null);
+  // Set when a stored session couldn't be refreshed at startup (offline
+  // with an expired access token) — distinct from being signed out.
+  const [sessionNotice, setSessionNotice] = useState<string | null>(null);
 
   // Wardrobe and saved outfits, lifted here (Sprint M16) rather than each of
   // Collection/Today/Stylist/Planner/Profile independently re-reading the
@@ -60,6 +68,11 @@ export default function App() {
   // that reset logic didn't move, only the data loading did.
   const [wardrobe, setWardrobe] = useState<GarmentItem[]>([]);
   const [savedOutfits, setSavedOutfits] = useState<Outfit[]>([]);
+  // Bumped to force a wardrobe re-read when nothing in [userId, profile]
+  // changed but the underlying data did — onboarding finishing on the
+  // already-active profile (Men, the default) being the case that used to
+  // silently leave the parent showing a stale, empty wardrobe.
+  const [wardrobeRefreshKey, setWardrobeRefreshKey] = useState(0);
 
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const scaleAnim = useRef(new Animated.Value(0.95)).current;
@@ -74,21 +87,48 @@ export default function App() {
   useEffect(() => {
     let mounted = true;
 
-    async function applySession(session: Session | null) {
+    function applySession(session: Session | null) {
       const nextUserId = session?.user?.id ?? null;
+      const isDemo = !!nextUserId && isDemoUser(session?.user?.email);
       setCurrentUserId(nextUserId);
-      if (nextUserId && isDemoUser(session?.user?.email)) {
-        // Idempotent — only actually writes anything the first time this
-        // specific demo account has an empty wardrobe. A brand-new real
-        // account never reaches this branch, so it never gets seeded.
-        await seedDemoWardrobeIfNeeded();
-      }
       if (!mounted) return;
+      if (nextUserId) setSessionNotice(null);
       setUserEmail(session?.user?.email ?? null);
       setUserId(nextUserId);
+
+      if (isDemo) {
+        // Deliberately NOT awaited inside the auth callback. Supabase
+        // documents `onAuthStateChange` handlers as needing to return
+        // promptly — awaiting Supabase calls from inside one can deadlock
+        // the auth client's internal lock, which would leave the app stuck
+        // on the blank session frame. Seeding is idempotent background
+        // provisioning (only writes anything the first time this specific
+        // demo account has an empty wardrobe), so it runs alongside the
+        // normal per-user loads below rather than gating them. A brand-new
+        // real account never reaches this branch, so it's never seeded.
+        const scope = captureSession();
+        seedDemoWardrobeIfNeeded()
+          .then((seeded) => {
+            // Only refresh if the seed genuinely wrote something for the
+            // session that asked for it — a failed seed must not be
+            // reported or treated as a completed cloud wardrobe.
+            if (seeded && isSessionCurrent(scope)) {
+              setWardrobeRefreshKey((k) => k + 1);
+            }
+          })
+          .catch((err) => console.warn('Demo wardrobe seeding failed:', err));
+      }
     }
 
-    getCurrentSession().then(applySession);
+    restoreSession().then(({ session, restoreFailed }) => {
+      if (restoreFailed && mounted) {
+        setSessionNotice(
+          "You're still signed in on this device, but CLOSIQ couldn't be reached to refresh your session. " +
+            "Reconnect and you'll be signed back in automatically — or log in again."
+        );
+      }
+      applySession(session);
+    });
     const unsubscribe = onAuthStateChange(applySession);
     return () => {
       mounted = false;
@@ -115,12 +155,26 @@ export default function App() {
     }
 
     setUserProfile(null); // show the "reading storage" frame while this user's data loads
+
+    // `active` is the second half of the isolation guard (the first being
+    // each storage module's own captured session): a read for user A that
+    // resolves after this effect has re-run for user B must never reach
+    // React state. React does not cancel in-flight promises for us.
+    let active = true;
     loadProfileSettings().then((settings) => {
+      if (!active) return;
       setProfile(settings.profile);
       setLayeringPreference(settings.layeringPreference);
     });
-    loadUserProfile().then(setUserProfile);
-    loadSavedOutfits().then(setSavedOutfits);
+    loadUserProfile().then((p) => {
+      if (active) setUserProfile(p);
+    });
+    loadSavedOutfits().then((o) => {
+      if (active) setSavedOutfits(o);
+    });
+    return () => {
+      active = false;
+    };
   }, [userId]);
 
   // Wardrobe depends on BOTH the authenticated user and the active
@@ -128,55 +182,103 @@ export default function App() {
   // keys — see wardrobeStorage.ts).
   useEffect(() => {
     if (userId === 'loading' || !userId) return;
-    loadUserWardrobe(profile).then(setWardrobe);
-  }, [userId, profile]);
+    // Guards BOTH stale users and stale profiles: a Men wardrobe read that
+    // resolves after the user switched to Women (or signed out and back in
+    // as someone else) is dropped rather than rendered.
+    let active = true;
+    loadUserWardrobe(profile).then((w) => {
+      if (active) setWardrobe(w);
+    });
+    return () => {
+      active = false;
+    };
+  }, [userId, profile, wardrobeRefreshKey]);
 
   const handleLogout = async () => {
-    await signOut();
+    // A failed signOut used to be swallowed entirely, leaving the user
+    // still signed in with no explanation and no SIGNED_OUT event — they'd
+    // tap Log Out, nothing would happen, and the next person to pick up the
+    // phone would still be in the previous account.
+    const result = await signOut();
+    if (!result.ok) {
+      // supabase-js keeps the local session when the server call fails
+      // (auth-js `_signOut` returns before `_removeSession()`), so "still
+      // signed in" is the literal truth — and the part the user most needs.
+      Alert.alert(
+        "Couldn't log out",
+        `${result.message ?? 'Something went wrong.'} You're still signed in on this device.`
+      );
+      return;
+    }
     // onAuthStateChange (above) picks up the resulting SIGNED_OUT event and
     // handles clearing per-user state + returning to Login — nothing else
     // needed here. Does NOT delete the account or any server-side data.
   };
 
+  // Every mutation below captures the session before awaiting and refuses
+  // to write its result into state if the account changed in the meantime —
+  // the same rule the storage modules apply to their caches, applied here
+  // to React state (Sprint M19).
   const handleGarmentAdded = async (garment: GarmentItem) => {
-    const updated = await saveUserGarment(garment, profile);
-    setWardrobe(updated);
+    const scope = captureSession();
+    const result = await saveUserGarment(garment, profile);
+    if (isSessionCurrent(scope)) setWardrobe(result.items);
   };
 
   const handleGarmentRemoved = async (id: string) => {
+    const scope = captureSession();
     const updated = await removeUserGarment(id, profile);
-    setWardrobe(updated);
+    if (isSessionCurrent(scope)) setWardrobe(updated);
   };
 
   const handleSaveOutfit = async (outfit: Outfit): Promise<Outfit[]> => {
+    const scope = captureSession();
     const updated = await saveOutfitToStorage(outfit);
+    if (!isSessionCurrent(scope)) return savedOutfits;
     setSavedOutfits(updated);
     return updated;
   };
 
   const handleDeleteSavedOutfit = async (id: string) => {
+    const scope = captureSession();
     const updated = await removeSavedOutfitFromStorage(id);
-    setSavedOutfits(updated);
+    if (isSessionCurrent(scope)) setSavedOutfits(updated);
   };
 
   const handleProfileChange = async (p: WardrobeProfile) => {
+    const scope = captureSession();
     setProfile(p);
-    await saveProfileSettings({ profile: p });
+    const saved = await saveProfileSettings({ profile: p });
+    // A preference write that resolves after a session change must not
+    // reapply the previous account's Men/Women profile — which would then
+    // drive the wardrobe read for the new user.
+    if (isSessionCurrent(scope)) setProfile(saved.profile);
   };
 
   const handleLayeringChange = async (l: LayeringPreference) => {
+    const scope = captureSession();
     setLayeringPreference(l);
-    await saveProfileSettings({ layeringPreference: l });
+    const saved = await saveProfileSettings({ layeringPreference: l });
+    if (isSessionCurrent(scope)) setLayeringPreference(saved.layeringPreference);
   };
 
   // Onboarding writes to the SAME profile/layering architecture Today and
   // Stylist already read from (handleProfileChange/handleLayeringChange) —
   // no second, incompatible representation of Men/Women or layering exists.
   const handleOnboardingComplete = async (result: OnboardingResult) => {
+    const scope = captureSession();
     await handleProfileChange(result.profile);
     await handleLayeringChange(result.layeringPreference);
     const saved = await saveUserProfile(result.userProfile);
+    if (!isSessionCurrent(scope)) return;
     setUserProfile(saved);
+    // Onboarding added garments through its own local wardrobe state, so
+    // the parent's copy is stale. Bumping the refresh key re-reads it
+    // unconditionally — the [userId, profile] deps alone are NOT enough,
+    // because the common case is finishing onboarding on Men, which is
+    // already the active profile, so nothing in those deps changes and the
+    // user lands on Today with an empty closet.
+    setWardrobeRefreshKey((k) => k + 1);
   };
 
   const handleWearAgain = (outfit: Outfit) => {
@@ -220,7 +322,7 @@ export default function App() {
   if (showSplash) {
     return (
       <SafeAreaView style={styles.splashContainer}>
-        <StatusBar barStyle="dark-content" backgroundColor={COLORS.bg} />
+        <StatusBar barStyle="dark-content" />
         <Animated.View
           style={[
             styles.splashContent,
@@ -246,7 +348,7 @@ export default function App() {
   if (userId === 'loading') {
     return (
       <SafeAreaView style={styles.container}>
-        <StatusBar barStyle="dark-content" backgroundColor={COLORS.bg} />
+        <StatusBar barStyle="dark-content" />
       </SafeAreaView>
     );
   }
@@ -254,8 +356,8 @@ export default function App() {
   if (!userId) {
     return (
       <SafeAreaView style={styles.container}>
-        <StatusBar barStyle="dark-content" backgroundColor={COLORS.bg} />
-        <LoginScreen />
+        <StatusBar barStyle="dark-content" />
+        <LoginScreen sessionNotice={sessionNotice} />
       </SafeAreaView>
     );
   }
@@ -266,7 +368,7 @@ export default function App() {
   if (!userProfile) {
     return (
       <SafeAreaView style={styles.container}>
-        <StatusBar barStyle="dark-content" backgroundColor={COLORS.bg} />
+        <StatusBar barStyle="dark-content" />
       </SafeAreaView>
     );
   }
@@ -274,7 +376,7 @@ export default function App() {
   if (!userProfile.onboardingCompleted) {
     return (
       <SafeAreaView style={styles.container}>
-        <StatusBar barStyle="dark-content" backgroundColor={COLORS.bg} />
+        <StatusBar barStyle="dark-content" />
         <OnboardingScreen onComplete={handleOnboardingComplete} />
       </SafeAreaView>
     );
@@ -282,7 +384,7 @@ export default function App() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="dark-content" backgroundColor={COLORS.bg} />
+      <StatusBar barStyle="dark-content" />
 
       {/* Screen Destination Switcher */}
       <View style={styles.screenView}>
@@ -338,7 +440,11 @@ export default function App() {
             onWearAgain={handleWearAgain}
             onNavigateToToday={() => setActiveTab('today')}
             userProfile={userProfile}
-            onUpdateUserProfile={async (partial) => setUserProfile(await saveUserProfile(partial))}
+            onUpdateUserProfile={async (partial) => {
+              const scope = captureSession();
+              const saved = await saveUserProfile(partial);
+              if (isSessionCurrent(scope)) setUserProfile(saved);
+            }}
             wardrobe={wardrobe}
             savedOutfits={savedOutfits}
             onDeleteSavedOutfit={handleDeleteSavedOutfit}
@@ -386,3 +492,16 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.bg
   }
 });
+
+/**
+ * SafeAreaProvider must sit above every screen that reads insets — required by
+ * react-native-safe-area-context (Sprint M21 / SDK 57 upgrade). AppContent is
+ * unchanged apart from where SafeAreaView comes from.
+ */
+export default function App() {
+  return (
+    <SafeAreaProvider>
+      <AppContent />
+    </SafeAreaProvider>
+  );
+}

@@ -233,6 +233,7 @@ The AI engine must use stable garment IDs from the active wardrobe.
   * [src/data/initialWardrobe.ts](file:///Users/pranav07vudiga/Desktop/Projects/Hackathon/Demux/CLOSIQ/src/data/initialWardrobe.ts)
 * **Styling**:
   * [src/index.css](file:///Users/pranav07vudiga/Desktop/Projects/Hackathon/Demux/CLOSIQ/src/index.css)
+* **Mobile app** (`mobile/`, React Native): runs on **Expo SDK 57** — upgraded from SDK 54 on 2026-09-12 at the user's explicit request, superseding the earlier "stay on SDK 54" rule. Requires Node >= 22.13. New Architecture and Android edge-to-edge are mandatory at this SDK; see `mobile/AGENTS.md` for the constraints that follow from that. `mobile/metro.config.js` widens Metro's `watchFolders` to the repo root so the mobile app can reuse this project's shared `src/types` and `src/data` — that shared-root arrangement is deliberate and must be preserved.
 
 ---
 

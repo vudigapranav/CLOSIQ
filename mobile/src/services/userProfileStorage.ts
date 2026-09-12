@@ -1,7 +1,13 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Alert } from 'react-native';
 import { UserProfileData, DEFAULT_USER_PROFILE, BodyType, SkinTone, StylePreference, TemperatureUnit, LocationPermissionStatus } from '../types/onboarding';
-import { userScopedKey, getCurrentUserId } from './authSession';
+import {
+  SessionScope,
+  captureSession,
+  isSessionCurrent,
+  userScopedKeyFor
+} from './authSession';
+import { runCloudWrite } from './cloudWriteFeedback';
 import { supabase } from './supabaseClient';
 import type { Tables } from '../types/supabase';
 
@@ -26,9 +32,9 @@ function rowToProfile(row: Tables<'profiles'>): UserProfileData {
   };
 }
 
-async function readCache(): Promise<UserProfileData | null> {
+async function readCache(scope: SessionScope): Promise<UserProfileData | null> {
   try {
-    const raw = await AsyncStorage.getItem(userScopedKey(BASE_STORAGE_KEY));
+    const raw = await AsyncStorage.getItem(userScopedKeyFor(scope.userId, BASE_STORAGE_KEY));
     if (!raw) return null;
     return { ...DEFAULT_USER_PROFILE, ...JSON.parse(raw) };
   } catch (err) {
@@ -37,24 +43,32 @@ async function readCache(): Promise<UserProfileData | null> {
   }
 }
 
-async function writeCache(data: UserProfileData): Promise<void> {
+async function writeCache(scope: SessionScope, data: UserProfileData): Promise<void> {
   try {
-    await AsyncStorage.setItem(userScopedKey(BASE_STORAGE_KEY), JSON.stringify(data));
+    await AsyncStorage.setItem(userScopedKeyFor(scope.userId, BASE_STORAGE_KEY), JSON.stringify(data));
   } catch (err) {
     console.warn('Failed to cache user profile:', err);
   }
 }
 
 export async function loadUserProfile(): Promise<UserProfileData> {
-  const userId = getCurrentUserId();
+  // Session captured once, up front — see authSession.ts (Sprint M19).
+  const scope = captureSession();
+  const userId = scope.userId;
   if (!userId) return DEFAULT_USER_PROFILE;
 
   try {
     const { data, error } = await supabase.from('profiles').select('*').eq('id', userId).maybeSingle();
     if (error) throw error;
+    if (!isSessionCurrent(scope)) {
+      // Handing this back would show one account's name, body type and
+      // onboarding status to whoever is signed in now.
+      console.warn('Discarding profile read that resolved after a session change.');
+      return DEFAULT_USER_PROFILE;
+    }
     if (data) {
       const mapped = rowToProfile(data);
-      await writeCache(mapped);
+      await writeCache(scope, mapped);
       return mapped;
     }
     // No cloud row yet (brand-new account, no row created for it yet) —
@@ -62,7 +76,8 @@ export async function loadUserProfile(): Promise<UserProfileData> {
     return DEFAULT_USER_PROFILE;
   } catch (err) {
     console.warn('Cloud profile fetch failed, falling back to local cache:', err);
-    const cached = await readCache();
+    const cached = await readCache(scope);
+    if (!isSessionCurrent(scope)) return DEFAULT_USER_PROFILE;
     if (!cached) {
       // Genuinely couldn't reach the cloud AND have nothing cached — without
       // this, a connectivity failure looks identical to a real new-account
@@ -77,42 +92,44 @@ export async function loadUserProfile(): Promise<UserProfileData> {
 }
 
 export async function saveUserProfile(partial: Partial<UserProfileData>): Promise<UserProfileData> {
-  const userId = getCurrentUserId();
-  const existing = (await readCache()) ?? DEFAULT_USER_PROFILE;
+  const scope = captureSession();
+  const userId = scope.userId;
+  const existing = (await readCache(scope)) ?? DEFAULT_USER_PROFILE;
   const updated = { ...existing, ...partial };
 
   // Optimistic local write first (Part 7: local update before the cloud
   // round trip resolves) — the UI reads this back immediately.
-  await writeCache(updated);
+  await writeCache(scope, updated);
 
   if (!userId) return updated;
 
-  try {
-    // Deliberately omits `is_demo` — never set/overwritten from the client;
-    // Postgres upsert only touches columns present in this payload, so the
-    // demo account's is_demo=true (and every other account's default
-    // false) is preserved on every save, insert or update alike.
-    const { error } = await supabase.from('profiles').upsert(
-      {
-        id: userId,
-        name: updated.name,
-        body_type: updated.bodyType,
-        skin_tone: updated.skinTone,
-        style_preferences: updated.stylePreferences,
-        temperature_unit: updated.temperatureUnit,
-        location_permission_status: updated.locationPermissionStatus,
-        onboarding_completed: updated.onboardingCompleted
-      },
-      { onConflict: 'id' }
-    );
-    if (error) throw error;
-  } catch (err) {
-    console.warn('Failed to sync user profile to cloud:', err);
-    Alert.alert(
-      "You're offline",
-      'Your profile change was saved on this device and will sync when you\'re back online.'
-    );
-  }
+  await runCloudWrite({
+    scope,
+    title: 'Profile change not saved to your account',
+    message:
+      "This change wasn't saved to your account. It's showing on this device for now, but your saved profile will replace it the next time it loads — try again to keep it.",
+    run: async () => {
+      // Deliberately omits `is_demo` — never set/overwritten from the client;
+      // Postgres upsert only touches columns present in this payload, so the
+      // demo account's is_demo=true (and every other account's default
+      // false) is preserved on every save, insert or update alike.
+      const { error } = await supabase.from('profiles').upsert(
+        {
+          id: userId,
+          name: updated.name,
+          body_type: updated.bodyType,
+          skin_tone: updated.skinTone,
+          style_preferences: updated.stylePreferences,
+          temperature_unit: updated.temperatureUnit,
+          location_permission_status: updated.locationPermissionStatus,
+          onboarding_completed: updated.onboardingCompleted
+        },
+        { onConflict: 'id' }
+      );
+      if (error) throw error;
+    }
+  });
 
+  if (!isSessionCurrent(scope)) return DEFAULT_USER_PROFILE;
   return updated;
 }

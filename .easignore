@@ -1,0 +1,67 @@
+# EAS Build upload rules for CLOSIQ (deployment prep, 2026-09-11).
+#
+# Verified against the installed eas-cli 21.7.0 source (build/vcs/clients/git.js,
+# build/vcs/local.js): EAS clones the WHOLE git repository from its top level,
+# reads .easignore from the REPOSITORY ROOT (this file — not mobile/), and when
+# this file exists NO .gitignore file is applied at all. Every rule from BOTH
+# /.gitignore and /mobile/.gitignore is therefore repeated below, with the
+# mobile-relative anchored rules re-anchored under mobile/.
+#
+# Why this file exists: without it, every build uploads ~448 MB, 444 MB of
+# which is `public/test samples/` — original source photos the mobile app
+# never reads (the served catalog is the 58 WebP files in public/wardrobe/,
+# which the mobile build doesn't bundle either; images come from the backend).
+#
+# SECURITY: the .env rules below keep GEMINI_API_KEY (root .env) and the local
+# EXPO_PUBLIC_* dev values (mobile/.env.local) out of the EAS archive. Build-time
+# EXPO_PUBLIC_* values must come from EAS environment variables instead.
+# Verify with:  node scripts/check-easignore.mjs
+
+# ---- secrets / local env (from both .gitignore files) ----
+.env
+.env.*
+!.env.example
+!mobile/.env.example
+*.local
+*.pem
+*.p8
+*.p12
+*.jks
+*.key
+*.mobileprovision
+
+# ---- unused by the mobile build, large ----
+public/test samples/
+
+# ---- from /.gitignore ----
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+node_modules
+dist
+dist-ssr
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+mobile/.test-build
+
+# ---- from /mobile/.gitignore (re-anchored) ----
+mobile/.expo/
+mobile/web-build/
+mobile/expo-env.d.ts
+.kotlin/
+*.orig.*
+.metro-health-check*
+*.tsbuildinfo
+mobile/ios
+mobile/android

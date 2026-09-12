@@ -9,12 +9,13 @@ import {
   ScrollView,
   ActivityIndicator,
   Alert,
-  Dimensions
+  Dimensions,
+  TextInput
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
-import { Camera, Image as ImageIcon, Sparkles, X, Check, RefreshCw } from 'lucide-react-native';
+import { Camera, Image as ImageIcon, Sparkles, X, Check, RefreshCw, AlertCircle } from 'lucide-react-native';
 import { COLORS, RADIUS } from '../theme';
-import { GarmentItem, GarmentCategory, WardrobeProfile } from '../../../src/types/wardrobe';
+import { GarmentItem, GarmentCategory, WardrobeProfile, FormalityLevel } from '../../../src/types/wardrobe';
 import { analyzeGarmentImageMobile, VisionAnalysisResult } from '../services/visionAnalysis';
 import { optimizeGarmentImage } from '../services/imageOptimizer';
 
@@ -35,7 +36,17 @@ interface AddItemModalProps {
   onGarmentAdded: (garment: GarmentItem) => void;
 }
 
-type ModalStep = 'choose' | 'preview' | 'analyzing' | 'confirm';
+const FORMALITY_OPTIONS: { key: FormalityLevel; label: string }[] = [
+  { key: 'casual', label: 'Casual' },
+  { key: 'smart_casual', label: 'Smart Casual' },
+  { key: 'formal', label: 'Formal' },
+  { key: 'evening', label: 'Evening' }
+];
+
+// 'manual' (Sprint M20): the analysis did not happen. The user is told why
+// and enters the details themselves — nothing is pre-filled as if an AI
+// had produced it.
+type ModalStep = 'choose' | 'preview' | 'analyzing' | 'confirm' | 'manual';
 
 export const AddItemModal: React.FC<AddItemModalProps> = ({
   visible,
@@ -57,6 +68,11 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({
   // twice before the first launch has resolved — the picker itself gives no
   // visual feedback until it opens.
   const [isPicking, setIsPicking] = useState(false);
+  // Manual-entry state, used only when analysis failed.
+  const [analysisFailure, setAnalysisFailure] = useState<string | null>(null);
+  const [manualName, setManualName] = useState('');
+  const [manualColor, setManualColor] = useState('');
+  const [manualFormality, setManualFormality] = useState<FormalityLevel>('casual');
 
   const resetState = () => {
     setStep('choose');
@@ -64,6 +80,10 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({
     setBase64Data(null);
     setAnalysisResult(null);
     setEditedCategory('tops');
+    setAnalysisFailure(null);
+    setManualName('');
+    setManualColor('');
+    setManualFormality('casual');
   };
 
   const handleClose = () => {
@@ -135,9 +155,43 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({
 
     setStep('analyzing');
     const result = await analyzeGarmentImageMobile(base64Data, 'image/jpeg', selectedCategory);
+    if (!result.ok) {
+      setAnalysisResult(null);
+      setAnalysisFailure(result.message);
+      setEditedCategory(selectedCategory);
+      setStep('manual');
+      return;
+    }
+    setAnalysisFailure(null);
     setAnalysisResult(result.data);
     setEditedCategory(result.data.category);
     setStep('confirm');
+  };
+
+  const handleAddManual = () => {
+    if (!imageUri || !manualName.trim()) return;
+    const categoryLabel = CATEGORY_HINTS.find((c) => c.key === editedCategory)?.label ?? 'Garment';
+    // Only what the user actually told us, plus explicitly-neutral
+    // placeholders for required fields — no invented fabric, style,
+    // pairing note or confidence score.
+    const newGarment: GarmentItem = {
+      id: `user-upload-${Date.now()}`,
+      name: manualName.trim(),
+      category: editedCategory,
+      subcategory: categoryLabel,
+      color: manualColor.trim() || 'Unspecified',
+      hexColor: '#9E9E9E',
+      fabric: 'Unspecified',
+      formality: manualFormality,
+      seasons: ['spring', 'summer', 'autumn', 'winter'],
+      imageUrl: imageUri,
+      favorite: false,
+      wearCount: 0,
+      dateAdded: new Date().toISOString().split('T')[0],
+      tags: ['Manual Entry']
+    };
+    onGarmentAdded(newGarment);
+    handleClose();
   };
 
   const handleConfirmAndAdd = () => {
@@ -155,7 +209,7 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({
       fit: analysisResult.fit,
       formality: analysisResult.formality,
       layeringRole: analysisResult.layeringRole,
-      style: analysisResult.style,
+      style: analysisResult.style || undefined,
       seasons: ['spring', 'summer', 'autumn', 'winter'],
       imageUrl: imageUri,
       favorite: false,
@@ -163,7 +217,7 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({
       dateAdded: new Date().toISOString().split('T')[0],
       tags: analysisResult.tags,
       aiConfidence: analysisResult.aiConfidence,
-      pairingNotes: analysisResult.pairingNotes
+      pairingNotes: analysisResult.pairingNotes || undefined
     };
 
     onGarmentAdded(newGarment);
@@ -283,6 +337,97 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({
             </View>
           )}
 
+          {/* STEP 4b: ANALYSIS FAILED — honest manual entry (Sprint M20) */}
+          {step === 'manual' && (
+            <ScrollView style={{ maxHeight: 460 }} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+              <View style={styles.failureBox}>
+                <AlertCircle size={16} color={COLORS.danger} style={{ marginRight: 8, marginTop: 1 }} />
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.failureTitle}>Couldn't analyze this photo</Text>
+                  <Text style={styles.failureBody}>
+                    {analysisFailure} No details were detected — try again, or enter them yourself below.
+                  </Text>
+                </View>
+              </View>
+
+              <View style={styles.confirmHeader}>
+                <View style={styles.thumbnailBox}>
+                  {imageUri && <Image source={{ uri: imageUri }} style={styles.thumbnailImg} />}
+                </View>
+                <TextInput
+                  style={styles.manualInput}
+                  placeholder="Name, e.g. White oxford shirt"
+                  placeholderTextColor={COLORS.textMuted}
+                  value={manualName}
+                  onChangeText={setManualName}
+                  maxLength={60}
+                />
+              </View>
+
+              <Text style={styles.categoryEditLabel}>Category</Text>
+              <View style={styles.categoryEditRow}>
+                {CATEGORY_HINTS.map((opt) => {
+                  const isSelected = editedCategory === opt.key;
+                  return (
+                    <TouchableOpacity
+                      key={opt.key}
+                      style={[styles.categoryEditChip, isSelected && styles.categoryEditChipSelected]}
+                      onPress={() => setEditedCategory(opt.key)}
+                    >
+                      <Text style={[styles.categoryEditChipText, isSelected && styles.categoryEditChipTextSelected]}>
+                        {opt.label}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+
+              <Text style={styles.categoryEditLabel}>Color (optional)</Text>
+              <TextInput
+                style={[styles.manualInput, { marginBottom: 16 }]}
+                placeholder="e.g. Navy"
+                placeholderTextColor={COLORS.textMuted}
+                value={manualColor}
+                onChangeText={setManualColor}
+                maxLength={30}
+              />
+
+              <Text style={styles.categoryEditLabel}>Formality</Text>
+              <View style={styles.categoryEditRow}>
+                {FORMALITY_OPTIONS.map((opt) => {
+                  const isSelected = manualFormality === opt.key;
+                  return (
+                    <TouchableOpacity
+                      key={opt.key}
+                      style={[styles.categoryEditChip, isSelected && styles.categoryEditChipSelected]}
+                      onPress={() => setManualFormality(opt.key)}
+                    >
+                      <Text style={[styles.categoryEditChipText, isSelected && styles.categoryEditChipTextSelected]}>
+                        {opt.label}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+
+              <View style={styles.actionRow}>
+                <TouchableOpacity style={styles.cancelBtn} onPress={handleStartAnalysis}>
+                  <RefreshCw size={14} color={COLORS.textSecondary} style={{ marginRight: 6 }} />
+                  <Text style={styles.cancelBtnText}>Try again</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[styles.heroAnalyzeBtn, !manualName.trim() && styles.sourceCardDisabled]}
+                  onPress={handleAddManual}
+                  disabled={!manualName.trim()}
+                >
+                  <Check size={16} color="#FFFFFF" style={{ marginRight: 6 }} />
+                  <Text style={styles.heroAnalyzeBtnText}>Add item</Text>
+                </TouchableOpacity>
+              </View>
+            </ScrollView>
+          )}
+
           {/* STEP 4: CONFIRMATION & EDIT METADATA */}
           {step === 'confirm' && analysisResult && (
             <ScrollView style={{ maxHeight: 420 }} showsVerticalScrollIndicator={false}>
@@ -293,7 +438,9 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({
                 <View style={{ flex: 1 }}>
                   <Text style={styles.resultCategory}>{editedCategory.toUpperCase()}</Text>
                   <Text style={styles.resultTitle}>{analysisResult.name}</Text>
-                  <Text style={styles.resultStyle}>{analysisResult.style} • {analysisResult.color}</Text>
+                  <Text style={styles.resultStyle}>
+                    {[analysisResult.style, analysisResult.color].filter(Boolean).join(' • ')}
+                  </Text>
                 </View>
               </View>
 
@@ -339,11 +486,13 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({
                 </View>
               </View>
 
-              {/* Rationale & Pairing Note */}
-              <View style={styles.pairingBox}>
-                <Text style={styles.pairingTitle}>Stylist Note</Text>
-                <Text style={styles.pairingBody}>"{analysisResult.pairingNotes}"</Text>
-              </View>
+              {/* Rationale & Pairing Note — only when the model gave one. */}
+              {!!analysisResult.pairingNotes && (
+                <View style={styles.pairingBox}>
+                  <Text style={styles.pairingTitle}>Stylist Note</Text>
+                  <Text style={styles.pairingBody}>"{analysisResult.pairingNotes}"</Text>
+                </View>
+              )}
 
               {/* Confirm Actions */}
               <View style={styles.actionRow}>
@@ -625,6 +774,37 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: COLORS.textPrimary,
     textTransform: 'capitalize'
+  },
+  failureBox: {
+    flexDirection: 'row',
+    backgroundColor: COLORS.surfaceSubtle,
+    borderRadius: RADIUS.sm,
+    padding: 12,
+    borderLeftWidth: 3,
+    borderLeftColor: COLORS.danger,
+    marginBottom: 16
+  },
+  failureTitle: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: COLORS.textPrimary,
+    marginBottom: 2
+  },
+  failureBody: {
+    fontSize: 12,
+    color: COLORS.textSecondary,
+    lineHeight: 17
+  },
+  manualInput: {
+    flex: 1,
+    backgroundColor: COLORS.surface,
+    borderRadius: RADIUS.sm,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 14,
+    color: COLORS.textPrimary
   },
   pairingBox: {
     backgroundColor: COLORS.surfaceSubtle,

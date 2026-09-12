@@ -65,26 +65,49 @@ export const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onComplete }
     useState<LocationPermissionStatus>('not_asked');
 
   const [wardrobe, setWardrobe] = useState<GarmentItem[]>([]);
+  // Garment ids whose cloud write did NOT land. They stay visible in the
+  // list (the user's photo isn't thrown away), but they must not count
+  // toward "your cloud wardrobe is set up" — finishing onboarding on the
+  // strength of items that only exist on this device would be a false
+  // claim of completed setup (Sprint M19).
+  const [unsyncedIds, setUnsyncedIds] = useState<string[]>([]);
   const [showAddItem, setShowAddItem] = useState(false);
 
   // Load any items already uploaded for the chosen profile (covers the case
   // where the user backs out of onboarding mid-way and returns).
   useEffect(() => {
     if (!selectedProfile) return;
-    loadUserWardrobe(selectedProfile).then(setWardrobe);
+    // Dropped if the user switches Men/Women (or the session changes)
+    // before this resolves, rather than overwriting the newer selection.
+    let active = true;
+    loadUserWardrobe(selectedProfile).then((items) => {
+      if (!active) return;
+      setWardrobe(items);
+      // Everything read back from the cloud is by definition synced.
+      setUnsyncedIds((prev) => prev.filter((id) => !items.some((i) => i.id === id)));
+    });
+    return () => {
+      active = false;
+    };
   }, [selectedProfile]);
 
-  const topsCount = wardrobe.filter((i) => i.category === 'tops').length;
-  const bottomsCount = wardrobe.filter((i) => i.category === 'bottoms').length;
-  const outerwearCount = wardrobe.filter((i) => i.category === 'outerwear').length;
-  const shoesCount = wardrobe.filter((i) => i.category === 'shoes').length;
-  const accessoriesCount = wardrobe.filter((i) => i.category === 'accessories').length;
+  // Counted from cloud-confirmed items only — see `unsyncedIds`.
+  const syncedWardrobe = wardrobe.filter((i) => !unsyncedIds.includes(i.id));
+  const topsCount = syncedWardrobe.filter((i) => i.category === 'tops').length;
+  const bottomsCount = syncedWardrobe.filter((i) => i.category === 'bottoms').length;
+  const outerwearCount = syncedWardrobe.filter((i) => i.category === 'outerwear').length;
+  const shoesCount = syncedWardrobe.filter((i) => i.category === 'shoes').length;
+  const accessoriesCount = syncedWardrobe.filter((i) => i.category === 'accessories').length;
   const canCompleteWardrobe = topsCount >= MIN_TOPS && bottomsCount >= MIN_BOTTOMS;
 
   const handleGarmentAdded = async (garment: GarmentItem) => {
     if (!selectedProfile) return;
-    const updated = await saveUserGarment(garment, selectedProfile);
-    setWardrobe(updated);
+    const result = await saveUserGarment(garment, selectedProfile);
+    setWardrobe(result.items);
+    setUnsyncedIds((prev) => {
+      if (result.cloudSynced) return prev.filter((id) => id !== garment.id);
+      return prev.includes(garment.id) ? prev : [...prev, garment.id];
+    });
   };
 
   const toggleStylePreference = (value: StylePreference) => {
@@ -112,6 +135,16 @@ export const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onComplete }
   const handleCompleteSetup = () => {
     if (!selectedProfile) return;
     if (!canCompleteWardrobe) {
+      // Distinguish "you haven't added enough yet" from "you added enough,
+      // but some of them never reached your account" — the second is not
+      // the user's mistake and needs a different instruction.
+      if (unsyncedIds.length > 0) {
+        Alert.alert(
+          'Some items are on this device only',
+          `${unsyncedIds.length} item${unsyncedIds.length === 1 ? "" : "s"} couldn't be saved to your account, so setup isn't finished. Check your connection and add ${MIN_TOPS} tops and ${MIN_BOTTOMS} bottoms that save successfully.`
+        );
+        return;
+      }
       Alert.alert('Almost there', `Add at least ${MIN_TOPS} tops and ${MIN_BOTTOMS} bottoms to finish setup.`);
       return;
     }

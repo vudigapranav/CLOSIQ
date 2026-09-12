@@ -63,7 +63,7 @@ export const PlannerScreen: React.FC<PlannerScreenProps> = ({
   // Outfit"/"Change Outfit" action). Reuses generateOutfitMobile/
   // swapGarmentMobile exactly as Today/Stylist do — no second AI engine.
   const [planningEvent, setPlanningEvent] = useState<PlannerEvent | null>(null);
-  const [outfitResult, setOutfitResult] = useState<{ mode: 'gemini' | 'fallback'; data: MobileOutfitResult } | null>(null);
+  const [outfitResult, setOutfitResult] = useState<{ mode: 'gemini' | 'fallback'; notice?: string; data: MobileOutfitResult } | null>(null);
   const [planLoading, setPlanLoading] = useState(false);
   const [planError, setPlanError] = useState<string | null>(null);
   const [selectedGarmentForSwap, setSelectedGarmentForSwap] = useState<GarmentItem | null>(null);
@@ -86,7 +86,17 @@ export const PlannerScreen: React.FC<PlannerScreenProps> = ({
   const savingRef = useRef(false);
 
   useEffect(() => {
-    loadPlannerEvents().then(setEvents);
+    // Dropped if this screen unmounts (logout returns the app to Login)
+    // before the read resolves — plannerStorage already refuses to hand
+    // back another session's events, this is the matching React-state
+    // guard (Sprint M19).
+    let active = true;
+    loadPlannerEvents().then((e) => {
+      if (active) setEvents(e);
+    });
+    return () => {
+      active = false;
+    };
   }, []);
 
   // Reuses M14's shared weather service/cache — not a second weather
@@ -192,7 +202,7 @@ export const PlannerScreen: React.FC<PlannerScreenProps> = ({
 
       setPlanLoading(false);
       if (res.ok && res.data && res.data.garmentIds.length > 0) {
-        setOutfitResult({ mode: res.mode, data: res.data });
+        setOutfitResult({ mode: res.mode, notice: res.notice, data: res.data });
         await recordRecentOutfit(res.data.garmentIds);
       } else {
         setPlanError(res.error || 'CLOSIQ couldn’t build a look right now. Try again.');
@@ -267,6 +277,7 @@ export const PlannerScreen: React.FC<PlannerScreenProps> = ({
       const updatedIds = outfitResult.data.garmentIds.map((id) => (id === garment.id ? res.data.replacementGarmentId : id));
       setOutfitResult({
         mode: res.mode,
+        notice: res.notice,
         data: {
           ...outfitResult.data,
           title: res.data.outfitTitle || outfitResult.data.title,
@@ -453,6 +464,7 @@ export const PlannerScreen: React.FC<PlannerScreenProps> = ({
               {outfitResult && !planLoading && !swapping && (
                 <OutfitResultCard
                   mode={outfitResult.mode}
+              notice={outfitResult.notice}
                   title={outfitResult.data.title}
                   vibe={outfitResult.data.vibe}
                   styleScore={outfitResult.data.styleScore}

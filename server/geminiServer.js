@@ -25,6 +25,28 @@ function getServerApiKey() {
 // won't go stale the same way a pinned version number will.
 const GEMINI_MODEL = 'gemini-flash-latest';
 
+// Sprint M20: hard per-request ceiling on every Gemini call. Previously
+// unbounded, so a stalled upstream held the HTTP request (and the phone's
+// spinner) open indefinitely. The mobile client's own timeout (40s,
+// mobile/src/services/apiRequest.ts) is deliberately longer, so the client
+// receives this server's honest "timed out" answer instead of racing it.
+// No automatic retries are configured (no `retryOptions`), so a 429 is
+// never silently re-sent against the quota.
+const GEMINI_TIMEOUT_MS = 30_000;
+
+/**
+ * Coarse, non-sensitive classification of a Gemini failure, returned to the
+ * client as `errorKind` so it can say "rate limited" or "timed out" instead
+ * of a generic failure. Never includes provider response bodies.
+ */
+export function classifyGeminiError(err) {
+  const status = err?.status ?? err?.code;
+  const message = String(err?.message || '');
+  if (status === 429 || /\b429\b|RESOURCE_EXHAUSTED|quota/i.test(message)) return 'rate_limited';
+  if (err?.name === 'AbortError' || err?.name === 'TimeoutError' || /abort|timed? ?out/i.test(message)) return 'timeout';
+  return 'unavailable';
+}
+
 const SYSTEM_PROMPT = `You are CLOSIQ, an expert personal AI stylist.
 Your primary rule: You MUST ONLY style outfits using the user's actual wardrobe items provided in the JSON input.
 
@@ -57,11 +79,11 @@ PERSONALIZATION CONTEXT (all of the following may be null — when a field is nu
 export async function handleAnalyzeGarmentServer(body) {
   const apiKey = getServerApiKey();
   if (!apiKey) {
-    return { ok: false, mode: 'demo', error: 'GEMINI_API_KEY not configured on server' };
+    return { ok: false, mode: 'demo', errorKind: 'not_configured', error: 'GEMINI_API_KEY not configured on server' };
   }
 
   try {
-    const ai = new GoogleGenAI({ apiKey });
+    const ai = new GoogleGenAI({ apiKey, httpOptions: { timeout: GEMINI_TIMEOUT_MS } });
     const mimeType = body.mimeType || 'image/png';
     // Strip data URI prefix if present
     const base64Data = body.imageData.includes(';base64,')
@@ -110,7 +132,7 @@ Category hint: ${body.categoryHint || 'tops'}.`;
     return { ok: true, mode: 'gemini', data: JSON.parse(text) };
   } catch (err) {
     console.error('[Server Gemini Error] Garment analysis failed:', err?.message || err);
-    return { ok: false, mode: 'demo', error: err?.message || 'Vision analysis failed' };
+    return { ok: false, mode: 'demo', errorKind: classifyGeminiError(err), error: err?.message || 'Vision analysis failed' };
   }
 }
 
@@ -121,11 +143,11 @@ Category hint: ${body.categoryHint || 'tops'}.`;
 export async function handleGenerateOutfitServer(body) {
   const apiKey = getServerApiKey();
   if (!apiKey) {
-    return { ok: false, mode: 'demo', error: 'GEMINI_API_KEY not configured on server' };
+    return { ok: false, mode: 'demo', errorKind: 'not_configured', error: 'GEMINI_API_KEY not configured on server' };
   }
 
   try {
-    const ai = new GoogleGenAI({ apiKey });
+    const ai = new GoogleGenAI({ apiKey, httpOptions: { timeout: GEMINI_TIMEOUT_MS } });
 
     const userPrompt = {
       request: body.prompt,
@@ -179,7 +201,7 @@ Return structured JSON matching this schema:
     return { ok: true, mode: 'gemini', data: JSON.parse(text) };
   } catch (err) {
     console.error('[Server Gemini Error] Outfit generation failed:', err?.message || err);
-    return { ok: false, mode: 'demo', error: err?.message || 'Outfit generation failed' };
+    return { ok: false, mode: 'demo', errorKind: classifyGeminiError(err), error: err?.message || 'Outfit generation failed' };
   }
 }
 
@@ -190,11 +212,11 @@ Return structured JSON matching this schema:
 export async function handleSwapGarmentServer(body) {
   const apiKey = getServerApiKey();
   if (!apiKey) {
-    return { ok: false, mode: 'demo', error: 'GEMINI_API_KEY not configured on server' };
+    return { ok: false, mode: 'demo', errorKind: 'not_configured', error: 'GEMINI_API_KEY not configured on server' };
   }
 
   try {
-    const ai = new GoogleGenAI({ apiKey });
+    const ai = new GoogleGenAI({ apiKey, httpOptions: { timeout: GEMINI_TIMEOUT_MS } });
 
     const swapPrompt = {
       occasion: body.prompt,
@@ -236,6 +258,6 @@ Return structured JSON:
     return { ok: true, mode: 'gemini', data: JSON.parse(text) };
   } catch (err) {
     console.error('[Server Gemini Error] Swap failed:', err?.message || err);
-    return { ok: false, mode: 'demo', error: err?.message || 'Swap failed' };
+    return { ok: false, mode: 'demo', errorKind: classifyGeminiError(err), error: err?.message || 'Swap failed' };
   }
 }

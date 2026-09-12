@@ -4,28 +4,38 @@
   "main": "index.ts",
   "dependencies": {
     "@react-native-async-storage/async-storage": "2.2.0",
-    "@react-native-community/datetimepicker": "8.4.4",
+    "@react-native-community/datetimepicker": "9.1.0",
     "@supabase/supabase-js": "^2.109.0",
-    "expo": "~54.0.37",
-    "expo-image-manipulator": "~14.0.8",
-    "expo-image-picker": "~17.0.11",
-    "expo-location": "~19.0.8",
-    "expo-status-bar": "~3.0.9",
+    "expo": "^57.0.22",
+    "expo-image-manipulator": "~57.0.17",
+    "expo-image-picker": "~57.0.17",
+    "expo-location": "~57.0.17",
+    "expo-splash-screen": "~57.0.9",
+    "expo-status-bar": "~57.0.1",
     "lucide-react-native": "^1.31.0",
-    "react": "19.1.0",
-    "react-native": "0.81.5",
-    "react-native-svg": "15.12.1",
+    "react": "19.2.3",
+    "react-native": "0.86.3",
+    "react-native-safe-area-context": "~5.7.0",
+    "react-native-svg": "15.15.4",
     "react-native-url-polyfill": "^4.0.0"
   },
   "devDependencies": {
-    "@types/react": "~19.1.10",
-    "typescript": "~5.9.2"
+    "@types/node": "^24.13.4",
+    "@types/react": "~19.2.10",
+    "typescript": "~6.0.3"
   },
   "scripts": {
     "start": "expo start",
     "android": "expo start --android",
     "ios": "expo start --ios",
-    "web": "expo start --web"
+    "web": "expo start --web",
+    "test": "rm -rf .test-build && tsc -p tsconfig.test.json && node --test --test-timeout=60000 '.test-build/mobile/tests/**/*.test.js'",
+    "check:release-env": "node --env-file-if-exists=.env.local scripts/validate-release-env.js --force",
+    "eas-build-pre-install": "node scripts/validate-release-env.js",
+    "diagnose": "node --env-file-if-exists=.env.local scripts/diagnose-connectivity.mjs"
   },
-  "private": true
+  "private": true,
+  "engines": {
+    "node": ">=22.13.0"
+  }
 }

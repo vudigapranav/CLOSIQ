@@ -6,9 +6,8 @@ This document tracks the live implementation status of **CLOSIQ**. It is updated
 
 ## Current Phase
 
-* **Phase**: Image Serving Fix — **COMPLETE**
-* **Status**: A forensic audit (prior turn, no fixes) traced broken garment images to `server/index.js` (serves `/wardrobe/*` static assets on port 3000) not running. This session actually started it and found the REAL reason it wasn't running: `npm run start` crashed immediately — `@supabase/supabase-js` 2.109.0 unconditionally constructs a Realtime client, which throws on Node < 22 (no native WebSocket) unless given a WebSocket implementation. Fixed with a 2-line change to `server/authVerify.js` (pass the already-installed `ws` package as the realtime transport) — no auth behavior change, confirmed by the fact `authVerify.js` never uses Realtime at all, only `auth.getUser()`. Server now starts and stays up; live-curled the exact demo garment URL and a second asset, both returned real image data (HTTP 200, correct `image/webp`, valid WebP bytes). Also fixed a genuine silent-failure gap in the new-user upload path (`wardrobeStorage.saveUserGarment`'s Storage-upload catch block only logged to console, unlike every other failure path in the same function) and added a shared `GarmentImage` component with `onError` handling + dev-mode logging to the 6 real garment-image render sites app-wide, replacing raw `<Image>` calls that failed silently. Full details in "Mobile Sprint M19" below (unchanged from the prior entry) and "IMAGE SERVING FIX" further below.
-
+* **Phase**: Login Repair (post-SDK-57) — **CODE COMPLETE; LOGIN NOT LIVE-VERIFIED**
+* **Status**: Fixed the auth paths behind the user's iPhone sign-in failure: the demo button no longer creates accounts (it signed up whenever sign-in failed), thrown auth rejections are caught instead of sticking the spinner, LoginScreen guards duplicate taps synchronously and clears loading in `finally`, failures are classified honestly (DNS / unreachable service / timeout / 5xx / device-reported offline) instead of always blaming the user's internet, placeholder or malformed Supabase config is refused before any request and can no longer crash `createClient` at import, and the Supabase transport has a bounded timeout (15 s auth, 90 s uploads) that leaves `globalThis.fetch`, local `file://` photo reads and token refresh untouched. Per Astra's review, no message claims the internet is working or that a request never left the device, ambiguous transport errors are `connectivity` rather than "offline", and unknown errors show safe generic text with raw detail kept for logs only. New `npm run diagnose` checks DNS (with a `supabase.com` control), Supabase health and backend reachability without printing secrets. **Cloud is healthy again** (ACTIVE_HEALTHY; auth health 200; Astra verified the demo account has 58 garments) — the original DNS failure was real before the restore. Tests 82/82 with 9/9 mutations detected; TypeScript, expo-doctor 20/21 (pre-existing icon blocker), both exports on Node v25.4.0, web build and lint all pass. **No cloud mutations, no new accounts, no Gemini calls, no deployment.** Login remains **not device-verified**. Details in "LOGIN REPAIR" below.
 ---
 
 # IMAGE SERVING FIX
@@ -59,6 +58,546 @@ Two layered causes, both confirmed, not assumed:
 - **P1**: New-user upload still has no device-level confirmation that a real photo, uploaded from a real device, actually persists and redisplays correctly across a session restart — same gap the forensic audit already flagged, not closed by this session (no real upload exists in the project to inspect, and physical-device testing wasn't performed here per standing preference).
 - **P2**: The underlying LAN-IP dependency for seed/catalog images is inherently fragile for physical-device demos (server must be manually kept running, IP must not change) — the forensic audit's own suggested durable fix (migrate catalog images into the public/Storage layer) was explicitly out of scope for both that audit and this fix session; still worth a deliberate decision in a future sprint, not an accident to routinely work around.
 - **P2**: `@supabase/supabase-js` is not pinned to an exact version (`^2.109.0`) — a future `npm install` could pull a version with a similar new startup requirement. Not fixing this now (pinning is a policy decision, not a bug fix) but worth knowing.
+
+---
+
+# LOGIN REPAIR (2026-09-12) — HONEST AUTH FAILURES, NO AUTO-SIGNUP, BOUNDED TRANSPORT
+
+Triggered by the user's iPhone (SDK 57 build) showing hostname-not-found on demo/sign-in while the phone had working internet. Scope: mobile auth paths only. **No cloud mutation, no account creation, no Gemini call, no SDK change, no deployment.** All uncommitted M19-C/M20/M21/deployment work preserved. `DIRECT_DISTRIBUTION.md` is Astra's and was not touched.
+
+## Cloud state — corrected twice during this session, recorded honestly
+1. At the start of this session a `nslookup` of the configured project host returned **no answer** while `supabase.com` resolved. Reported as confirming the paused project.
+2. Minutes later the diagnostics script resolved the host (2 Cloudflare addresses) and `dig`/`getaddrinfo`/`curl` agreed. **I wrongly attributed reading #1 to a bad `awk` parse.** That guess was incorrect.
+3. Astra's timeline settles it: **the DNS failure was real before the restore**, then 502/500 while the project came up, and it is healthy now. Both readings were true at the time they were taken.
+4. `list_projects` now reports **ACTIVE_HEALTHY** (it was INACTIVE on 2026-09-11), and `GET /auth/v1/health` with the anon key returns **200** (`GoTrue v2.196.0`). Astra separately verified the demo account over authenticated REST: **HTTP 200, 58 garments, 1 profile, 0 saved looks, 0 planner events** — so the demo account exists and never needed creating.
+
+**Consequence:** the user's original error is explained by the outage, and sign-in may now work on the device. That is **not** verified from here — see the device gate below.
+
+## Defects fixed (all SOURCE VERIFIED + TEST VERIFIED unless stated)
+1. **The demo button created accounts.** `signInDemo()` fell back to `supabase.auth.signUp()` whenever sign-in failed, then retried sign-in. Two bugs in one: a transport failure (DNS) is not "the account is missing", and against a reachable-but-wrong project it would have **provisioned a shared account there**. Demo now performs exactly one `signInWithPassword` and never calls `signUp`. If credentials are genuinely rejected it reports `demo_missing` and says CLOSIQ won't create the account automatically.
+2. **Thrown auth rejections were unhandled.** supabase-js usually returns errors but its transport can throw; `signIn`/`signUp` had no try/catch, so a throw escaped into the screen's un-awaited handler — the spinner stuck and the form stayed disabled. All entry points now run through `attemptAuth()`, which converts a throw into a classified result.
+3. **LoginScreen loading/duplicate taps.** `if (loading) return` reads React state, so two taps in the same tick both passed. Replaced with a synchronous `inFlightRef`, and `setLoading(false)` moved into `finally` for both submit and demo.
+4. **Every failure blamed the user's internet.** `mapAuthError` mapped anything matching `network|fetch|timed out` to "Check your internet connection" — exactly the wrong advice for a DNS/paused-service outage. New `authErrors.ts` classifies `config | dns | offline | connectivity | timeout | service_unavailable | rate_limited | invalid_credentials | email_exists | weak_password | invalid_email | email_not_confirmed | demo_missing | unknown`, matching iOS and Android error dialects (NSURLError -1003/-1009/-1001, OkHttp "Unable to resolve host", ENOTFOUND/EAI_AGAIN) plus HTTP 429/502/503/504.
+5. **Placeholder/malformed config reached the network.** New `supabaseConfig.ts` validates URL and key (present, https, not a placeholder host/key, not a service-role key — detected with a dependency-free base64url decoder, since `Buffer` doesn't exist in React Native). `authService` refuses **before any request** and says it is a build problem; LoginScreen shows that reason.
+6. **No request timeout.** New `supabaseTransport.ts` wraps only the Supabase client's fetch: **15 s** for auth/database, **90 s** for `/storage/v1/` uploads, caller-supplied `AbortSignal` still honoured, timer always cleared, and a timeout is reported as a timeout rather than an opaque abort. `globalThis.fetch` is **not** wrapped, so `wardrobeStorage`'s local `file://` photo read and expo/fetch's global behaviour are unchanged, and token auto-refresh (an ordinary auth request) stays well inside the budget.
+
+### Astra review items, applied
+* **Wording claims nothing the signal can't prove.** DNS/refused/reset cannot establish that the internet works, that the device is blameless, or that a request never left the device (captive portals, blocked resolvers and VPNs look identical). All transport messages now use neutral "Couldn't reach CLOSIQ's account service…" phrasing. Only the OS's own offline signal (-1009 / "internet connection appears to be offline") maps to `offline`, and even then as *"Your device reports…"*. Generic `fetch`/`ECONNREFUSED`/`ECONNRESET`/`socket hang up` map to **`connectivity`**, never "proven offline". Tests assert the forbidden phrasings are absent.
+* **Unknown errors never leak provider text.** `unknown` returns fixed generic UI text; the raw string is returned separately as `detail` for logging only, and `signOut` no longer surfaces raw text either.
+* **A malformed URL can no longer crash before the gate.** `createClient()` throws on an invalid URL at import time, which would kill the app on launch before any check could explain it. The client is now constructed against a syntactically valid placeholder whenever validation fails, staying inert while every auth entry point refuses up front.
+* **The transport is tested as itself**, with an injected fetch and real cancellation — not via the classifier.
+* No global error suppression, no LogBox hiding: nothing was silenced anywhere.
+
+## Diagnostics command (new)
+`cd mobile && npm run diagnose` → `mobile/scripts/diagnose-connectivity.mjs`. Read-only: configuration presence, DNS for the project host **plus a `supabase.com` control** (so "DNS is broken here" is distinguishable from "this project doesn't resolve"), `GET /auth/v1/health` (anon key sent as a header so the check is meaningful — 200 healthy, 401 key rejected, 5xx/540 unavailable/paused), and the CLOSIQ backend `/healthz`. **Never prints the anon key** — only that one is present and its length. No auth attempt, no mutation, no Gemini.
+
+Live run on this machine, 2026-09-12: config present; `supabase.com` and the project host both resolve; **auth service healthy (200 in 436 ms)**; local backend `/healthz` 200 and reporting Supabase configured. `0 failures, 0 warnings`.
+
+## Verification
+| Check | Result |
+|---|---|
+| Mobile TypeScript | **PASS** |
+| Regression tests | **PASS — 82/82** (19 new in `tests/loginRepair.test.ts`) |
+| Mutation test of the new guards | **9/9 detected** from a clean baseline: demo auto-signup restored, config gate removed, thrown errors rethrown, DNS blamed on the internet, unknown leaking raw text, ambiguous errors called offline, transport timeout removed, upload budget collapsed, LoginScreen state guard restored |
+| `npx expo-doctor` | **20/21** — the only failure is the pre-existing non-square icon (blocker B4) |
+| iOS export | **PASS** — 2598 modules, 4.5 MB (Node v25.4.0, ≥22.13 as SDK 57 requires) |
+| Android export | **PASS** — 2604 modules, 4.5 MB |
+| Root web build | **PASS** |
+| Root lint | **PASS — 0 findings** |
+| Cloud mutations / new accounts / Gemini calls | **none** |
+
+`node --test` now runs with `--test-timeout=60000`, so a hung test fails instead of blocking forever (a hang did occur while writing these tests — caused by the test double, not app code, and fixed).
+
+## NOT verified — the device gate
+**Login is NOT live-verified.** Nothing in this repair has been exercised against the restored cloud from the app, and nothing has run on a device. Required before claiming the user's problem is fixed:
+1. Demo login on the iPhone → wardrobe loads (Astra's REST check says 58 garments exist for that account, but the app path is unproven).
+2. Email/password login, and a deliberately wrong password → "Incorrect email or password", not a connection message.
+3. Airplane mode → the message must describe an unreachable service or a device-reported offline state, and must never claim the internet is fine.
+4. Double-tap Log In and Try Demo rapidly → exactly one request, spinner always clears.
+5. A garment photo upload after login → confirms the 90 s upload budget and that local `file://` reads still work under expo/fetch.
+
+Other external blockers are unchanged: B1 account deletion, B2 privacy policy, B3 third-party-AI consent, B4 icon, B5 no deployed backend, B7 shared demo account. Hosting provider still unchosen; EAS project still unlinked; 50 paths uncommitted.
+
+---
+
+
+# MOBILE SPRINT M21 — EXPO SDK 54 → 57 UPGRADE (2026-09-12)
+
+Performed at the user's explicit authorization, superseding the standing "stay on SDK 54" rule (recorded in CLAUDE.md §11 and `mobile/AGENTS.md`). All M19-C/M20/deployment-prep work was preserved — verified by symbol after the upgrade — and a full copy of the 210 uncommitted files plus a diff patch was taken first (scratchpad `pre-sdk57-backup/`). Nothing was deployed, submitted, reset, or discarded.
+
+## Availability check (before installing anything)
+`SDK 57 IS A STABLE RELEASE` — docs.expo.dev/versions/v57.0.0 lists it as latest, dated 2026-07-29. No prerelease was used and no substitute SDK was considered. Requirements from the official support table: **React 19.2.3, React Native 0.86, Node ≥ 22.13.x, Xcode 26.4+, iOS 16.4+, compileSdk/targetSdk 36**.
+
+## Upgrade path — incremental, as Expo documents
+Expo's upgrade walkthrough states "We recommend upgrading SDK versions incrementally, one at a time," so the upgrade ran **54 → 55 → 56 → 57**, each step `npm install expo@^N.0.0` then `npx expo install --fix`, with checks between steps. Migration notes were read for every intervening version (SDK 55, 56, 57 changelogs) before running it.
+* **54 → 55**: RN 0.83.10, React 19.2.0. Legacy Architecture removed (New Architecture is now mandatory; the app never set `newArchEnabled`, so nothing to remove). Android edge-to-edge became mandatory. `tsc` clean, iOS export clean.
+* **55 → 56**: RN 0.85.3, React 19.2.3, TypeScript 6. `expo/fetch` became the default `globalThis.fetch`. Two toolchain breakages surfaced and were fixed (below). Tests 63/63, iOS export clean.
+* **56 → 57**: RN 0.86.3. The changelog states "React Native 0.86 is intended to have no breaking changes from 0.85" — none were encountered.
+
+## Migration changes made (only what the upgrade required)
+1. **`app.json`: top-level `splash` removed** — invalid in the SDK 57 schema (expo-doctor caught it). Migrated to the **`expo-splash-screen` config plugin** with the identical asset, `resizeMode` and `backgroundColor`. The animated in-app CLOSIQ splash in `App.tsx` is a separate thing and is untouched.
+2. **`App.tsx`: safe areas** — SDK 55+ makes Android edge-to-edge mandatory, and React Native's `SafeAreaView` is deprecated and a no-op there, so headers/nav dock would have rendered under the system bars. Switched to `react-native-safe-area-context` (Expo's documented replacement): `SafeAreaProvider` wraps the app (the component body is unchanged, just renamed to `AppContent`), and `SafeAreaView` now comes from that package. Also dropped `StatusBar backgroundColor`, which edge-to-edge ignores; `barStyle` kept.
+3. **`@types/node` added as a devDependency** — previously arrived transitively; SDK 56 stopped providing it, which broke the Node-side test types.
+4. **`mobile/tsconfig.json`: `exclude: ["tests", ".test-build", "scripts"]`** — the app config now uses `moduleResolution: bundler` with a `react-native` condition, which cannot resolve `node:` built-ins. The tests are Node programs and are type-checked by their own `tsconfig.test.json`, so scoping the app config to app code is the correct split (app `tsc` still covers `App.tsx` and all of `src/`).
+5. **`mobile/tsconfig.test.json`: `ignoreDeprecations: "6.0"`** — TypeScript 6 deprecates `moduleResolution: node10`, but the CJS test build genuinely needs it: the shared root `src/` is ESM (`"type": "module"`), so `node16` resolution refuses to `require` it. **Follow-up:** TypeScript 7 will remove node10; the test build will need reworking then.
+6. **`mobile/package.json`: `engines.node >= 22.13.0`** — SDK 57's documented minimum.
+7. **NOT changed, deliberately:** `mobile/metro.config.js` (the shared-root `watchFolders` is preserved verbatim — both exports resolve `../../../src/*`), Supabase auth/storage, the server-side Gemini architecture, onboarding, wardrobe ownership, Planner, Saved Looks, and all CLOSIQ branding.
+
+### expo/fetch and the garment upload — investigated, no change needed
+SDK 56 makes `expo/fetch` the global `fetch`, and `wardrobeStorage.saveUserGarment` uploads a photo with `fetch(file://…).arrayBuffer()`. `file://` support is **undocumented**, so rather than assume, the native sources in `node_modules/expo` were read: Android routes `file://` through `OkHttpFileUrlInterceptor` ("OkHttp does not support `file://` scheme under the hood… we add a fake http://filesystem.local prefix"), and iOS `NativeResponse.swift` special-cases `url.scheme == "file"`. Both platforms support it, so the upload path is unchanged. The known SDK 56 `Response.blob()` bug on native does not apply — this code uses `arrayBuffer()`. **SOURCE VERIFIED only; needs device confirmation.**
+
+## Installed versions after the upgrade
+| Package | Version |
+|---|---|
+| expo | 57.0.22 (`expo config` reports `sdkVersion 57.0.0`) |
+| react-native | 0.86.3 |
+| react | 19.2.3 |
+| typescript | 6.0.3 |
+| @types/react | 19.2.18 |
+| @types/node | 24.13.4 (new) |
+| react-native-safe-area-context | 5.7.0 (new) |
+| expo-splash-screen | 57.0.9 (new) |
+| expo-image-picker | 57.0.17 |
+| expo-location | 57.0.17 |
+| expo-image-manipulator | 57.0.17 |
+| expo-status-bar | 57.0.1 (installed but not imported anywhere — left in place) |
+| @react-native-community/datetimepicker | 9.1.0 |
+| @react-native-async-storage/async-storage | 2.2.0 (unchanged) |
+| react-native-svg | 15.15.4 |
+| @supabase/supabase-js | 2.109.0 (unchanged) |
+| react-native-url-polyfill | 4.0.0 (unchanged) |
+
+## Verification — SOURCE / BUILD only
+| Check | Result |
+|---|---|
+| `npx expo install --check` | **PASS** — "Dependencies are up to date" |
+| `npx expo-doctor` | **20/21** — the only failure is blocker **B4**: the icon and `android.adaptiveIcon.foregroundImage` are the 984×274 wordmark, not square. Pre-existing, not caused by the upgrade, and not fixable without real artwork (CLAUDE.md forbids fabricating a logo). |
+| Mobile TypeScript (`npx tsc --noEmit`) | **PASS** |
+| Regression tests (`npm test`) | **PASS — 63/63** |
+| iOS export | **PASS** — 2595 modules, 4.5 MB (was 2581 / 4.74 MB on SDK 54) |
+| Android export | **PASS** — 2601 modules, 4.5 MB (was 2587 / 4.76 MB) |
+| Root web build | **PASS** (unaffected — the web app has its own React/Vite versions) |
+| Root lint | **PASS — 0 findings** |
+| `.easignore` check | **PASS** — 210 files, 4.2 MB, no secrets |
+| `eas.json` | still valid against eas-cli's `@expo/eas-json` resolver |
+| M19-C/M20 work | intact — every symbol still present |
+
+**LIVE VERIFIED: none this sprint.** (Supabase is still paused; no backend deployed.)
+**DEVICE VERIFIED: none. Runtime compatibility of SDK 57 is NOT established.**
+
+## EAS build compatibility
+* **New builds are required.** Native dependencies changed (RN 0.83→0.86 across the chain, `react-native-safe-area-context` and `expo-splash-screen` added), so any previously produced binary is stale. No EAS build has ever been made for this project, so nothing needs invalidating.
+* **A development build is not needed to test now.** The project is now on the same SDK as the App Store / Play Store **Expo Go (SDK 57)**, so the app can be opened in stock Expo Go on a physical iPhone or Android — which was impossible on SDK 54 and was the user's original blocker. A dev build is only needed if `expo-dev-client` features are wanted; the `development` EAS profile still sets `developmentClient: true` without `expo-dev-client` installed (unchanged pre-existing issue, listed in RELEASE_CHECKLIST.md).
+* **EAS image:** SDK 57 requires Xcode 26.4+; EAS's `auto` image for SDK 57 satisfies it — confirm the Xcode version in the first iOS build log.
+* **eas-cli:** 21.7.0 installed, 24.3.0 available. `eas.json` requires `>= 16.0.0` and still validates, but upgrading the CLI before the first SDK 57 build is recommended.
+
+## Required device QA — NOT performed (cannot be, from here)
+Runtime compatibility must not be claimed until a human runs the app. On top of the existing M19-C 11-step script and the M20 additions, SDK 57 specifically needs:
+1. **Android edge-to-edge layout** — headers, the floating nav dock, the splash and every modal must clear the status bar and gesture bar (this is the highest-risk change).
+2. **Garment photo upload** — pick a photo and save; confirm it uploads (exercises `expo/fetch` with `file://` under the new default fetch).
+3. **Native launch screen** — confirm the migrated `expo-splash-screen` plugin renders as before on both platforms.
+4. Camera and photo-library permission prompts (expo-image-picker 57), location/weather (expo-location 57), the date/time picker in Planner (datetimepicker 9.1), and all SVG icons.
+5. Full auth cycle, since New Architecture is now mandatory and AsyncStorage backs the session.
+
+## Unresolved blockers (unchanged by this upgrade)
+B1 account deletion · B2 privacy policy · B3 third-party-AI consent · **B4 non-square icon (now also failing expo-doctor)** · B5 no deployed backend · B6 Supabase paused · B7 shared demo account. Deployment decisions from the previous session are still open (hosting provider not chosen; EAS project not linked; 46 paths uncommitted).
+
+---
+
+
+# DEPLOYMENT PREPARATION (2026-09-11) — LOCAL PREP COMPLETE, NOTHING DEPLOYED
+
+The runbook is `DEPLOYMENT.md`; store blockers are in `RELEASE_CHECKLIST.md`. **Not executed:** no backend deploy, no `eas init`, no EAS build, no submission, no Supabase restore or setting change, no commit. Expo SDK 54 is preserved (`expo` 54.0.37, RN 0.81.5; `npx expo install --check` → "Dependencies are up to date").
+
+## Re-verification of M19/M20 (from current files, not earlier reports)
+* SOURCE VERIFIED: every M19/M20 fix is present, by symbol, in the affected files (`captureSession`, `mergePendingLocal`, `garmentRowExists`, `refreshNestedGarmentImages`, `storageReferenceUrl`, `restoreSession`, `startAutoRefresh`, `postApi`, `errorKind`, `GEMINI_TIMEOUT_MS`, `checkServerEnv`, `ws` dependency, `engines >=22.9.0`, the release-env hook).
+* TEST VERIFIED: 63/63 (61 from M19/M20 + 2 new catalog-asset tests). Mobile `tsc`, web build and lint (0 findings) pass; the iOS export (2581 modules) and Android export (2587 modules) pass after this session's `app.json` changes, with JS bundle hashes identical to M20's (the changes are native config only).
+* Still true, re-confirmed: release blockers B1–B4 and B7 are present in the code; the Supabase project is **INACTIVE**; **no device QA has ever been observed**. M19 remains NOT COMPLETE.
+
+## Findings and changes this session
+1. **EAS would have uploaded ~448 MB per build** (SOURCE VERIFIED against the installed eas-cli 21.7.0: `build/vcs/clients/git.js` clones from `git rev-parse --show-toplevel`; `build/vcs/local.js` reads `.easignore` from the **repo root** and, when it exists, applies no `.gitignore` at all). 444 MB of that is `public/test samples/`, which the app never reads. Added a repo-root **`.easignore`** that repeats both `.gitignore` files' rules (with `mobile/` anchors re-rooted) plus `public/test samples/`. Upload is now **207 files, 4.2 MB**.
+   * New `scripts/check-easignore.mjs` loads **eas-cli's own `Ignore` class**, walks the tree as its copy does, and fails if `.env`, `.env.local`, signing keys or `credentials.json` would upload, or if a required build input would be missing. Negative-tested by removing the `.env` rules: it failed on exactly `.env` and `mobile/.env.local`; restored.
+2. **`mobile/eas.json`**:
+   * explicit `environment` per profile (`development`/`preview`/`production`)
+   * preview Android `buildType: apk`; production Android `app-bundle`
+   * `cli.version >= 16.0.0`
+   * `submit.production.android` locked to `track: internal`, `releaseStatus: draft` (no public rollout possible from `eas submit`)
+   * Validated with eas-cli's own `@expo/eas-json` 21.6.0 resolver (all six profile/platform combinations plus both submit profiles resolve as intended). `eas config` itself can't run until `eas init` links a project.
+3. **`mobile/app.json`**: `ios.infoPlist.ITSAppUsesNonExemptEncryption: false` (HTTPS only), and image-picker `microphonePermission: false`, since the picker only uses `mediaTypes: ['images']`. `npx expo config --type introspect`, before vs after: `RECORD_AUDIO` is now `tools:node="remove"`, the iOS microphone usage string is gone, and the camera, photo-library and location strings are retained. **Deliberately not blocked:** `READ_EXTERNAL_STORAGE`, because `AddItemModal` requests media-library permission before opening the gallery, so blocking it would break uploads on Android ≤ 12. `SYSTEM_ALERT_WINDOW` (from the template) and FINE location are left as decisions in `RELEASE_CHECKLIST.md`.
+4. **Backend operations** (`server/index.js`):
+   * `GET /healthz` — config presence booleans, version, commit (from `GIT_COMMIT` or the Render/Railway/Fly variables); no secrets, no Gemini or Supabase call
+   * one JSON log line per `/api/*` and `/healthz` request — method, path, status, ms; never bodies, tokens or user ids
+   * graceful `SIGTERM`/`SIGINT` drain with a 35 s ceiling
+5. **`scripts/verify-deployment.mjs <baseUrl>`** (zero Gemini calls). Checks:
+   * https, and http→https behaviour
+   * `/healthz`
+   * HSTS (warn only)
+   * the unauthenticated `POST /api/ai/*` → 401 auth gate
+   * `GET` → 405
+   * all 58 catalog WebPs served with RIFF/WEBP bytes
+   * path traversal
+6. **`mobile/tests/deploymentCatalog.test.ts`**: every `GARMENT_CATALOG` `imagePath` exists in `public/wardrobe` as a real WebP.
+
+## Evidence (kept separate)
+* **LIVE VERIFIED (this machine only; not a hosted deploy):**
+  * The server started with `NODE_ENV=production` and the real `.env` → `verify-deployment.mjs` **PASSED** (58/58 images, 401 gate, 405, traversal blocked), JSON request logs emitted, and `SIGTERM` → "All connections closed", exit 0.
+  * A **clean-checkout simulation** (tracked + new files, no `node_modules`, no test samples) ran `npm ci --include=dev` (76 packages) → `npm run build` → production start → verifier PASSED.
+  * `NODE_ENV=production` without the Supabase variables → CONFIG ERROR ×2, "Refusing to start", exit 1.
+  * The release-env gate under **Node 20.20.2** (EAS's Android image ships Node 20.19): a valid config → OK; LAN/http → 4 problems, exit 1; the `development` profile is skipped.
+* **SOURCE VERIFIED:** the eas-cli upload and ignore semantics; `eas.json` resolution; the `app.json` introspection; that the web client sends no Supabase token (`src/services/ai/*`), so web AI calls 401 on any deployed host (pre-existing since M17 — a decision, not changed).
+* **Checked against official docs (2026-09-11):**
+  * Google Play requires target API 36 since 2026-08-31; SDK 54 targets 36.
+  * App Store Connect requires Xcode 26 since 2026-04-28; EAS's SDK 54 default image is Xcode 26.x.
+  * EAS `EXPO_PUBLIC_` variables must be plaintext or sensitive, not secret.
+  * `eas submit` iOS only uploads to TestFlight and needs an existing App Store Connect record plus `ascAppId`.
+  * `eas submit` Android can make the first upload once the Play Console app and service-account key exist.
+  * **No SDK 54 incompatibility with current store requirements was found; no SDK change was made.**
+* **NOT TESTED:** any hosted backend or real TLS (none deployed); live Supabase (paused); any EAS build, including whether EAS env vars reach the `eas-build-pre-install` hook (the gate fails the build loudly if they don't); any device; 16 KB page compliance of the native libraries; App Store Connect's acceptance of the current (non-compliant) icon.
+
+## Decisions required before execution (see DEPLOYMENT.md §1)
+1. Backend hosting provider — **still open**. The user asked for free options first; compared from official pricing pages on 2026-09-11 (see the session summary).
+2. API origin — **DECIDED: provider subdomain** (the user accepted that moving hosts later strands installed builds).
+3. EAS owner — **DECIDED: personal account `vudigapranav`**.
+4. Supabase: restore, plan, SMTP, Site URL.
+5. Apple and Google developer accounts.
+6. `com.closiq.app` ownership.
+7. Whether the web app is in scope.
+8. Committing/pushing the 42 pending paths.
+
+---
+
+
+# MOBILE SPRINT M20 — PRODUCTION-READINESS AUDIT + CORRECTIVE PASS (2026-09-11)
+
+A focused audit of seven production-readiness areas, with minimal fixes for confirmed defects only. Expo SDK 54 (`~54.0.37`, RN 0.81.5), Supabase, Gemini, Metro and the existing architecture are unchanged. No new mobile dependency, no offline framework, no service replaced, no Expo upgrade. **Nothing was deployed, no EAS/production build was created, no Supabase setting was changed, and no user data was touched.** All M19-C uncommitted work is preserved; this builds on it.
+
+Labels: **SOURCE VERIFIED** (read/changed in code, or checked against library source in `node_modules`) · **TEST VERIFIED** (a behavioural test in `mobile/tests/` runs the real module and was proven to catch a regression by mutation) · **LIVE VERIFIED** (a real request against running infrastructure) · **DEVICE VERIFIED** (observed on a device/simulator) · **NOT TESTED**.
+
+## 1. Expired signed images — Wardrobe, Saved Looks, Planner — FIXED
+
+**Defect (SOURCE VERIFIED).** Uploaded photos are served through 1-hour signed URLs. The wardrobe re-signed on every load, but Saved Looks (`saved_outfits.items`) and Planner events (`planner_events.outfit`) store full garment objects **including the signed URL at save time**, so every saved look and planned outfit showed broken photos about an hour after saving, permanently. There was also no recovery for a URL that expired while a screen stayed open, and an upload whose signing failed at load became `imageUrl: ''`, which nothing could ever re-sign.
+
+**Fix.** New `mobile/src/services/garmentImages.ts`. Every signed URL carries its bucket object path (`/storage/v1/object/sign/garment-images/<path>`), and that path is the durable reference — no schema change, no data rewrite, no outfit regeneration.
+* `refreshGarmentImages()` re-signs all uploads in **one** batch call; a signing failure keeps the durable reference.
+* Saved Looks and Planner loads (cloud **and** cache-fallback paths) re-resolve the images nested in each record. Stored records are never written back to the cloud by a read, and `syncPending` records keep their marker.
+* Wardrobe rows now resolve from `storage_path` (durable reference, then signed) rather than an empty placeholder; the duplicated signing code in `wardrobeStorage.ts` was replaced by the shared helper.
+* `GarmentImage` (used by every garment image site: Collection, Profile, outfit card, and the garment/look/event detail modals) re-signs a failing storage URL **once** before showing its placeholder. That covers a screen left open past expiry, and references that couldn't be signed while offline.
+
+TEST VERIFIED: an old look's expired URL comes back freshly signed with `tableCalls === ['select']` (no write-back, no regeneration); a pending local look is refreshed and stays pending; a Planner event's outfit is refreshed and an outfit-less event is left alone; the batch signs in exactly one call; signing failure keeps a re-signable reference instead of `''`. The `GarmentImage` retry is React-layer and **SOURCE VERIFIED only**.
+
+## 2. Vision fallback presented as a successful AI analysis — FIXED
+
+**Defect (SOURCE VERIFIED).** On any failure (offline, 401, Gemini 429/quota, no server), `analyzeGarmentImageMobile` returned **`ok: true`** with a fabricated result: "Charcoal", "Cotton Blend", "Smart Casual", "Modern Minimalist", a canned "Stylist Note" and **`aiConfidence: 88`**. It was rendered on the same "analysis complete" screen as a real Gemini scan and saved to the account. The success path also invented `aiConfidence: 92` and a default pairing note when the model omitted them.
+
+**Fix.** `visionAnalysis.ts` returns `{ ok: false, reason, message }` on failure, carrying no garment data. `AddItemModal` gains a `manual` step: "Couldn't analyze this photo" with the real reason, **Try again**, and manual entry of name (required), category, optional colour and formality. Nothing is pre-filled as if an AI produced it. The saved item carries only what the user entered, explicit "Unspecified" placeholders for required fields, and the tag `Manual Entry` — no confidence, style, fabric or note. On the success path, confidence is kept only when the model returned a number, and an empty stylist note is hidden rather than invented.
+
+Related (same class of invented score): an outfit produced by the **local engine because an AI request failed** no longer shows "90% Match"; the card shows why Gemini wasn't used instead. A re-shown saved look keeps its original score.
+
+TEST VERIFIED: failure means `ok: false` with no `data`; a success without confidence stays `undefined` (was 92) and has no invented note; a model-provided confidence is kept. Manual-entry UI and the hidden score are **SOURCE VERIFIED only**.
+
+## 3. API timeouts and unclear network/auth failure states — FIXED
+
+**Defects (SOURCE VERIFIED).**
+* Mobile `fetch()` calls to `/api/ai/*` had **no timeout**. A stalled LAN connection, or the unreachable `.invalid` release placeholder, left the spinner up indefinitely.
+* The server's Gemini calls had **no timeout** either.
+* Every failure — offline, expired session (401), Gemini 429, server down — collapsed into the same silent local fallback. The server returned 200 `{ok:false}` with no machine-readable reason.
+
+**Fix.**
+* New `mobile/src/services/apiRequest.ts` (`postApi`): 40 s `AbortController` timeout, and classification into `timeout | offline | unauthorized | rate_limited | ai_unavailable | server_error`, each with one plain user-facing sentence. Vision, generate and swap all use it.
+* Generate/swap keep their local-engine fallback, but now return `notice` ("Your session has expired… Showing a simple pick from CLOSIQ's local engine instead."), rendered on `OutfitResultCard` in Today, Stylist and Planner.
+* Server: `new GoogleGenAI({ apiKey, httpOptions: { timeout: 30_000 } })`, and failures carry `errorKind` (`rate_limited | timeout | unavailable | not_configured`) via an exported `classifyGeminiError`. Verified in `@google/genai` source that no automatic retries run without `retryOptions`, so a 429 is never silently re-sent against quota.
+
+TEST VERIFIED: a never-answering request times out in under 2 s at a 50 ms budget; seven failure shapes each classify correctly (including a 200-with-`errorKind` Gemini 429); the fallback notice names the expired session; `classifyGeminiError` handles status 429, a `RESOURCE_EXHAUSTED` message, `AbortError` and 500. **NOT TESTED:** a real Gemini timeout or 429 (zero Gemini calls made).
+
+## 4. Startup, session expiry, foreground restoration, cached data — FIXED (two defects)
+
+**Defect A — offline cold start looked like a sign-out (SOURCE VERIFIED against `@supabase/auth-js` `GoTrueClient.js`).** With an expired access token (1 h) and no connection, `getSession()` attempts a refresh, gets a retryable network error, and returns `session: null` while **keeping** the stored session (only non-retryable failures discard it). The app rendered a plain Login screen as if the user had been signed out. **Fix:** `authService.restoreSession()` reports `restoreFailed` **only** for `isAuthRetryableFetchError`, and Login then says "You're still signed in on this device, but CLOSIQ couldn't be reached… Reconnect and you'll be signed back in automatically — or log in again." The auto-restore claim is SOURCE VERIFIED: auth-js's refresh ticker retries from the stored session and emits `TOKEN_REFRESHED`, which `App.tsx` already applies. A revoked or invalid refresh token stays a silent, correct sign-out.
+
+**Defect B — no foreground refresh (SOURCE VERIFIED).** The documented Supabase React Native `AppState` wiring was missing, so after more than an hour in the background, requests went out with an expired JWT until the next 30 s tick. **Fix:** `supabaseClient.ts` calls `startAutoRefresh()` when the app becomes active and `stopAutoRefresh()` otherwise (not on web).
+
+Cached data (SOURCE VERIFIED, unchanged by design): per-user AsyncStorage caches and M19's `syncPending` records survive; a failed cloud read falls back to the cache, whose images are now re-resolved too (§1). No foreground data reload was added — images recover lazily through `GarmentImage`, which avoids extra network churn.
+
+TEST VERIFIED: retryable error → `restoreFailed: true`; `AuthApiError` (revoked refresh token) → `false`; no session → `false`. The `AppState` listener and the Login notice are **SOURCE VERIFIED only**; the force-quit/offline cold start is **NOT TESTED**.
+
+## 5. Seed image URLs retaining obsolete LAN addresses — FIXED
+
+**Defect (SOURCE VERIFIED).** `seedDemoWardrobeIfNeeded()` inserted `getResolvedSeedWardrobe()` URLs, which were already host-qualified with the `EXPO_PUBLIC_API_URL` of seed time (`http://192.168.x.x:3000/wardrobe/...`). On read, `resolveSeedImageUrl` passed any `http(s)` URL through unchanged, so the demo wardrobe — and any saved look containing seed pieces — broke whenever the network or host changed. Nothing in the app could ever fix it.
+
+**Fix.** `resolveStaticImageUrl()` re-hosts any `/wardrobe/...` path, relative or on **any** http(s) host, on the **current** API origin at read time. It's applied to wardrobe rows, the wardrobe cache, Saved Looks and Planner items. Seeds now store the **relative** `/wardrobe/...` path. Existing rows are **not rewritten** (user data preserved); they're corrected at read time.
+
+TEST VERIFIED: a LAN URL resolves to the current host; relative paths resolve; storage URLs, device files and unrelated hosts are untouched; every seed insert stores `^/wardrobe/`. LIVE VERIFIED (local server, this machine): `GET /wardrobe/men/footwear/leather_loafers.webp` → 200 `image/webp`, a valid RIFF/WEBP body, 30,326 bytes.
+
+## 6. Backend direct dependency declarations — FIXED (two defects)
+
+* **`ws`** (SOURCE VERIFIED): imported directly by `server/authVerify.js` but only present transitively through `@google/genai`, so a dependency change there would have crashed the server at startup. Now declared as `"ws": "^8.21.3"` (the version already installed; `npm ls ws` shows it deduped; `package-lock.json` synced). A scan of every bare import in `server/`, `vite.config.js` and `mobile/` found **no other undeclared direct dependency** (`react-native-url-polyfill` confirmed imported from `mobile/index.ts`).
+* **`engines`** (checked against official Node docs): the root start script uses `node --env-file-if-exists`, which was **added in Node v22.9.0** and never backported to 20. `engines: ">=20.6.0"` therefore allowed hosts where `npm run start` exits immediately with "bad option". Corrected to `">=22.9.0"` (Node 20 has been EOL since 2026-04). Lockfile synced.
+
+## 7. Production API and Supabase environment validation — ADDED
+
+* **Server** (`server/envCheck.js`, wired into `server/index.js`): with `NODE_ENV=production` the process **refuses to start** when `SUPABASE_URL`/`SUPABASE_ANON_KEY` are missing, placeholders, or (for the URL) not https — previously it started "healthy" and 401'd every AI call. It warns when `GEMINI_API_KEY` is missing and when an unused service-role key is present. In development it only prints the problems. Secret values are never printed. TEST VERIFIED (3 tests). LIVE VERIFIED: the real server started with this machine's `.env` and reported no config errors, `POST /api/ai/generate-outfit` without a token → 401, zero Gemini calls.
+* **Mobile** (`mobile/scripts/validate-release-env.js`): runs as the `eas-build-pre-install` hook and **fails `preview`/`production` EAS builds** when `EXPO_PUBLIC_API_URL` or `EXPO_PUBLIC_SUPABASE_URL` is not https, is LAN/localhost/private/`.invalid`/placeholder, or has a path; when the anon key is missing, a placeholder, or a **service-role key** (JWT `role` or `sb_secret_`); or when any `EXPO_PUBLIC_*` name looks like a secret. `npm run check:release-env` runs it locally against `.env.local`, where it **correctly fails today** (the LAN dev IP). Development builds are not gated. TEST VERIFIED (3 tests). NOT TESTED on an EAS builder (no build created).
+* `mobile/.env.example` had a real LAN IP committed, contradicting its own instructions; replaced with `YOUR_MAC_LAN_IP`.
+
+## 8. Release checklist — `RELEASE_CHECKLIST.md` (new, repo root)
+
+Covers production HTTPS, Supabase Auth/RLS/Storage, signing, identifiers, icons, privacy, account deletion, and Apple/Google compatibility, with evidence. Store requirements were checked against official sources on 2026-09-11: Google Play target-API page, Apple Upcoming Requirements, Apple App Review Guidelines, Apple and Google account-deletion pages, and the Expo SDK 54 docs and changelog.
+
+**SDK 54: no verified submission blocker.** It targets Android API 36 (local `react-native/gradle/libs.versions.toml`), which Google Play has required since 2026-08-31; Expo documents it as building with Xcode 26, which App Store Connect has required since 2026-04-28; RN ≥0.77 supports 16 KB pages (per-library compliance to be checked on the first build).
+
+**Release blockers found (not code-fixed in M20 — each is a product/infrastructure decision):**
+* B1 — no in-app account deletion (Apple 5.1.1(v); Google in-app **plus** a web link).
+* B2 — no privacy policy.
+* B3 — no explicit consent before sending photos/wardrobe to Google Gemini (Apple 5.1.2(i) now names third-party AI explicitly).
+* B4 — no store-compliant icon: the configured icon is the 984×274 transparent wordmark, and `assets/icon.png` / `android-icon-foreground.png` are unmodified Expo template placeholders. **Not fabricated, per CLAUDE.md.**
+* B5 — no deployed HTTPS backend.
+* B6 — Supabase project paused.
+* B7 — the shared public demo account turns uploads into cross-user UGC (Apple 1.2).
+
+Also flagged in `app.json`/`eas.json` (left unchanged — release-config decisions):
+* `expo-dev-client` is missing for the `development` profile.
+* `microphonePermission: false` is needed on the image-picker plugin (it adds `RECORD_AUDIO` by default).
+* `ITSAppUsesNonExemptEncryption` is missing.
+* Consider blocking FINE location.
+* No EAS env vars are configured.
+
+## 9. Regression tests and verification
+
+`mobile/tests/` — **61 tests, 61 pass** (35 from M19-C + 26 new in `m20ImagesAndSeeds.test.ts` and `m20NetworkAndConfig.test.ts`). **Mutation test** (scratch copy, working tree untouched): **13/13 M20 guards detected** — nested images not refreshed (3 failures), LAN host kept (4), failed signing → `''` (2), host-qualified seeds (1), fabricated vision success (1), invented confidence (1), 429 unclassified on mobile (2), fallback notice dropped (1), revoked token shown as restore failure (1), release gate allowing LAN (1), allowing service role (1), server allowing http Supabase in production (1), server 429 unclassified (1).
+
+| Check | Result |
+|---|---|
+| Mobile TypeScript (`npx tsc --noEmit`) | **PASS** |
+| Regression tests (`npm test`, mobile) | **PASS — 61/61** |
+| iOS export | **PASS** — 2581 modules, 4.74 MB |
+| Android export | **PASS** — 2587 modules, 4.76 MB |
+| Web build (`npm run build`) | **PASS** |
+| Lint (`npm run lint`) | **PASS — 0 warnings, 0 errors** |
+| Local server start + static image + unauthenticated API | **LIVE VERIFIED** (this machine only) |
+| Gemini calls | **0** |
+| Supabase (live) | **NOT TESTED** — project still paused |
+| Device | **NOT TESTED** — no device session this sprint |
+
+**M19 remains NOT COMPLETE**, and M20's React-layer behaviour (manual-entry step, fallback notice, `GarmentImage` re-sign, Login session notice, `AppState` refresh) is **not device verified**. The M19-C audit's 11-step device checklist still applies. Add these M20 steps:
+* airplane-mode garment scan → "Couldn't analyze this photo" + manual entry;
+* a saved look more than an hour old shows its photos;
+* background the app for more than an hour → AI still works on return;
+* force-quit offline after more than an hour → the "still signed in… reconnect" notice.
+
+---
+
+
+# MOBILE SPRINT M19-C — INDEPENDENT AUDIT (2026-09-11)
+
+An adversarial re-audit of the uncommitted M19-C diff, done by reading the code fresh rather than trusting the M19-C write-up below. All uncommitted work was preserved; Expo SDK 54 and the existing architecture are unchanged; no new dependency. **Four confirmed defects were found and fixed** (§2), the M19-C section's two overclaims were corrected inline (§4), and the test suite was strengthened from 20 to 35 tests and **mutation-tested** (§3).
+
+Labels: **SOURCE VERIFIED** = read in code. **TEST VERIFIED** = a behavioural test in `mobile/tests/` runs the real module and would fail if the behaviour regressed (proven by mutation, §3). **LIVE VERIFIED** = real request to the live Supabase project. **DEVICE VERIFIED** = observed on a physical device/simulator. **NOT TESTED** = none of the above.
+
+## 0. Blocker for LIVE and DEVICE verification
+
+The Supabase project `wibinjtekmadwtbxygrd` ("Closiq") is **INACTIVE (paused)** — `list_projects` reports `status: INACTIVE`, and a read-only `pg_constraint` query failed with `password authentication failed for user "postgres"`. It was deliberately **not restored** by this session (a state change on the user's infrastructure, needs the user's go-ahead). Consequences: **zero LIVE verification this session**, the schema's unique constraints could not be inspected, and the physical-device QA session cannot begin until the project is restored.
+
+## 1. The six audit questions
+
+| # | Requirement | Verdict | Evidence |
+|---|---|---|---|
+| 1 | Delayed user-A requests cannot update user B's cache or React state | **Holds** | Cache: TEST VERIFIED (all six modules; wardrobe, looks, planner, history, profile, preferences). React state: SOURCE VERIFIED only — `App.tsx` effect-scoped `active` flags + `captureSession` guards on every mutation handler; no React renderer exists in this project to test them. |
+| 2 | Failed cloud writes show no false success and promise no automatic sync | **Did NOT fully hold — fixed** (§2 D1, D2, D5) | TEST VERIFIED after fixes. |
+| 3 | Retry uses the correct user and creates no duplicate records | **User: held. Duplicates: did NOT hold — fixed** (§2 D3) | TEST VERIFIED. |
+| 4 | Failed garment deletion cannot delete its Storage image | **Holds** | TEST VERIFIED, now with a true ordering assertion (`garments.delete` resolves strictly before `storage.remove`). |
+| 5 | Logout errors are surfaced | **Held, with a dead-code wording bug — fixed** (§2 D4) | Service contract TEST VERIFIED (error returned, throw caught, success ok). Alert itself SOURCE VERIFIED. |
+| 6 | Onboarding refreshes the parent wardrobe for both Men and Women | **Holds in source** | SOURCE VERIFIED: Women changes `profile` AND bumps `wardrobeRefreshKey` (one superseded load is cancelled by effect cleanup — harmless extra request); Men bumps the key. The trigger is covered only by source-wiring tests. Behavioural test added for the data half (an unsynced onboarding item survives the refresh, both profiles). **DEVICE verification required for both profiles.** |
+
+**Residual, not fixed (not a confirmed defect):** "confirmed deletion" means the DB `delete` returned no error. PostgREST returns success with 0 rows if RLS silently filters the delete, which would then remove the image of a row that still exists. Unreachable while the `garments` DELETE policy exists (LIVE VERIFIED present in M19, not re-checkable today — project paused). Hardening option: `.delete().select('id')` and require ≥1 row for uploaded items.
+
+## 2. Confirmed defects fixed this audit
+
+**D1 — False "Saved ✓" (SOURCE VERIFIED defect → TEST VERIFIED fix).** After a failed look save where the user tapped "Not now", the look sat in `savedOutfits`, so `TodayScreen`/`StylistScreen` rendered **"Saved ✓"** for a look that never reached the account — and tapping Save again was a silent no-op, because `saveOutfitToStorage`'s local duplicate check returned before any cloud call. Fix: failed creates are marked `syncPending`; both screens exclude pending looks from `isCurrentOutfitSaved`; re-saving a pending look now genuinely retries the insert (with the D3 existence check). The alert now says so: "try again now, or tap Save Look again later."
+
+**D2 — Local-only items wiped on the next reload (SOURCE VERIFIED defect → TEST VERIFIED fix).** Every successful cloud read overwrote the cache with the cloud list. So a garment/look/event the alert had just described as "on this device only" **disappeared from the device too** on the next profile switch, relaunch, re-login — or the onboarding-completion refresh itself. That made the alert false and destroyed user-created data, contrary to the "preserve local-only data" rule. Fix: `mergePendingLocal()` in `cloudWriteFeedback.ts` keeps cached records marked `syncPending` whose id the cloud lacks; the cloud copy wins as soon as it has the id (self-heals an insert that committed despite a lost response). This is a flag on the existing cached record, **not a sync queue** — nothing uploads in the background, and the wording still says so.
+
+**D3 — Retry could create duplicate rows (SOURCE VERIFIED defect → TEST VERIFIED fix).** If an insert committed but its response was lost (a normal mobile-network failure mode), "Try again" inserted a second copy. Whether the DB has a unique constraint to reject it could not be checked (project paused) — and if one exists, the retry would instead fail with 23505 and falsely tell the user the save failed. Fix, schema-independent: `runCloudWrite` passes the attempt number to `run`, and garment/look/planner inserts check for their own row (`user_id` + stable client id) before re-inserting. Upserts (profile, preferences, image upload with `upsert: true`) were already idempotent.
+
+**D4 — Logout alert's key sentence was dead code (SOURCE VERIFIED defect → fixed, SOURCE VERIFIED).** `result.message ?? '… You are still signed in.'` — `mapAuthError` always returns a string, so the fallback never showed. Verified against `node_modules/@supabase/auth-js/dist/main/GoTrueClient.js` `_signOut` (line ~3329): on a non-401/403/404 error it returns **before** `_removeSession()`, so the local session genuinely survives. The alert now always ends "You're still signed in on this device."
+
+**D5 — Three failure messages were inaccurate (SOURCE VERIFIED defect → fixed).** A failed planner **edit** said the change "applies on this device only" — but a failed edit is *reverted*; now: "…so the event has been left as it was." Profile and preference failures said "applies on this device only", but the next successful load replaces them with the cloud copy; now they say exactly that.
+
+## 3. Are the tests testing behaviour? — honest assessment + mutation proof
+
+Weaknesses found in the M19-C suite and fixed:
+* `onboardingRefresh`: two of its three tests were **source-regex wiring checks**, and the third ("re-read returns the garments onboarding saved") only proved `loadUserWardrobe` maps a row — it did not exercise the refresh at all. Replaced with a behavioural test (Men and Women) that runs the real save → refresh read and proves an unsynced onboarding item survives. The file header now states plainly which tests are wiring and which are behaviour.
+* "an in-flight preference WRITE" never issued the write: the session switched before the cache read yielded, so `runCloudWrite` abandoned it pre-flight. Rewritten to switch accounts **inside** the upsert handler (write genuinely on the wire, payload asserted as user A); the pre-flight case kept as its own test.
+* The image "ordering" test only asserted a delete happened *somewhere*. The fake client now records a resolution-order `sequence`; the test asserts `garments.delete` precedes `storage.remove`.
+* A test titled "all six modules" covered four; renamed. Dead code removed.
+
+New tests: retry abandoned (not replayed as user B) when the account changes while the Try-again dialog is up; every retry attempt writes as the original user; committed-but-lost insert not duplicated on retry (garment, look, planner); pending garment/event survives reload; pending look replaced by the cloud copy; pending look re-save retries; synced look re-save stays a no-op; `authService.signOut` failure/throw/success.
+
+**Result: 35 tests, 35 pass.** **Mutation test** (scratch copy, working tree untouched — each guard broken individually, suite re-run): **12/12 guards detected** — `isSessionCurrent` forced true (8 failures), garment delete revert skipped (1), image removal before DB delete (3), false sync promise restored (2), retry idempotency removed (1), pending merge removed (4), `signOut` swallowing errors (1), pending re-save no-op restored (1), retry ignoring session change (2), refresh key removed from deps (1, wiring test), onboarding counting unsynced items (1, wiring test). The one initial survivor (wardrobe-load stale discard) was defence-in-depth redundancy: removing both of its guards fails the delayed-A→B test.
+
+## 4. Verification run (this audit, 2026-09-11)
+
+| Check | Result |
+|---|---|
+| Mobile TypeScript (`npx tsc --noEmit`) | **PASS** |
+| Regression tests (`npm test` in `mobile/`) | **PASS — 35/35** |
+| iOS export | **PASS** — 2579 modules, 4.73 MB |
+| Android export | **PASS** — 2585 modules, 4.75 MB |
+| Web build (`npm run build`) | **PASS** |
+| Lint (`npm run lint`) | **PASS — 0 warnings, 0 errors** |
+| Gemini calls | **0** |
+| LIVE (Supabase) | **NOT TESTED** — project paused (§0) |
+| DEVICE | **NOT TESTED** — requires the user's physical device and a restored project |
+
+## 5. Physical-device QA — REQUIRED BEFORE M19 CAN CLOSE (NOT YET OBSERVED)
+
+Prerequisites: restore the Supabase project; start `npm run start` (root) so seed images and `/api/ai/*` resolve; confirm `mobile/.env.local`'s `EXPO_PUBLIC_API_URL` matches the Mac's current LAN IP; launch in Expo Go on the device. Record each step as PASS/FAIL with what was actually seen.
+
+1. **Signup** with a real inbox → confirmation email arrives → click link → **log in** → onboarding appears (never observed since M17).
+2. **Onboarding** on Men: upload **2 tops + 2 bottoms** from the camera roll → finish → the 4 items are on Wardrobe and Today **immediately** (audit question 6). Repeat later on a second account with **Women**.
+3. **Generate** one outfit — **one** Gemini call. If it returns 429, stop all AI testing and record it; use existing saved looks for everything below.
+4. **Save** the look → button shows "Saved ✓" → Profile → Saved Looks lists it.
+5. **Planner**: add an event, assign the saved look.
+6. **Image persistence**: force-quit, reopen → the 4 uploaded photos still render (signed URLs re-minted on load).
+7. **Failure/retry** (airplane mode, no AI): add a garment → "Item not saved to your account" with Not now / Try again → Not now → it stays in Wardrobe → switch Men↔Women and back → **it is still there** (D2). Save an existing look → "Not now" → the button must **not** show "Saved ✓" (D1). Reconnect → tap Save Look → it saves once. Delete a garment offline → "Item not removed" → it stays; photo still renders.
+8. **Logout** offline → "Couldn't log out … You're still signed in on this device." Reconnect → logout succeeds → Login screen.
+9. **Second account** → none of account 1's garments, looks, events, name, or Men/Women preference appear, including if logged in quickly while account 1's reads may still be loading.
+10. **Original account** → everything from 2–6 is back.
+11. **Force-quit / reopen** while signed in → no Login flash, straight to Today.
+
+## 6. Remaining follow-ups (unchanged from M19-C unless noted)
+
+* **NEW (P2):** pending (`syncPending`) garments and planner events have no visible "not synced" badge in Wardrobe/Planner/Profile — the only signal is the alert at the moment of failure. Looks are covered by the Save button state.
+* **NEW (P2):** harden garment delete to require ≥1 deleted row before removing an uploaded image (§1 residual).
+* Signed-image expiry (1-hour TTL, no in-session re-sign) — P1.
+* Vision fallback labelling (local engine output not distinguished from a real Gemini scan) — P1.
+* API timeouts (no `AbortController` in `visionAnalysis.ts` / `outfitStylist.ts`) — P1.
+* Deployment configuration (unreachable production API placeholder, LAN-IP dev URL, no backend in `eas.json`) — P0 before any real build.
+* `mobile/AGENTS.md` references Expo v57 docs while the project pins SDK 54.
+* `@supabase/supabase-js` unpinned (`^2.109.0`).
+
+**M19 IS NOT COMPLETE.** Nothing in this audit was observed on a device, and nothing was live-verified.
+
+---
+
+
+# MOBILE SPRINT M19-C — USER ISOLATION + HONEST CLOUD PERSISTENCE (CORRECTIVE PASS)
+
+**Date**: 2026-09-09/10. A corrective pass over M18/M19's cloud integration. No new features, no schema changes, no RLS changes, no Gemini calls, no Expo/Supabase/Metro version changes, no design changes. Expo SDK 54 (`expo ~54.0.37`), `@supabase/supabase-js ^2.109.0`, Metro, and the existing UI are all untouched.
+
+Evidence below is labelled strictly: **SOURCE VERIFIED** (read/changed the code), **TEST VERIFIED** (an automated regression test in `mobile/tests/` exercises the real shipping module and asserts the behaviour), **LIVE VERIFIED** (a real request against the live Supabase project), **DEVICE VERIFIED** (observed running on a simulator/physical device), **NOT TESTED**. A TypeScript pass, a bundle export, or a lint run is never treated as proof of runtime behaviour.
+
+---
+
+## 1. Delayed user-A reads completing after switching to user B — REPRODUCED AND FIXED
+
+**Root cause (SOURCE VERIFIED).** `authSession.ts`'s `userScopedKey(base)` read the module-level `currentUserId` *at the moment it was called*. Every one of the six user-scoped storage modules called it at the END of an async operation, after the Supabase round trip resolved. A read issued for user A that resolved after user B signed in therefore built its AsyncStorage key from **B's** id — writing A's garments/looks/events/profile into B's cache — and handed the same rows back to whatever React state was awaiting B's data. `App.tsx`'s `.then(setWardrobe)` / `.then(setUserProfile)` calls had no cancellation guard either, so a late resolution overwrote the newer user's state directly.
+
+**Fix (SOURCE VERIFIED).** Session-scope primitives added to `mobile/src/services/authSession.ts`:
+* `captureSession()` returns an immutable `{ userId, generation }` snapshot taken at operation start.
+* `sessionGeneration` advances **only on an actual account change** — a Supabase `TOKEN_REFRESHED` / repeated `INITIAL_SESSION` for the same user does not invalidate an in-flight read (deliberate: it would otherwise cause spurious blank screens). An A → B → A sequence *does* invalidate A's original scope, because it is genuinely a different session.
+* `isSessionCurrent(scope)` gates every commit point.
+* `userScopedKeyFor(userId, base)` builds keys from the **captured** id. `userScopedKey()` still exists for synchronous callers but is no longer used by any storage module.
+
+Applied across **all six** user-scoped modules — `wardrobeStorage`, `savedOutfitsStorage`, `plannerStorage`, `userProfileStorage`, `profileSettingsStorage`, `outfitHistoryStorage`. Every one now: captures the scope first, derives all keys and all `user_id` query filters from it, and refuses to write a cache entry, perform a cloud write, or return data once `isSessionCurrent()` is false (returning `[]` / `DEFAULT_USER_PROFILE` / `DEFAULT_SETTINGS` instead — a stale read yields nothing rather than the wrong user's data).
+
+**Mutations and profile changes are guarded too, not just reads** (SOURCE VERIFIED): `App.tsx`'s `handleGarmentAdded`, `handleGarmentRemoved`, `handleSaveOutfit`, `handleDeleteSavedOutfit`, `handleProfileChange`, `handleLayeringChange`, `handleOnboardingComplete` and `onUpdateUserProfile` all capture the session before awaiting and skip the `setState` if it changed. `saveProfileSettings` in particular returns `DEFAULT_SETTINGS` on a stale resolution, so a late Men/Women write can never reapply the previous account's wardrobe profile — which would then have driven the new user's wardrobe read. The two load effects and the wardrobe effect additionally use an effect-scoped `active` flag (`return () => { active = false; }`), which also covers the **stale-profile** case: a Men read resolving after the user switched to Women is dropped rather than rendered. `PlannerScreen`'s load effect got the same guard.
+
+**Demo initialization moved out of the awaited auth callback** (SOURCE VERIFIED): `applySession` in `App.tsx` was `async` and did `await seedDemoWardrobeIfNeeded()` *before* `setUserId(...)`. Awaiting Supabase calls inside an `onAuthStateChange` handler can deadlock the auth client's internal lock, and it also gated the entire UI on a network round trip. It is now a synchronous function that sets session state immediately and fires the (idempotent) seed alongside the normal per-user loads, session-guarded, refreshing the wardrobe only if the seed genuinely succeeded.
+
+**TEST VERIFIED** (`mobile/tests/userIsolation.test.ts`, 6 tests, all passing):
+* Session generation advances on a real change and not on a same-user re-emit; A → B → A is correctly treated as a new session.
+* A deferred user-A wardrobe read released after `setCurrentUserId(B)` returns `[]`, writes **no** cache entry under B's key (nor A's), and its query was scoped to A's id.
+* The same delayed A → B pattern is discarded by wardrobe, saved looks, planner, and outfit history, with `store.size === 0` asserted after each.
+* A delayed profile read does not return user A's name or `onboardingCompleted: true` to user B.
+* A stale preferences response cannot flip the new user to `women`/`usually`.
+* An in-flight preference **write** resolving after the switch does not land on B's key and is not returned into B's session (A's own key is still correctly written).
+
+**NOT TESTED**: the same scenario driven through the real React tree on a device (see Outstanding Native QA).
+
+---
+
+## 2. Failed-write semantics — CORRECTED
+
+**What was wrong (SOURCE VERIFIED).** Every failed cloud write across wardrobe, Saved Looks, Planner, profile and preferences showed `Alert.alert("You're offline", "… saved on this device and will sync when you're back online.")`. There is no sync queue, no reconnect listener, and no background job anywhere in this codebase — that message was a promise the app could not keep, and the local cache diverged from the account permanently and silently.
+
+**Fix (SOURCE VERIFIED).** New `mobile/src/services/cloudWriteFeedback.ts`. `runCloudWrite({ scope, title, message, run })` performs the write, and on failure surfaces an honest alert offering the only recovery mechanism that actually exists — retrying the same call now, through the same service. Bounded at 4 attempts. Every retry is session-guarded. Messages state plainly that the change is on this device only and **"does not upload later on its own."** No second persistence system was introduced; no caches were wiped; pre-existing local-only data is untouched (the old orphaned pre-M17 device-global keys remain orphaned, as before).
+
+**Rollback policy, chosen deliberately** (SOURCE VERIFIED):
+* **Creates** (garment add, look save, planner add) keep the local optimistic write on failure — rolling back would destroy the item the user just made. Honestly labelled unsynced instead.
+* **Edits and deletes** (planner update/delete, look delete, garment delete) are **reverted** to what the account actually holds, because the previous behaviour showed a deletion or edit that never happened and the item silently reappeared on the next load. Nothing the user authored is lost by reverting.
+* `saveUserGarment` now returns `{ items, cloudSynced, imageSynced }` instead of a bare array — the honest signal callers need. A metadata row that saves while its photo upload fails still gets its own distinct message.
+* `recordRecentOutfit` remains silent (background bookkeeping, not a user-initiated save) — unchanged by design.
+
+**TEST VERIFIED** (`mobile/tests/failedWrites.test.ts`, 11 tests, all passing): a failed garment save reports `cloudSynced: false`, keeps the item locally, alerts, and offers `['Not now', 'Try again']`; accepting the retry genuinely re-issues the insert (asserted by attempt count) and then reports `cloudSynced: true`; a failed photo upload still saves the row and reports `imageSynced: false` with a photo-specific message; failed saves for looks, planner events, user profile and preferences all alert; rejected planner edits/deletes and a rejected saved-look delete are rolled back to the stored state. Every test additionally asserts, over all alerts raised, that no message matches `/will sync|syncs? when|sync automatically|automatically sync/`. A repo-wide grep confirms the only remaining occurrence of that wording is the explanatory comment in `cloudWriteFeedback.ts`.
+
+**NOT TESTED**: the alert dialogs' actual appearance and button behaviour on a device.
+
+---
+
+## 3. Garment image deletion ordering + logout errors — FIXED
+
+**Image deletion (SOURCE VERIFIED + TEST VERIFIED).** `removeUserGarment` previously fired `storage.remove()` as an unawaited floating promise with `.catch(() => {})`, **unconditionally** — including when the database delete had just failed, orphaning a live row's photo. It now runs only after the DB delete is confirmed, only for non-seed items (seed/catalog rows never have an uploaded object), is awaited, and logs a specific warning if the object removal itself fails. Three tests cover this: no `remove` call at all when the DB delete is rejected (and the cache is reverted); exactly one `remove` with the correct `<userId>/<id>.jpg` path after a confirmed delete; and no `remove` attempt for a seed item.
+
+**Logout (SOURCE VERIFIED, NOT DEVICE VERIFIED).** `authService.signOut()` returned `Promise<void>` and discarded Supabase's error entirely; `App.tsx` awaited it and did nothing. A failed sign-out left the user signed in, with no `SIGNED_OUT` event and no feedback — tap Log Out, nothing happens. It now returns `{ ok, message? }` (mapped through the existing `mapAuthError`, wrapped in try/catch), and `handleLogout` alerts `"Couldn't log out"` with the reason and the explicit statement that the user is still signed in. `getCurrentSession()` failing on launch is also caught now and falls through to the Login screen rather than leaving the app on the blank session frame forever.
+
+---
+
+## 4. Post-onboarding wardrobe refresh — FIXED
+
+**Root cause (SOURCE VERIFIED).** `App.tsx` reloaded the wardrobe on `[userId, profile]` only. `OnboardingScreen` adds garments through its **own** local state, so when the user finished onboarding on **Men** — the default and the common path — neither dep changed, the parent never re-read, and the user landed on Today with an empty closet holding items they had just added. (Finishing on Women happened to work, purely because `profile` changed.)
+
+**Fix (SOURCE VERIFIED only — ⚠ corrected by the M19-C audit: this line originally said "+ TEST VERIFIED", which overclaimed. The App.tsx tests are source-regex wiring checks and the original "data half" test did not exercise the refresh at all; see the audit section above).** A `wardrobeRefreshKey` counter was added to the wardrobe effect's deps and is bumped by `handleOnboardingComplete` unconditionally, after the profile/layering/profile-data writes and the session guard. It is also bumped when a demo seed genuinely succeeds. `mobile/tests/onboardingRefresh.test.ts` asserts the wiring directly against `App.tsx` source (the effect's dep array, and that the onboarding handler bumps the key) and asserts the data half at runtime — a re-read with the profile unchanged at Men returns the garment onboarding saved.
+
+**Failed cloud saves no longer count as completed cloud wardrobe setup (SOURCE VERIFIED; the OnboardingScreen part is a source-wiring test only — ⚠ corrected by the M19-C audit; the `seedDemoWardrobeIfNeeded` boolean is genuinely behaviour-tested).** `OnboardingScreen` tracks `unsyncedIds` from `saveUserGarment(...).cloudSynced`; the tops/bottoms/outerwear/footwear/accessories counts that gate "Complete setup" are computed from the cloud-confirmed subset only. Items that failed to sync stay visible (the user's photo is not thrown away) but do not advance the gate, and the "can't finish yet" alert distinguishes "you haven't added enough" from "some of these never reached your account". `seedDemoWardrobeIfNeeded()` now returns a boolean rather than `void`, so a failed seed cannot be reported as a completed cloud wardrobe (both the failure and success cases are tested).
+
+---
+
+## 5. Regression tests — NEW
+
+`mobile/tests/` — **20 tests, 20 passing, 0 failing** at the time, run with `npm test` from `mobile/`. (⚠ Superseded: the M19-C audit strengthened and extended this to 35 — see the audit section above.)
+
+* `tests/helpers/installMocks.ts` intercepts `react-native` (Alert), AsyncStorage, and `./supabaseClient` via a `Module._load` patch. Nothing about the modules under test is stubbed or reimplemented — every assertion exercises the real shipping code path.
+* `tests/helpers/fakeSupabase.ts` mirrors the exact builder chains the storage modules use and records every table/storage call, so tests can assert on ordering (used for the image-cleanup test) and on query scoping.
+* **Zero Gemini quota spent.** Nothing in these tests touches `outfitStylist.ts` / `visionAnalysis.ts`; every failure under test is a mocked Supabase rejection.
+* Tooling: `tsconfig.test.json` compiles to CommonJS into `mobile/.test-build` (git-ignored), then Node 25's built-in `node --test` runs it. **No new dependency was added** — no Jest, no Babel config, no Metro change.
+
+---
+
+## 6. Verification run (this session)
+
+| Check | Command | Result |
+|---|---|---|
+| Mobile TypeScript | `npx tsc --noEmit` (in `mobile/`) | **PASS**, 0 errors |
+| Regression tests | `npm test` (in `mobile/`) | **PASS**, 20/20 |
+| iOS export | `npx expo export --platform ios` | **PASS** — 2579 modules, 4.72 MB bundle (was 2577 / 4.71 MB in M19; +2 modules = the new `cloudWriteFeedback.ts` and its pull-in) |
+| Android export | `npx expo export --platform android` | **PASS** — 2585 modules, 4.74 MB bundle |
+| Web build | `npm run build` (root) | **PASS** — 1824 modules, built in 646 ms |
+| Lint | `npm run lint` (root, oxlint) | **PASS** — **0 warnings, 0 errors** (M18/M19's two long-standing warnings are gone; one of them, an unused `Alert` import in `profileSettingsStorage.ts`, was a direct consequence of this sprint's changes and was cleaned up) |
+
+**NOT TESTED this session**: nothing was run on a simulator or physical device, and no request was made against the live Supabase project. No Gemini calls. No deployment, no EAS build, no auth-confirmation setting change, no user-data reset.
+
+---
+
+## 7. Outstanding native QA — M19 IS NOT COMPLETE UNTIL THIS IS OBSERVED
+
+**M19 must not be called complete on the strength of this session.** Everything above is source- and test-verified; the React/UI layer running on a real device is still unobserved. The following must be watched by a human on a simulator or device before M19 closes:
+
+1. Demo login → wardrobe renders → Save Look → Planner event → **Log out** → log in as a second account → confirm **none** of the demo account's wardrobe, looks, planner events, name or Men/Women preference appears — including if the second login happens quickly, while the first account's reads may still be in flight.
+2. Airplane mode: add a garment, save a look, add a planner event, change a preference — confirm each failure alert appears, says the change is device-only, offers **Try again**, and that accepting the retry after reconnecting actually saves.
+3. Delete a garment with airplane mode on — confirm it does **not** disappear and the "still there" message appears; then delete with connectivity and confirm it stays gone after a reload.
+4. Brand-new account → onboarding on **Men** → confirm the items added during onboarding are present on Today and Wardrobe immediately after finishing (this is the exact bug fixed in §4).
+5. Log Out with airplane mode on — confirm the "Couldn't log out" alert appears and the user remains signed in.
+6. Force-quit and reopen while signed in — confirm no Login flash (unobserved since M17).
+
+---
+
+## 8. Remaining follow-ups (recorded, NOT fixed this session)
+
+* **Signed-image expiry.** `wardrobeStorage.ts` mints signed garment-image URLs with a 1-hour TTL (`SIGNED_URL_TTL_SECONDS`), regenerated on each wardrobe load and never persisted. A session left in the foreground for more than an hour will show broken/placeholder images for user-uploaded garments until the next wardrobe reload, with no refresh path. Needs either a shorter-lived re-sign on render, an expiry-aware refresh, or public-with-RLS objects. **P1 for a long demo session.**
+* **Vision fallback labeling.** `visionAnalysis.ts` degrades to a local deterministic engine when `/api/ai/*` is unreachable. The UI does not distinguish a real Gemini vision result from that fallback, so a user can be shown fabricated-looking garment attributes presented as an AI scan. Needs an explicit "estimated offline" label. **P1 for demo honesty.**
+* **API timeouts.** The `fetch` calls in `visionAnalysis.ts` and `outfitStylist.ts` have no `AbortController` timeout — an unreachable-but-not-refusing host (the `PROD_UNCONFIGURED_URL` placeholder, or a stalled LAN connection) hangs the generation spinner indefinitely rather than failing over to the local engine. **P1.**
+* **Deployment configuration.** `mobile/src/config.ts`'s production fallback is still the deliberately unreachable `https://closiq-backend-not-yet-deployed.invalid`; `mobile/.env.local` points at a LAN IP that changes with the network; `eas.json`'s per-profile `env` has no real backend origin. No public backend is deployed. Any production/preview EAS build will have no working `/api/ai/*` and no seed/catalog garment images. **P0 before any real build — explicitly out of scope this session (no deploy, no EAS build performed).**
+* `mobile/AGENTS.md` instructs reading the Expo **v57** docs, while the project pins Expo SDK **54**. Nothing in this session touched an Expo API, so it made no difference here, but the mismatch should be resolved deliberately rather than discovered mid-upgrade.
+* `@supabase/supabase-js` remains unpinned (`^2.109.0`) — carried over from the previous session's note.
 
 ---
 

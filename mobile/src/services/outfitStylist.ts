@@ -1,7 +1,6 @@
 import { GarmentItem, GarmentCategory, LayeringPreference } from '../../../src/types/wardrobe';
-import { API_BASE_URL } from '../config';
 import { OutfitPersonalizationContext } from './personalizationContext';
-import { getAuthHeader } from './authService';
+import { postApi, describeApiFailure } from './apiRequest';
 
 export interface MobileOutfitResult {
   title: string;
@@ -27,7 +26,7 @@ export async function generateOutfitMobile(
   layeringPreference: LayeringPreference = 'avoid',
   excludeGarmentIds: string[] = [],
   personalization?: OutfitPersonalizationContext
-): Promise<{ ok: boolean; mode: 'gemini' | 'fallback'; data: MobileOutfitResult; error?: string }> {
+): Promise<{ ok: boolean; mode: 'gemini' | 'fallback'; data: MobileOutfitResult; error?: string; notice?: string }> {
   if (!wardrobe || wardrobe.length === 0) {
     return {
       ok: false,
@@ -59,62 +58,55 @@ export async function generateOutfitMobile(
     pairingNotes: item.pairingNotes || ''
   }));
 
-  const SERVER_URL = `${API_BASE_URL}/api/ai/generate-outfit`;
+  // Sprint M20: timed out, and the reason is carried to the caller. A 401
+  // (expired session), 429 (Gemini quota) or timeout still falls through to
+  // the local deterministic engine as before — but `notice` now tells the
+  // user why they're seeing the local engine instead of Gemini.
+  const result = await postApi('/api/ai/generate-outfit', {
+    prompt,
+    layeringPreference,
+    excludeGarmentIds,
+    wardrobe: formattedWardrobe,
+    // Undefined fields are dropped by JSON.stringify, so calling this
+    // function without a 5th argument (every pre-M15 call site) sends
+    // the exact same body as before — this is additive, not a breaking
+    // change to the request shape.
+    userProfileContext: personalization?.userProfileContext,
+    weatherContext: personalization?.weatherContext,
+    plannerContext: personalization?.plannerContext,
+    recentOutfitContext: personalization?.recentOutfitContext
+  });
 
-  try {
-    // Sprint M17: the server now requires a verified Supabase session on
-    // every /api/ai/* call (server/apiRouter.js). A 401 here just means
-    // `response.ok` is false below, same as any other non-2xx — it falls
-    // through to the local deterministic engine exactly like "server
-    // offline" already did. Nothing new to special-case.
-    const response = await fetch(SERVER_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', ...(await getAuthHeader()) },
-      body: JSON.stringify({
-        prompt,
-        layeringPreference,
-        excludeGarmentIds,
-        wardrobe: formattedWardrobe,
-        // Undefined fields are dropped by JSON.stringify, so calling this
-        // function without a 5th argument (every pre-M15 call site) sends
-        // the exact same body as before — this is additive, not a breaking
-        // change to the request shape.
-        userProfileContext: personalization?.userProfileContext,
-        weatherContext: personalization?.weatherContext,
-        plannerContext: personalization?.plannerContext,
-        recentOutfitContext: personalization?.recentOutfitContext
-      })
-    });
+  let notice: string | undefined;
+  if (result.ok) {
+    const resData = result.json as { mode?: string; data?: Record<string, any> };
+    if (resData.data && Array.isArray(resData.data.garmentIds)) {
+      // Validate returned IDs exist in closet
+      const validIds = resData.data.garmentIds.filter((id: string) =>
+        wardrobe.some((item) => item.id === id)
+      );
 
-    if (response.ok) {
-      const resData = await response.json();
-      if (resData.ok && resData.data && Array.isArray(resData.data.garmentIds)) {
-        // Validate returned IDs exist in closet
-        const validIds = resData.data.garmentIds.filter((id: string) =>
-          wardrobe.some((item) => item.id === id)
-        );
-
-        if (validIds.length > 0) {
-          return {
-            ok: true,
-            mode: resData.mode === 'gemini' ? 'gemini' : 'fallback',
-            data: {
-              title: resData.data.title || `${prompt} Outfit`,
-              vibe: resData.data.vibe || 'Smart Editorial',
-              styleScore: resData.data.styleScore || 88,
-              garmentIds: validIds,
-              explanation: {
-                summary: resData.data.explanation?.summary || 'Tailored to your active wardrobe and occasion needs.',
-                colorHarmony: resData.data.explanation?.colorHarmony,
-                occasionFit: resData.data.explanation?.occasionFit
-              }
+      if (validIds.length > 0) {
+        return {
+          ok: true,
+          mode: resData.mode === 'gemini' ? 'gemini' : 'fallback',
+          data: {
+            title: resData.data.title || `${prompt} Outfit`,
+            vibe: resData.data.vibe || 'Smart Editorial',
+            styleScore: resData.data.styleScore || 88,
+            garmentIds: validIds,
+            explanation: {
+              summary: resData.data.explanation?.summary || 'Tailored to your active wardrobe and occasion needs.',
+              colorHarmony: resData.data.explanation?.colorHarmony,
+              occasionFit: resData.data.explanation?.occasionFit
             }
-          };
-        }
+          }
+        };
       }
     }
-  } catch {
-    console.log('Mobile outfit endpoint note: server offline or unconfigured, using deterministic styling fallback');
+    notice = 'The AI returned no usable pieces from your wardrobe.';
+  } else {
+    notice = describeApiFailure(result.reason);
   }
 
   // Deterministic fallback filtering excluded items
@@ -137,6 +129,7 @@ export async function generateOutfitMobile(
   return {
     ok: true,
     mode: 'fallback',
+    notice: `${notice} Showing a simple pick from CLOSIQ's local engine instead.`,
     data: {
       title: `${prompt.charAt(0).toUpperCase() + prompt.slice(1)} Ensemble`,
       vibe: top.style || 'Elevated Everyday',
@@ -156,7 +149,7 @@ export async function swapGarmentMobile(
   targetCategory: GarmentCategory,
   prompt: string,
   wardrobe: GarmentItem[]
-): Promise<{ ok: boolean; mode: 'gemini' | 'fallback'; data: MobileSwapResult; error?: string }> {
+): Promise<{ ok: boolean; mode: 'gemini' | 'fallback'; data: MobileSwapResult; error?: string; notice?: string }> {
   const formattedWardrobe = wardrobe.map((item) => ({
     garmentId: item.id,
     name: item.name,
@@ -172,41 +165,35 @@ export async function swapGarmentMobile(
     pairingNotes: item.pairingNotes || ''
   }));
 
-  const SERVER_URL = `${API_BASE_URL}/api/ai/swap-garment`;
+  const result = await postApi('/api/ai/swap-garment', {
+    currentOutfitGarmentIds,
+    targetGarmentIdToSwap,
+    targetCategory,
+    prompt,
+    wardrobe: formattedWardrobe
+  });
 
-  try {
-    const response = await fetch(SERVER_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', ...(await getAuthHeader()) },
-      body: JSON.stringify({
-        currentOutfitGarmentIds,
-        targetGarmentIdToSwap,
-        targetCategory,
-        prompt,
-        wardrobe: formattedWardrobe
-      })
-    });
-
-    if (response.ok) {
-      const resData = await response.json();
-      if (resData.ok && resData.data && resData.data.replacementGarmentId) {
-        // Validate replacement exists in closet
-        const exists = wardrobe.some((item) => item.id === resData.data.replacementGarmentId);
-        if (exists && resData.data.replacementGarmentId !== targetGarmentIdToSwap) {
-          return {
-            ok: true,
-            mode: resData.mode === 'gemini' ? 'gemini' : 'fallback',
-            data: {
-              replacementGarmentId: resData.data.replacementGarmentId,
-              outfitTitle: resData.data.outfitName,
-              whyItWorks: resData.data.whyItWorks || 'Replaced piece with an alternative matching option from your wardrobe.'
-            }
-          };
-        }
+  let notice: string | undefined;
+  if (result.ok) {
+    const resData = result.json as { mode?: string; data?: Record<string, any> };
+    if (resData.data && resData.data.replacementGarmentId) {
+      // Validate replacement exists in closet
+      const exists = wardrobe.some((item) => item.id === resData.data!.replacementGarmentId);
+      if (exists && resData.data.replacementGarmentId !== targetGarmentIdToSwap) {
+        return {
+          ok: true,
+          mode: resData.mode === 'gemini' ? 'gemini' : 'fallback',
+          data: {
+            replacementGarmentId: resData.data.replacementGarmentId,
+            outfitTitle: resData.data.outfitName,
+            whyItWorks: resData.data.whyItWorks || 'Replaced piece with an alternative matching option from your wardrobe.'
+          }
+        };
       }
     }
-  } catch {
-    console.log('Mobile swap endpoint note: server offline or unconfigured, using fallback swap selection');
+    notice = 'The AI returned no usable replacement.';
+  } else {
+    notice = describeApiFailure(result.reason);
   }
 
   // Fallback swap algorithm: find alternative garment in same category
@@ -220,6 +207,7 @@ export async function swapGarmentMobile(
   return {
     ok: true,
     mode: 'fallback',
+    notice: `${notice} Swapped using CLOSIQ's local engine instead.`,
     data: {
       replacementGarmentId: replacement.id,
       whyItWorks: `Swapped to ${replacement.name} (${replacement.color}) for fresh visual contrast while maintaining occasion suitability.`

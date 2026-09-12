@@ -1,5 +1,10 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { userScopedKey, getCurrentUserId } from './authSession';
+import {
+  SessionScope,
+  captureSession,
+  isSessionCurrent,
+  userScopedKeyFor
+} from './authSession';
 import { supabase } from './supabaseClient';
 
 const BASE_STORAGE_KEY = '@closiq_recent_outfit_signatures';
@@ -13,9 +18,9 @@ export function buildOutfitSignature(garmentIds: string[]): string {
   return [...garmentIds].sort().join('|');
 }
 
-async function readCache(): Promise<string[]> {
+async function readCache(scope: SessionScope): Promise<string[]> {
   try {
-    const raw = await AsyncStorage.getItem(userScopedKey(BASE_STORAGE_KEY));
+    const raw = await AsyncStorage.getItem(userScopedKeyFor(scope.userId, BASE_STORAGE_KEY));
     if (!raw) return [];
     const parsed = JSON.parse(raw);
     return Array.isArray(parsed) ? parsed : [];
@@ -25,9 +30,9 @@ async function readCache(): Promise<string[]> {
   }
 }
 
-async function writeCache(signatures: string[]): Promise<void> {
+async function writeCache(scope: SessionScope, signatures: string[]): Promise<void> {
   try {
-    await AsyncStorage.setItem(userScopedKey(BASE_STORAGE_KEY), JSON.stringify(signatures));
+    await AsyncStorage.setItem(userScopedKeyFor(scope.userId, BASE_STORAGE_KEY), JSON.stringify(signatures));
   } catch (err) {
     console.warn('Failed to cache recent outfit history:', err);
   }
@@ -40,7 +45,9 @@ async function writeCache(signatures: string[]): Promise<void> {
  * not just a restart. AsyncStorage remains as a read cache.
  */
 export async function loadRecentOutfitSignatures(): Promise<string[]> {
-  const userId = getCurrentUserId();
+  // Session captured once, up front — see authSession.ts (Sprint M19).
+  const scope = captureSession();
+  const userId = scope.userId;
   if (!userId) return [];
 
   try {
@@ -52,11 +59,16 @@ export async function loadRecentOutfitSignatures(): Promise<string[]> {
       .limit(MAX_HISTORY);
     if (error) throw error;
     const signatures = (data || []).map((row) => row.signature);
-    await writeCache(signatures);
+    if (!isSessionCurrent(scope)) {
+      console.warn('Discarding outfit-history read that resolved after a session change.');
+      return [];
+    }
+    await writeCache(scope, signatures);
     return signatures;
   } catch (err) {
     console.warn('Cloud outfit-history fetch failed, falling back to local cache:', err);
-    return readCache();
+    const cached = await readCache(scope);
+    return isSessionCurrent(scope) ? cached : [];
   }
 }
 
@@ -71,14 +83,16 @@ export async function loadRecentOutfitSignatures(): Promise<string[]> {
 export async function recordRecentOutfit(garmentIds: string[]): Promise<void> {
   if (garmentIds.length === 0) return;
 
+  const scope = captureSession();
   const signature = buildOutfitSignature(garmentIds);
-  const existing = await readCache();
+  const existing = await readCache(scope);
   const withoutDuplicate = existing.filter((s) => s !== signature);
   const updated = [signature, ...withoutDuplicate].slice(0, MAX_HISTORY);
-  await writeCache(updated);
+  await writeCache(scope, updated);
 
-  const userId = getCurrentUserId();
+  const userId = scope.userId;
   if (!userId) return;
+  if (!isSessionCurrent(scope)) return;
 
   try {
     const nowIso = new Date().toISOString();

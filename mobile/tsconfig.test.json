@@ -1,0 +1,27 @@
+{
+  "compilerOptions": {
+    "strict": true,
+    "module": "commonjs",
+    "moduleResolution": "node10",
+    "target": "es2022",
+    "lib": [
+      "es2022",
+      "dom"
+    ],
+    "jsx": "react-jsx",
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "resolveJsonModule": true,
+    "outDir": ".test-build",
+    "rootDir": "..",
+    "skipLibCheck": true,
+    "types": [
+      "node",
+      "react"
+    ],
+    "ignoreDeprecations": "6.0"
+  },
+  "include": [
+    "tests/**/*.ts"
+  ]
+}

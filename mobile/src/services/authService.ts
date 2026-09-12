@@ -1,5 +1,7 @@
-import type { Session, AuthError } from '@supabase/supabase-js';
-import { supabase } from './supabaseClient';
+import { isAuthRetryableFetchError } from '@supabase/supabase-js';
+import type { Session } from '@supabase/supabase-js';
+import { supabase, supabaseConfigCheck } from './supabaseClient';
+import { classifyAuthError, AuthFailureKind } from './authErrors';
 
 /**
  * CLOSIQ Mobile — Authentication service (Sprint M17).
@@ -15,6 +17,35 @@ export interface AuthResult {
   /** Set on failure (human-readable), or on a success-without-session case
    *  (e.g. "check your email to confirm your account"). */
   message?: string;
+  /** Why it failed, for callers that need to react differently (2026-09-12). */
+  kind?: AuthFailureKind;
+}
+
+/**
+ * Login repair (2026-09-12): a build whose Supabase configuration is
+ * missing/placeholder/malformed must not attempt a request at all — the
+ * resulting network error would be reported as a connection problem when it
+ * is actually a build problem.
+ */
+function configFailure(): AuthResult | null {
+  if (supabaseConfigCheck.ok) return null;
+  return { ok: false, session: null, kind: 'config', message: supabaseConfigCheck.message };
+}
+
+/**
+ * supabase-js normally RETURNS errors, but its transport can also THROW
+ * (DNS failure, an aborted request, an unexpected runtime error). Every
+ * call below goes through this so a throw becomes an honest result instead
+ * of an unhandled rejection that leaves the UI spinning.
+ */
+async function attemptAuth(run: () => Promise<AuthResult>): Promise<AuthResult> {
+  try {
+    return await run();
+  } catch (err) {
+    const { kind, message } = classifyAuthError(err);
+    console.warn(`[CLOSIQ] Auth request threw (${kind})`);
+    return { ok: false, session: null, kind, message };
+  }
 }
 
 // The brief's literal demo credentials — what the user actually types.
@@ -26,24 +57,36 @@ export const DEMO_DISPLAY_PASSWORD = 'demo@123';
 const DEMO_BACKING_EMAIL = 'demo.account@closiq.app';
 const DEMO_BACKING_PASSWORD = 'demo@123';
 
-function mapAuthError(error: AuthError | { message?: string }): string {
-  const msg = error?.message || '';
-  if (/invalid login credentials/i.test(msg)) return 'Incorrect email or password.';
-  if (/already registered|already exists|user_already_exists/i.test(msg)) {
-    return 'An account with this email already exists. Try logging in instead.';
-  }
-  if (/password.*(at least|should be|characters)/i.test(msg)) return 'Password must be at least 6 characters.';
-  if (/invalid email|unable to validate email/i.test(msg)) return 'Enter a valid email address.';
-  if (/rate limit/i.test(msg)) return 'Too many attempts. Wait a moment and try again.';
-  if (/network|fetch|failed to fetch|timed? ?out/i.test(msg)) {
-    return 'Unable to connect. Check your internet connection and try again.';
-  }
-  return msg || 'Something went wrong. Please try again.';
-}
-
 export async function getCurrentSession(): Promise<Session | null> {
   const { data } = await supabase.auth.getSession();
   return data.session;
+}
+
+/**
+ * Startup session restore that can tell "signed out" apart from "couldn't
+ * refresh" (Sprint M20).
+ *
+ * When the stored access token has expired (1 hour) and the app cold-starts
+ * without a connection, auth-js's `getSession()` tries a refresh, fails
+ * with a retryable network error, and returns `session: null` — while
+ * KEEPING the stored session (only non-retryable failures discard it). The
+ * app used to render that as a plain Login screen, as if the user had been
+ * signed out. `restoreFailed` (true ONLY for that network case) lets the
+ * caller say what actually happened;
+ * the auto-refresh ticker then restores the session (emitting
+ * TOKEN_REFRESHED) as soon as the network is back.
+ */
+export async function restoreSession(): Promise<{ session: Session | null; restoreFailed: boolean }> {
+  try {
+    const { data, error } = await supabase.auth.getSession();
+    // ONLY a network (retryable) failure means the session is still stored.
+    // A revoked/invalid refresh token is a genuine sign-out — auth-js has
+    // already discarded it, and the Login screen is the correct, silent
+    // outcome there.
+    return { session: data.session, restoreFailed: !data.session && isAuthRetryableFetchError(error) };
+  } catch (err) {
+    return { session: null, restoreFailed: isAuthRetryableFetchError(err) };
+  }
 }
 
 /** Returns an unsubscribe function. */
@@ -58,15 +101,31 @@ export async function signIn(email: string, password: string): Promise<AuthResul
     return signInDemo();
   }
 
-  const { data, error } = await supabase.auth.signInWithPassword({ email: trimmedEmail, password });
-  if (error) return { ok: false, session: null, message: mapAuthError(error) };
-  return { ok: true, session: data.session };
+  const configProblem = configFailure();
+  if (configProblem) return configProblem;
+
+  return attemptAuth(async () => {
+    const { data, error } = await supabase.auth.signInWithPassword({ email: trimmedEmail, password });
+    if (error) {
+      const { kind, message } = classifyAuthError(error);
+      return { ok: false, session: null, kind, message };
+    }
+    return { ok: true, session: data.session };
+  });
 }
 
 export async function signUp(email: string, password: string): Promise<AuthResult> {
   const trimmedEmail = email.trim();
+
+  const configProblem = configFailure();
+  if (configProblem) return configProblem;
+
+  return attemptAuth(async () => {
   const { data, error } = await supabase.auth.signUp({ email: trimmedEmail, password });
-  if (error) return { ok: false, session: null, message: mapAuthError(error) };
+  if (error) {
+    const { kind, message } = classifyAuthError(error);
+    return { ok: false, session: null, kind, message };
+  }
 
   if (!data.session) {
     // Common when the Supabase project has "Confirm email" enabled — the
@@ -78,6 +137,7 @@ export async function signUp(email: string, password: string): Promise<AuthResul
     };
   }
   return { ok: true, session: data.session };
+  });
 }
 
 /**
@@ -87,46 +147,53 @@ export async function signUp(email: string, password: string): Promise<AuthResul
  * happens separately, keyed off `isDemoUser()`, once a session exists.
  */
 export async function signInDemo(): Promise<AuthResult> {
-  const signInAttempt = await supabase.auth.signInWithPassword({
-    email: DEMO_BACKING_EMAIL,
-    password: DEMO_BACKING_PASSWORD
-  });
-  if (!signInAttempt.error) {
-    return { ok: true, session: signInAttempt.data.session };
-  }
+  const configProblem = configFailure();
+  if (configProblem) return configProblem;
 
-  const signUpAttempt = await supabase.auth.signUp({
-    email: DEMO_BACKING_EMAIL,
-    password: DEMO_BACKING_PASSWORD
-  });
-  if (signUpAttempt.error) {
-    return { ok: false, session: null, message: mapAuthError(signUpAttempt.error) };
-  }
-  if (signUpAttempt.data.session) {
-    return { ok: true, session: signUpAttempt.data.session };
-  }
+  return attemptAuth(async () => {
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email: DEMO_BACKING_EMAIL,
+      password: DEMO_BACKING_PASSWORD
+    });
 
-  // Signed up but no session (email confirmation required project-wide) —
-  // one more sign-in attempt in case confirmation doesn't apply here for
-  // some other reason; otherwise surface a clear, actionable message.
-  const retry = await supabase.auth.signInWithPassword({
-    email: DEMO_BACKING_EMAIL,
-    password: DEMO_BACKING_PASSWORD
-  });
-  if (!retry.error) {
-    return { ok: true, session: retry.data.session };
-  }
+    if (!error) return { ok: true, session: data.session };
 
-  return {
-    ok: false,
-    session: null,
-    message:
-      'The demo account needs email confirmation disabled on this Supabase project (Authentication > Providers > Email > "Confirm email") to sign in automatically.'
-  };
+    const classified = classifyAuthError(error);
+
+    // Login repair (2026-09-12): this used to fall back to `signUp()` (and
+    // then a second sign-in) whenever sign-in failed. That is wrong twice
+    // over: a transport failure like DNS is not "the account is missing",
+    // and creating accounts is never a demo button's job — it silently
+    // provisioned a shared account, and against a reachable-but-wrong
+    // project it would create an account there. Demo now ONLY signs in.
+    if (classified.kind === 'invalid_credentials') {
+      return {
+        ok: false,
+        session: null,
+        kind: 'demo_missing',
+        message:
+          "The demo account isn't set up on this project. CLOSIQ won't create it automatically — ask the team to provision it, or log in with your own account."
+      };
+    }
+
+    return { ok: false, session: null, kind: classified.kind, message: classified.message };
+  });
 }
 
-export async function signOut(): Promise<void> {
-  await supabase.auth.signOut();
+export async function signOut(): Promise<{ ok: boolean; message?: string }> {
+  try {
+    const { error } = await supabase.auth.signOut();
+    if (error) {
+      const classified = classifyAuthError(error);
+      console.warn(`[CLOSIQ] Sign-out failed (${classified.kind})`);
+      return { ok: false, message: classified.message };
+    }
+    return { ok: true };
+  } catch (err) {
+    const classified = classifyAuthError(err);
+    console.warn(`[CLOSIQ] Sign-out threw (${classified.kind})`);
+    return { ok: false, message: classified.message };
+  }
 }
 
 export function isDemoUser(email?: string | null): boolean {
