@@ -3,6 +3,7 @@ import {
   handleGenerateOutfitServer,
   handleSwapGarmentServer
 } from './geminiServer.js';
+import { handleStudioPhotoServer } from './studioPhoto.js';
 import { getAuthenticatedUserId } from './authVerify.js';
 
 /**
@@ -16,7 +17,8 @@ import { getAuthenticatedUserId } from './authVerify.js';
 const ROUTES = {
   '/api/ai/analyze-garment': handleAnalyzeGarmentServer,
   '/api/ai/generate-outfit': handleGenerateOutfitServer,
-  '/api/ai/swap-garment': handleSwapGarmentServer
+  '/api/ai/swap-garment': handleSwapGarmentServer,
+  '/api/ai/studio-photo': handleStudioPhotoServer
 };
 
 function readJsonBody(req) {

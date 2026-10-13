@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import {
   StyleSheet,
   View,
@@ -20,6 +20,7 @@ import { analyzeGarmentImageMobile, VisionAnalysisResult } from '../services/vis
 import { optimizeGarmentImage } from '../services/imageOptimizer';
 import { StorageLocationPicker } from './StorageLocationPicker';
 import { SizePicker } from './SizePicker';
+import { makeStudioPhotoMobile } from '../services/studioPhoto';
 
 const { width } = Dimensions.get('window');
 
@@ -80,6 +81,14 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({
   const [manualFormality, setManualFormality] = useState<FormalityLevel>('casual');
   const [storageLocation, setStorageLocation] = useState<string | undefined>(undefined);
   const [size, setSize] = useState<string | undefined>(undefined);
+  // White-background "studio" version, made in parallel with the AI scan.
+  // The user picks which photo to save; the original is always available.
+  const [studioUri, setStudioUri] = useState<string | null>(null);
+  const [studioStatus, setStudioStatus] = useState<'idle' | 'loading' | 'ready' | 'failed'>('idle');
+  const [useStudio, setUseStudio] = useState(true);
+  // Bumped on every new photo/reset so a late studio result for an older
+  // photo is ignored.
+  const studioRunRef = useRef(0);
 
   const resetState = () => {
     setStep('choose');
@@ -93,6 +102,10 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({
     setManualFormality('casual');
     setStorageLocation(undefined);
     setSize(undefined);
+    studioRunRef.current += 1;
+    setStudioUri(null);
+    setStudioStatus('idle');
+    setUseStudio(true);
   };
 
   const handleClose = () => {
@@ -163,6 +176,15 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({
     }
 
     setStep('analyzing');
+    if (studioStatus !== 'ready') {
+      const run = ++studioRunRef.current;
+      setStudioStatus('loading');
+      makeStudioPhotoMobile(base64Data).then((uri) => {
+        if (studioRunRef.current !== run) return;
+        setStudioUri(uri);
+        setStudioStatus(uri ? 'ready' : 'failed');
+      });
+    }
     const result = await analyzeGarmentImageMobile(base64Data, 'image/jpeg', selectedCategory);
     if (!result.ok) {
       setAnalysisResult(null);
@@ -175,6 +197,46 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({
     setAnalysisResult(result.data);
     setEditedCategory(result.data.category);
     setStep('confirm');
+  };
+
+  // The photo that gets saved: the studio version only once it exists and
+  // the user hasn't switched back to the original.
+  const chosenImageUri = useStudio && studioStatus === 'ready' && studioUri ? studioUri : imageUri;
+
+  const renderPhotoChoice = () => {
+    if (!imageUri || studioStatus === 'idle') return null;
+    const studioSelected = useStudio && studioStatus === 'ready';
+    return (
+      <View style={styles.photoChoiceRow}>
+        <TouchableOpacity
+          style={[styles.photoChoice, !studioSelected && styles.photoChoiceSelected]}
+          onPress={() => setUseStudio(false)}
+          accessibilityLabel="Use original photo"
+        >
+          <Image source={{ uri: imageUri }} style={styles.photoChoiceImg} />
+          <Text style={[styles.photoChoiceLabel, !studioSelected && styles.photoChoiceLabelSelected]}>Original</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.photoChoice, studioSelected && styles.photoChoiceSelected]}
+          onPress={() => setUseStudio(true)}
+          disabled={studioStatus !== 'ready'}
+          accessibilityLabel="Use studio photo with white background"
+        >
+          {studioStatus === 'ready' && studioUri ? (
+            <Image source={{ uri: studioUri }} style={styles.photoChoiceImg} />
+          ) : (
+            <View style={[styles.photoChoiceImg, styles.photoChoicePlaceholder]}>
+              {studioStatus === 'loading' ? (
+                <ActivityIndicator color={COLORS.primary} />
+              ) : (
+                <Text style={styles.photoChoiceNote}>Couldn't make a studio photo</Text>
+              )}
+            </View>
+          )}
+          <Text style={[styles.photoChoiceLabel, studioSelected && styles.photoChoiceLabelSelected]}>Studio</Text>
+        </TouchableOpacity>
+      </View>
+    );
   };
 
   const handleAddManual = () => {
@@ -193,10 +255,10 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({
       fabric: 'Unspecified',
       formality: manualFormality,
       seasons: ['spring', 'summer', 'autumn', 'winter'],
-      imageUrl: imageUri,
       favorite: false,
       wearCount: 0,
       dateAdded: new Date().toISOString().split('T')[0],
+      imageUrl: chosenImageUri || imageUri,
       tags: ['Manual Entry'],
       storageLocation,
       size
@@ -222,7 +284,7 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({
       layeringRole: analysisResult.layeringRole,
       style: analysisResult.style || undefined,
       seasons: ['spring', 'summer', 'autumn', 'winter'],
-      imageUrl: imageUri,
+      imageUrl: chosenImageUri || imageUri,
       favorite: false,
       wearCount: 0,
       dateAdded: new Date().toISOString().split('T')[0],
@@ -363,9 +425,11 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({
                 </View>
               </View>
 
+              {renderPhotoChoice()}
+
               <View style={styles.confirmHeader}>
                 <View style={styles.thumbnailBox}>
-                  {imageUri && <Image source={{ uri: imageUri }} style={styles.thumbnailImg} />}
+                  {chosenImageUri && <Image source={{ uri: chosenImageUri }} style={styles.thumbnailImg} />}
                 </View>
                 <TextInput
                   style={styles.manualInput}
@@ -449,9 +513,11 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({
           {/* STEP 4: CONFIRMATION & EDIT METADATA */}
           {step === 'confirm' && analysisResult && (
             <ScrollView style={{ maxHeight: 420 }} showsVerticalScrollIndicator={false}>
+              {renderPhotoChoice()}
+
               <View style={styles.confirmHeader}>
                 <View style={styles.thumbnailBox}>
-                  {imageUri && <Image source={{ uri: imageUri }} style={styles.thumbnailImg} />}
+                  {chosenImageUri && <Image source={{ uri: chosenImageUri }} style={styles.thumbnailImg} />}
                 </View>
                 <View style={{ flex: 1 }}>
                   <Text style={styles.resultCategory}>{editedCategory.toUpperCase()}</Text>
@@ -537,6 +603,49 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({
 };
 
 const styles = StyleSheet.create({
+  photoChoiceRow: {
+    flexDirection: 'row',
+    gap: 12,
+    marginBottom: 14
+  },
+  photoChoice: {
+    flex: 1,
+    borderRadius: RADIUS.md,
+    borderWidth: 2,
+    borderColor: COLORS.border,
+    padding: 6,
+    alignItems: 'center',
+    backgroundColor: COLORS.bg
+  },
+  photoChoiceSelected: {
+    borderColor: COLORS.primary
+  },
+  photoChoiceImg: {
+    width: '100%',
+    aspectRatio: 1,
+    borderRadius: RADIUS.sm,
+    backgroundColor: '#FFFFFF'
+  },
+  photoChoicePlaceholder: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 8
+  },
+  photoChoiceNote: {
+    fontSize: 11,
+    color: COLORS.textMuted,
+    textAlign: 'center'
+  },
+  photoChoiceLabel: {
+    marginTop: 6,
+    fontSize: 12,
+    fontWeight: '600',
+    color: COLORS.textSecondary
+  },
+  photoChoiceLabelSelected: {
+    color: COLORS.primary,
+    fontWeight: '800'
+  },
   placeField: {
     gap: 16,
     marginTop: 4,
