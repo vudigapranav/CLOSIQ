@@ -2,14 +2,19 @@ import React, { useEffect, useState } from 'react';
 import { X, Camera, Upload, Sparkles, Check, AlertTriangle } from 'lucide-react';
 import { GarmentItem, GarmentCategory, FormalityLevel, LayeringRole, WardrobeProfile } from '../../types/wardrobe';
 import { getQuickAddSamples, CatalogEntry } from '../../data/garmentCatalog';
+import { normalizeSize } from '../../data/garmentSizes';
 import { analyzeCatalogGarment, VisionAnalysisResult } from '../../services/aiVisionScanner';
 import { analyzeGarmentImageWithGemini } from '../../services/ai';
 import { GarmentImage } from '../ui/GarmentImage';
 import { PrimaryButton } from '../ui/PrimaryButton';
 import { CategoryChip } from '../ui/CategoryChip';
+import { StorageLocationField } from '../ui/StorageLocationField';
+import { SizeField } from '../ui/SizeField';
 
 interface AddItemModalProps {
   wardrobeProfile: WardrobeProfile;
+  /** Custom places already used in this wardrobe, offered in the place picker. */
+  customPlaces?: string[];
   onClose: () => void;
   onAddGarment: (item: GarmentItem) => void;
 }
@@ -41,7 +46,7 @@ const UPLOAD_CATEGORY_OPTIONS: { key: GarmentCategory; label: string }[] = [
   { key: 'accessories', label: 'Accessories' }
 ];
 
-export const AddItemModal: React.FC<AddItemModalProps> = ({ wardrobeProfile, onClose, onAddGarment }) => {
+export const AddItemModal: React.FC<AddItemModalProps> = ({ wardrobeProfile, customPlaces = [], onClose, onAddGarment }) => {
   const quickAddSamples = getQuickAddSamples(wardrobeProfile);
 
   const [step, setStep] = useState<Step>('options');
@@ -61,6 +66,8 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({ wardrobeProfile, onC
   const [tags, setTags] = useState<string[]>([]);
   const [pairingNotes, setPairingNotes] = useState('');
   const [aiConfidence, setAiConfidence] = useState(0.95);
+  const [storageLocation, setStorageLocation] = useState<string | undefined>(undefined);
+  const [size, setSize] = useState<string | undefined>(undefined);
   const [errorMessage, setErrorMessage] = useState('');
 
   useEffect(() => {
@@ -149,7 +156,9 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({ wardrobeProfile, onC
       dateAdded: new Date().toISOString().split('T')[0],
       tags,
       aiConfidence,
-      pairingNotes
+      pairingNotes,
+      storageLocation,
+      size: normalizeSize(size)
       // Deliberately no `profile`/`isSeedItem` — user-added items always
       // stay visible regardless of which wardrobe profile is active later.
     };
@@ -436,6 +445,10 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({ wardrobeProfile, onC
                   />
                 </div>
               </div>
+
+              <SizeField category={category} value={size} onChange={setSize} />
+
+              <StorageLocationField value={storageLocation} onChange={setStorageLocation} customPlaces={customPlaces} />
             </div>
 
             <button

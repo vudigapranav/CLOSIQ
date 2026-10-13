@@ -18,6 +18,8 @@ import { COLORS, RADIUS } from '../theme';
 import { GarmentItem, GarmentCategory, WardrobeProfile, FormalityLevel } from '../../../src/types/wardrobe';
 import { analyzeGarmentImageMobile, VisionAnalysisResult } from '../services/visionAnalysis';
 import { optimizeGarmentImage } from '../services/imageOptimizer';
+import { StorageLocationPicker } from './StorageLocationPicker';
+import { SizePicker } from './SizePicker';
 
 const { width } = Dimensions.get('window');
 
@@ -32,6 +34,8 @@ const CATEGORY_HINTS: { key: GarmentCategory; label: string }[] = [
 interface AddItemModalProps {
   visible: boolean;
   profile: WardrobeProfile;
+  /** Custom places already used in this wardrobe, offered in the place picker. */
+  customPlaces?: string[];
   onClose: () => void;
   onGarmentAdded: (garment: GarmentItem) => void;
 }
@@ -51,6 +55,7 @@ type ModalStep = 'choose' | 'preview' | 'analyzing' | 'confirm' | 'manual';
 export const AddItemModal: React.FC<AddItemModalProps> = ({
   visible,
   profile: _profile,
+  customPlaces = [],
   onClose,
   onGarmentAdded
 }) => {
@@ -73,6 +78,8 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({
   const [manualName, setManualName] = useState('');
   const [manualColor, setManualColor] = useState('');
   const [manualFormality, setManualFormality] = useState<FormalityLevel>('casual');
+  const [storageLocation, setStorageLocation] = useState<string | undefined>(undefined);
+  const [size, setSize] = useState<string | undefined>(undefined);
 
   const resetState = () => {
     setStep('choose');
@@ -84,6 +91,8 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({
     setManualName('');
     setManualColor('');
     setManualFormality('casual');
+    setStorageLocation(undefined);
+    setSize(undefined);
   };
 
   const handleClose = () => {
@@ -188,7 +197,9 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({
       favorite: false,
       wearCount: 0,
       dateAdded: new Date().toISOString().split('T')[0],
-      tags: ['Manual Entry']
+      tags: ['Manual Entry'],
+      storageLocation,
+      size
     };
     onGarmentAdded(newGarment);
     handleClose();
@@ -217,7 +228,9 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({
       dateAdded: new Date().toISOString().split('T')[0],
       tags: analysisResult.tags,
       aiConfidence: analysisResult.aiConfidence,
-      pairingNotes: analysisResult.pairingNotes || undefined
+      pairingNotes: analysisResult.pairingNotes || undefined,
+      storageLocation,
+      size
     };
 
     onGarmentAdded(newGarment);
@@ -410,6 +423,11 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({
                 })}
               </View>
 
+              <View style={styles.placeField}>
+                <SizePicker key={editedCategory} category={editedCategory} value={size} onChange={setSize} />
+                <StorageLocationPicker value={storageLocation} onChange={setStorageLocation} customPlaces={customPlaces} />
+              </View>
+
               <View style={styles.actionRow}>
                 <TouchableOpacity style={styles.cancelBtn} onPress={handleStartAnalysis}>
                   <RefreshCw size={14} color={COLORS.textSecondary} style={{ marginRight: 6 }} />
@@ -494,6 +512,11 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({
                 </View>
               )}
 
+              <View style={styles.placeField}>
+                <SizePicker key={editedCategory} category={editedCategory} value={size} onChange={setSize} />
+                <StorageLocationPicker value={storageLocation} onChange={setStorageLocation} customPlaces={customPlaces} />
+              </View>
+
               {/* Confirm Actions */}
               <View style={styles.actionRow}>
                 <TouchableOpacity style={styles.cancelBtn} onPress={resetState}>
@@ -514,6 +537,11 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({
 };
 
 const styles = StyleSheet.create({
+  placeField: {
+    gap: 16,
+    marginTop: 4,
+    marginBottom: 16
+  },
   backdrop: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.55)',

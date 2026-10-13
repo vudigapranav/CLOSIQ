@@ -24,11 +24,17 @@ import { PlannerScreen } from './src/screens/PlannerScreen';
 import { ProfileScreen } from './src/screens/ProfileScreen';
 import { OnboardingScreen, OnboardingResult } from './src/screens/OnboardingScreen';
 import { LoginScreen } from './src/screens/LoginScreen';
-import { WardrobeProfile, LayeringPreference, Outfit, GarmentItem } from '../src/types/wardrobe';
+import { WardrobeProfile, LayeringPreference, Outfit, GarmentItem, GarmentDetailsPatch } from '../src/types/wardrobe';
 import { loadProfileSettings, saveProfileSettings } from './src/services/profileSettingsStorage';
 import { recordRecentOutfit } from './src/services/outfitHistoryStorage';
 import { loadUserProfile, saveUserProfile } from './src/services/userProfileStorage';
-import { loadUserWardrobe, saveUserGarment, removeUserGarment, seedDemoWardrobeIfNeeded } from './src/services/wardrobeStorage';
+import {
+  loadUserWardrobe,
+  saveUserGarment,
+  removeUserGarment,
+  updateUserGarmentDetails,
+  seedDemoWardrobeIfNeeded
+} from './src/services/wardrobeStorage';
 import { loadSavedOutfits, saveOutfitToStorage, removeSavedOutfitFromStorage } from './src/services/savedOutfitsStorage';
 import { restoreSession, onAuthStateChange, signOut, isDemoUser } from './src/services/authService';
 import { setCurrentUserId, captureSession, isSessionCurrent } from './src/services/authSession';
@@ -231,6 +237,15 @@ function AppContent() {
     if (isSessionCurrent(scope)) setWardrobe(updated);
   };
 
+  const handleGarmentDetailsChanged = async (id: string, patch: GarmentDetailsPatch) => {
+    const scope = captureSession();
+    // Show the edit immediately; the stored result (rolled back on a failed
+    // cloud write) replaces it when the write settles.
+    setWardrobe((prev) => prev.map((g) => (g.id === id ? { ...g, ...patch } : g)));
+    const updated = await updateUserGarmentDetails(id, profile, patch);
+    if (isSessionCurrent(scope)) setWardrobe(updated);
+  };
+
   const handleSaveOutfit = async (outfit: Outfit): Promise<Outfit[]> => {
     const scope = captureSession();
     const updated = await saveOutfitToStorage(outfit);
@@ -408,6 +423,7 @@ function AppContent() {
             wardrobe={wardrobe}
             onGarmentAdded={handleGarmentAdded}
             onGarmentRemoved={handleGarmentRemoved}
+            onGarmentDetailsChanged={handleGarmentDetailsChanged}
           />
         )}
         {activeTab === 'planner' && (

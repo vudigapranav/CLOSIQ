@@ -45,7 +45,16 @@ export interface GarmentItem {
   /** True only for items auto-populated at onboarding/profile-switch time —
    *  distinguishes the swappable starter set from deliberate user additions. */
   isSeedItem?: boolean;
+  /** Where this piece is kept at home — a preset from
+   *  `src/data/storageLocations.ts` or the user's own custom place. */
+  storageLocation?: string;
+  /** Size as the user entered it — a preset from `src/data/garmentSizes.ts`
+   *  (e.g. "M", "40", "UK 8", "Free size") or free text. */
+  size?: string;
 }
+
+/** The fields a user can edit on an item after it's saved. */
+export type GarmentDetailsPatch = Partial<Pick<GarmentItem, 'storageLocation' | 'size'>>;
 
 export interface OutfitExplanation {
   summary: string;

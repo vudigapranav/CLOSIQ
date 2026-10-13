@@ -1,6 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Alert } from 'react-native';
-import { GarmentItem, WardrobeProfile } from '../../../src/types/wardrobe';
+import { GarmentItem, GarmentDetailsPatch, WardrobeProfile } from '../../../src/types/wardrobe';
 import { getProfileSeedWardrobe } from '../../../src/data/garmentCatalog';
 import {
   SessionScope,
@@ -18,6 +18,8 @@ import {
   storageReferenceUrl
 } from './garmentImages';
 import type { Tables } from '../types/supabase';
+import { normalizeStorageLocation } from '../../../src/data/storageLocations';
+import { normalizeSize } from '../../../src/data/garmentSizes';
 
 const BASE_STORAGE_KEYS: Record<WardrobeProfile, string> = {
   men: '@closiq_user_wardrobe_men',
@@ -82,7 +84,9 @@ function rowToGarment(row: Tables<'garments'>): GarmentItem {
     style: row.style || undefined,
     layeringRole: (row.layering_role as GarmentItem['layeringRole']) || undefined,
     profile: (row.source_profile as WardrobeProfile) || undefined,
-    isSeedItem: row.is_seed_item
+    isSeedItem: row.is_seed_item,
+    storageLocation: row.storage_location || undefined,
+    size: row.size || undefined
   };
 }
 
@@ -275,7 +279,9 @@ export async function saveUserGarment(
         style: item.style || null,
         layering_role: item.layeringRole || null,
         source_profile: item.profile || null,
-        is_seed_item: item.isSeedItem || false
+        is_seed_item: item.isSeedItem || false,
+        storage_location: normalizeStorageLocation(item.storageLocation) ?? null,
+        size: normalizeSize(item.size) ?? null
       });
       if (error) throw error;
     }
@@ -360,6 +366,59 @@ export async function removeUserGarment(
     }
   }
 
+  return updated;
+}
+
+/**
+ * Edits the user-editable details of a saved garment (size, where it's
+ * kept). Optimistic like the other mutations: the cache updates first; if
+ * the cloud write fails the cache is rolled back, so the app never shows a
+ * value the account doesn't have.
+ */
+export async function updateUserGarmentDetails(
+  id: string,
+  profile: WardrobeProfile,
+  patch: GarmentDetailsPatch
+): Promise<GarmentItem[]> {
+  const scope = captureSession();
+  const userId = scope.userId;
+  const clean: GarmentDetailsPatch = {};
+  const row: { storage_location?: string | null; size?: string | null } = {};
+  if ('storageLocation' in patch) {
+    clean.storageLocation = normalizeStorageLocation(patch.storageLocation);
+    row.storage_location = clean.storageLocation ?? null;
+  }
+  if ('size' in patch) {
+    clean.size = normalizeSize(patch.size);
+    row.size = clean.size ?? null;
+  }
+
+  const existingCache = await loadCachedWardrobe(scope, profile);
+  const updated = existingCache.map((item) => (item.id === id ? { ...item, ...clean } : item));
+  await AsyncStorage.setItem(storageKey(scope, profile), JSON.stringify(updated));
+
+  if (!userId) return updated;
+
+  const cloudUpdated = await runCloudWrite({
+    scope,
+    title: 'Change not saved',
+    message: "We couldn't save this change to your account. Try again in a moment.",
+    run: async () => {
+      const { error } = await supabase
+        .from('garments')
+        .update(row)
+        .eq('user_id', userId)
+        .eq('garment_id', id)
+        .eq('wardrobe_profile', profile);
+      if (error) throw error;
+    }
+  });
+
+  if (!isSessionCurrent(scope)) return [];
+  if (!cloudUpdated) {
+    await AsyncStorage.setItem(storageKey(scope, profile), JSON.stringify(existingCache));
+    return existingCache;
+  }
   return updated;
 }
 

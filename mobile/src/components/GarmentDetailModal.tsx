@@ -9,19 +9,26 @@ import {
 } from 'react-native';
 import { X, Trash2, Sparkles, Shirt } from 'lucide-react-native';
 import { COLORS, RADIUS } from '../theme';
-import { GarmentItem } from '../../../src/types/wardrobe';
+import { GarmentItem, GarmentDetailsPatch } from '../../../src/types/wardrobe';
 import { GarmentImage } from './GarmentImage';
+import { StorageLocationPicker } from './StorageLocationPicker';
+import { SizePicker } from './SizePicker';
 
 interface GarmentDetailModalProps {
   item: GarmentItem | null;
   onClose: () => void;
   onRemove: (id: string) => void;
+  /** Persists an edited size / "where is it kept" place for this item. */
+  onUpdateItem: (id: string, patch: GarmentDetailsPatch) => void;
+  customPlaces?: string[];
 }
 
 export const GarmentDetailModal: React.FC<GarmentDetailModalProps> = ({
   item,
   onClose,
-  onRemove
+  onRemove,
+  onUpdateItem,
+  customPlaces = []
 }) => {
   if (!item) return null;
 
@@ -84,6 +91,16 @@ export const GarmentDetailModal: React.FC<GarmentDetailModalProps> = ({
                 <Text style={styles.attrLabel}>Fit</Text>
                 <Text style={styles.attrVal}>{item.fit || 'Regular'}</Text>
               </View>
+            </View>
+
+            {/* Size and where it's kept */}
+            <View key={item.id} style={styles.placeSection}>
+              <SizePicker category={item.category} value={item.size} onChange={(size) => onUpdateItem(item.id, { size })} />
+              <StorageLocationPicker
+                value={item.storageLocation}
+                customPlaces={customPlaces}
+                onChange={(storageLocation) => onUpdateItem(item.id, { storageLocation })}
+              />
             </View>
 
             {/* Pairing Notes */}
@@ -217,6 +234,10 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: COLORS.textPrimary,
     textTransform: 'capitalize'
+  },
+  placeSection: {
+    gap: 16,
+    marginBottom: 16
   },
   noteBox: {
     backgroundColor: COLORS.surfaceSubtle,

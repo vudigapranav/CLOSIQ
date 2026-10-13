@@ -8,12 +8,13 @@ import {
   Dimensions,
   FlatList
 } from 'react-native';
-import { Shirt, Plus } from 'lucide-react-native';
+import { Shirt, Plus, MapPin } from 'lucide-react-native';
 import { COLORS, RADIUS } from '../theme';
-import { GarmentItem, WardrobeProfile } from '../../../src/types/wardrobe';
+import { GarmentItem, GarmentDetailsPatch, WardrobeProfile } from '../../../src/types/wardrobe';
 import { AddItemModal } from '../components/AddItemModal';
 import { GarmentDetailModal } from '../components/GarmentDetailModal';
 import { GarmentImage } from '../components/GarmentImage';
+import { customStorageLocations, usedStorageLocations } from '../../../src/data/storageLocations';
 
 const { width } = Dimensions.get('window');
 
@@ -31,6 +32,7 @@ interface CollectionScreenProps {
   wardrobe: GarmentItem[];
   onGarmentAdded: (garment: GarmentItem) => void;
   onGarmentRemoved: (id: string) => void;
+  onGarmentDetailsChanged: (id: string, patch: GarmentDetailsPatch) => void;
 }
 
 interface GarmentCardProps {
@@ -72,23 +74,39 @@ export const CollectionScreen: React.FC<CollectionScreenProps> = ({
   profile,
   wardrobe,
   onGarmentAdded,
-  onGarmentRemoved
+  onGarmentRemoved,
+  onGarmentDetailsChanged
 }) => {
   const [selectedCategory, setSelectedCategory] = useState<string>('All');
+  // '' = every place. The place row only appears once some item has a place.
+  const [selectedPlace, setSelectedPlace] = useState<string>('');
   const [showAddModal, setShowAddModal] = useState(false);
-  const [selectedGarment, setSelectedGarment] = useState<GarmentItem | null>(null);
-
-  // Filter items by category. `wardrobe` is lifted to App.tsx (Sprint
-  // M16) — this screen no longer loads its own copy from AsyncStorage.
-  const filteredGarments = useMemo(
-    () =>
-      selectedCategory === 'All'
-        ? wardrobe
-        : wardrobe.filter((g) => g.category === selectedCategory),
-    [wardrobe, selectedCategory]
+  // Held by id and looked up in `wardrobe`, so the open detail sheet shows a
+  // place change as soon as App's wardrobe state updates.
+  const [selectedGarmentId, setSelectedGarmentId] = useState<string | null>(null);
+  const selectedGarment = useMemo(
+    () => (selectedGarmentId ? wardrobe.find((g) => g.id === selectedGarmentId) ?? null : null),
+    [wardrobe, selectedGarmentId]
   );
 
-  const handleSelectGarment = useCallback((item: GarmentItem) => setSelectedGarment(item), []);
+  const usedPlaces = useMemo(() => usedStorageLocations(wardrobe), [wardrobe]);
+  const customPlaces = useMemo(() => customStorageLocations(wardrobe), [wardrobe]);
+  // A place disappears once its last item moves; drop the filter with it.
+  const placeFilter = usedPlaces.includes(selectedPlace) ? selectedPlace : '';
+
+  // Filter items by category and place. `wardrobe` is lifted to App.tsx
+  // (Sprint M16) — this screen no longer loads its own copy from AsyncStorage.
+  const filteredGarments = useMemo(
+    () =>
+      wardrobe.filter(
+        (g) =>
+          (selectedCategory === 'All' || g.category === selectedCategory) &&
+          (!placeFilter || g.storageLocation === placeFilter)
+      ),
+    [wardrobe, selectedCategory, placeFilter]
+  );
+
+  const handleSelectGarment = useCallback((item: GarmentItem) => setSelectedGarmentId(item.id), []);
 
   const renderGarmentCard = useCallback(
     ({ item }: { item: GarmentItem }) => <GarmentCard item={item} onPress={handleSelectGarment} />,
@@ -141,6 +159,30 @@ export const CollectionScreen: React.FC<CollectionScreenProps> = ({
         </ScrollView>
       </View>
 
+      {/* Where-is-it-kept filter */}
+      {usedPlaces.length > 0 && (
+        <View style={styles.placeFilterContainer}>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterRail}>
+            {['', ...usedPlaces].map((place) => {
+              const isSelected = placeFilter === place;
+              return (
+                <TouchableOpacity
+                  key={place || 'all-places'}
+                  style={[styles.placeChip, isSelected && styles.selectedFilterChip]}
+                  activeOpacity={0.75}
+                  onPress={() => setSelectedPlace(place)}
+                >
+                  <MapPin size={12} color={isSelected ? '#FFFFFF' : COLORS.primary} />
+                  <Text style={[styles.filterText, isSelected && styles.selectedFilterText]}>
+                    {place || 'All places'}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
+        </View>
+      )}
+
       {/* Wardrobe Grid or Empty State */}
       {filteredGarments.length === 0 ? (
         <View style={styles.emptyState}>
@@ -150,7 +192,9 @@ export const CollectionScreen: React.FC<CollectionScreenProps> = ({
 
           <Text style={styles.emptyTitle}>No Garments Cataloged</Text>
           <Text style={styles.emptySubtitle}>
-            {selectedCategory === 'All'
+            {placeFilter
+              ? `Nothing here is kept in ${placeFilter}${selectedCategory === 'All' ? '' : ` under ${selectedCategory.toUpperCase()}`}.`
+              : selectedCategory === 'All'
               ? 'Your digital closet is empty. Tap "+ Add Item" to capture or upload real clothing photos.'
               : `No items cataloged under ${selectedCategory.toUpperCase()}. Upload a new garment to get started.`}
           </Text>
@@ -181,6 +225,7 @@ export const CollectionScreen: React.FC<CollectionScreenProps> = ({
       <AddItemModal
         visible={showAddModal}
         profile={profile}
+        customPlaces={customPlaces}
         onClose={() => setShowAddModal(false)}
         onGarmentAdded={onGarmentAdded}
       />
@@ -188,8 +233,10 @@ export const CollectionScreen: React.FC<CollectionScreenProps> = ({
       {/* Garment Detail Modal */}
       <GarmentDetailModal
         item={selectedGarment}
-        onClose={() => setSelectedGarment(null)}
+        onClose={() => setSelectedGarmentId(null)}
         onRemove={onGarmentRemoved}
+        onUpdateItem={onGarmentDetailsChanged}
+        customPlaces={customPlaces}
       />
     </View>
   );
@@ -241,6 +288,23 @@ const styles = StyleSheet.create({
   filterRail: {
     paddingHorizontal: 20,
     gap: 8
+  },
+  placeFilterContainer: {
+    paddingTop: 10,
+    paddingBottom: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.border
+  },
+  placeChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: RADIUS.pill,
+    backgroundColor: COLORS.bg,
+    borderWidth: 1,
+    borderColor: COLORS.border
   },
   filterChip: {
     paddingHorizontal: 14,

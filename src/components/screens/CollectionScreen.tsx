@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
-import { Search, Plus, X, Shirt } from 'lucide-react';
+import { Search, Plus, X, Shirt, MapPin } from 'lucide-react';
 import { CategoryChip } from '../ui/CategoryChip';
 import { ClothingCard } from '../ui/ClothingCard';
 import { EmptyState } from '../ui/EmptyState';
 import { PrimaryButton } from '../ui/PrimaryButton';
 import { GarmentItem } from '../../types/wardrobe';
+import { usedStorageLocations } from '../../data/storageLocations';
 
 interface CollectionScreenProps {
   wardrobe: GarmentItem[];
@@ -20,6 +21,11 @@ export const CollectionScreen: React.FC<CollectionScreenProps> = ({
   const [activeCategory, setActiveCategory] = useState<string>('All');
   const [showSearch, setShowSearch] = useState<boolean>(false);
   const [searchQuery, setSearchQuery] = useState<string>('');
+  // '' = every place. Only offered once at least one item has a place set.
+  const [activePlace, setActivePlace] = useState<string>('');
+  const usedPlaces = usedStorageLocations(wardrobe);
+  // A place disappears once its last item is moved or removed; drop the filter with it.
+  const placeFilter = usedPlaces.includes(activePlace) ? activePlace : '';
 
   const categoryOptions = [
     { label: 'All', key: 'All' },
@@ -34,13 +40,17 @@ export const CollectionScreen: React.FC<CollectionScreenProps> = ({
     if (activeCategory !== 'All' && item.category !== activeCategory) {
       return false;
     }
+    if (placeFilter && item.storageLocation !== placeFilter) {
+      return false;
+    }
     if (searchQuery.trim() !== '') {
       const q = searchQuery.toLowerCase();
       const matchName = item.name.toLowerCase().includes(q);
       const matchBrand = (item.brand || '').toLowerCase().includes(q);
       const matchColor = item.color.toLowerCase().includes(q);
       const matchFabric = item.fabric.toLowerCase().includes(q);
-      return matchName || matchBrand || matchColor || matchFabric;
+      const matchPlace = (item.storageLocation || '').toLowerCase().includes(q);
+      return matchName || matchBrand || matchColor || matchFabric || matchPlace;
     }
     return true;
   });
@@ -103,7 +113,7 @@ export const CollectionScreen: React.FC<CollectionScreenProps> = ({
           <Search size={18} style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', color: 'var(--color-text-muted)' }} />
           <input
             type="text"
-            placeholder="Search by name, color, or fabric..."
+            placeholder="Search by name, color, fabric, or place..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             style={{
@@ -147,6 +157,34 @@ export const CollectionScreen: React.FC<CollectionScreenProps> = ({
         })}
       </div>
 
+      {/* Where-is-it-kept filter */}
+      {usedPlaces.length > 0 && (
+        <div style={{ position: 'relative', marginTop: -8, marginBottom: 20 }}>
+          <MapPin size={15} style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', color: 'var(--color-primary)', pointerEvents: 'none' }} />
+          <select
+            aria-label="Filter by where it's kept"
+            value={placeFilter}
+            onChange={(e) => setActivePlace(e.target.value)}
+            style={{
+              width: '100%',
+              padding: '10px 14px 10px 36px',
+              borderRadius: 'var(--radius-pill)',
+              border: '1px solid var(--color-border-medium)',
+              backgroundColor: placeFilter ? 'var(--color-primary-alpha)' : 'var(--color-surface)',
+              color: 'var(--color-text-primary)',
+              fontSize: '0.82rem'
+            }}
+          >
+            <option value="">All places</option>
+            {usedPlaces.map((place) => (
+              <option key={place} value={place}>
+                {place} ({wardrobe.filter((i) => i.storageLocation === place).length})
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
+
       {/* Wardrobe Grid / Empty States */}
       {wardrobe.length === 0 ? (
         <EmptyState
@@ -163,7 +201,7 @@ export const CollectionScreen: React.FC<CollectionScreenProps> = ({
         <EmptyState
           icon={<Search size={26} color="var(--color-primary)" />}
           title="No items match."
-          description="Try a different category or search term."
+          description="Try a different category, place, or search term."
         />
       ) : (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 14 }}>

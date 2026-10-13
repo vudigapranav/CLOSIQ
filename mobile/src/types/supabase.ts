@@ -44,8 +44,10 @@ export type Database = {
           name: string
           pairing_notes: string | null
           seasons: string[]
+          size: string | null
           secondary_colors: string[] | null
           source_profile: string | null
+          storage_location: string | null
           storage_path: string | null
           style: string | null
           subcategory: string
@@ -76,8 +78,10 @@ export type Database = {
           name: string
           pairing_notes?: string | null
           seasons?: string[]
+          size?: string | null
           secondary_colors?: string[] | null
           source_profile?: string | null
+          storage_location?: string | null
           storage_path?: string | null
           style?: string | null
           subcategory?: string
@@ -108,8 +112,10 @@ export type Database = {
           name?: string
           pairing_notes?: string | null
           seasons?: string[]
+          size?: string | null
           secondary_colors?: string[] | null
           source_profile?: string | null
+          storage_location?: string | null
           storage_path?: string | null
           style?: string | null
           subcategory?: string

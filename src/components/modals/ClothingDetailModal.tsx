@@ -1,18 +1,25 @@
 import React from 'react';
 import { X, Tag, Sparkles, Layers, Trash2 } from 'lucide-react';
-import { GarmentItem } from '../../types/wardrobe';
+import { GarmentItem, GarmentDetailsPatch } from '../../types/wardrobe';
 import { GarmentImage } from '../ui/GarmentImage';
+import { StorageLocationField } from '../ui/StorageLocationField';
+import { SizeField } from '../ui/SizeField';
 
 interface ClothingDetailModalProps {
   item: GarmentItem | null;
   onClose: () => void;
   onDeleteItem: (id: string) => void;
+  /** Persists an edited size / "where is it kept" place for this item. */
+  onUpdateItem: (id: string, patch: GarmentDetailsPatch) => void;
+  customPlaces?: string[];
 }
 
 export const ClothingDetailModal: React.FC<ClothingDetailModalProps> = ({
   item,
   onClose,
-  onDeleteItem
+  onDeleteItem,
+  onUpdateItem,
+  customPlaces = []
 }) => {
   if (!item) return null;
 
@@ -128,6 +135,16 @@ export const ClothingDetailModal: React.FC<ClothingDetailModalProps> = ({
         <p className="text-body" style={{ color: 'var(--color-text-secondary)', marginBottom: 20 }}>
           {item.subcategory} · {item.formality.replace('_', ' ')} · {item.fabric}
         </p>
+
+        {/* Size and where it's kept — editable in place; saved as they change */}
+        <div key={item.id} style={{ display: 'flex', flexDirection: 'column', gap: 16, marginBottom: 20 }}>
+          <SizeField category={item.category} value={item.size} onChange={(size) => onUpdateItem(item.id, { size })} />
+          <StorageLocationField
+            value={item.storageLocation}
+            customPlaces={customPlaces}
+            onChange={(storageLocation) => onUpdateItem(item.id, { storageLocation })}
+          />
+        </div>
 
         {/* Best Paired With Section */}
         <div

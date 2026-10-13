@@ -11,8 +11,9 @@ import { ClothingDetailModal } from './components/modals/ClothingDetailModal';
 import { AddItemModal } from './components/modals/AddItemModal';
 import { SplashScreen } from './components/ui/SplashScreen';
 import { getProfileSeedWardrobe } from './data/garmentCatalog';
-import { GarmentItem, Outfit, WardrobeProfile, LayeringPreference, WeekDay, WeeklyPlanEntry } from './types/wardrobe';
+import { GarmentItem, GarmentDetailsPatch, Outfit, WardrobeProfile, LayeringPreference, WeekDay, WeeklyPlanEntry } from './types/wardrobe';
 import { isSameOutfit } from './services/aiStylist';
+import { customStorageLocations } from './data/storageLocations';
 
 const WEEK_DAYS: WeekDay[] = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
@@ -104,6 +105,11 @@ export function App() {
 
   const handleDeleteItem = (id: string) => {
     setWardrobe((prev) => prev.filter((item) => item.id !== id));
+  };
+
+  const handleUpdateItem = (id: string, patch: GarmentDetailsPatch) => {
+    setWardrobe((prev) => prev.map((item) => (item.id === id ? { ...item, ...patch } : item)));
+    setSelectedDetailItem((prev) => (prev && prev.id === id ? { ...prev, ...patch } : prev));
   };
 
   const handleSaveOutfit = (outfit: Outfit) => {
@@ -265,6 +271,8 @@ export function App() {
           item={selectedDetailItem}
           onClose={() => setSelectedDetailItem(null)}
           onDeleteItem={handleDeleteItem}
+          onUpdateItem={handleUpdateItem}
+          customPlaces={customStorageLocations(wardrobe)}
         />
       )}
 
@@ -272,6 +280,7 @@ export function App() {
       {isAddItemOpen && (
         <AddItemModal
           wardrobeProfile={wardrobeProfile}
+          customPlaces={customStorageLocations(wardrobe)}
           onClose={() => setIsAddItemOpen(false)}
           onAddGarment={handleAddGarment}
         />
