@@ -6,8 +6,44 @@ This document tracks the live implementation status of **CLOSIQ**. It is updated
 
 ## Current Phase
 
-* **Phase**: Login Repair (post-SDK-57) — **CODE COMPLETE; LOGIN NOT LIVE-VERIFIED**
-* **Status**: Fixed the auth paths behind the user's iPhone sign-in failure: the demo button no longer creates accounts (it signed up whenever sign-in failed), thrown auth rejections are caught instead of sticking the spinner, LoginScreen guards duplicate taps synchronously and clears loading in `finally`, failures are classified honestly (DNS / unreachable service / timeout / 5xx / device-reported offline) instead of always blaming the user's internet, placeholder or malformed Supabase config is refused before any request and can no longer crash `createClient` at import, and the Supabase transport has a bounded timeout (15 s auth, 90 s uploads) that leaves `globalThis.fetch`, local `file://` photo reads and token refresh untouched. Per Astra's review, no message claims the internet is working or that a request never left the device, ambiguous transport errors are `connectivity` rather than "offline", and unknown errors show safe generic text with raw detail kept for logs only. New `npm run diagnose` checks DNS (with a `supabase.com` control), Supabase health and backend reachability without printing secrets. **Cloud is healthy again** (ACTIVE_HEALTHY; auth health 200; Astra verified the demo account has 58 garments) — the original DNS failure was real before the restore. Tests 82/82 with 9/9 mutations detected; TypeScript, expo-doctor 20/21 (pre-existing icon blocker), both exports on Node v25.4.0, web build and lint all pass. **No cloud mutations, no new accounts, no Gemini calls, no deployment.** Login remains **not device-verified**. Details in "LOGIN REPAIR" below.
+* **Phase**: Live deployment + new wardrobe features (2026-10-13) — **WEBSITE LIVE ON VERCEL; ANDROID APK BUILD STARTED; NOT DEVICE-VERIFIED**
+* **Status**: Website + AI backend deployed to Vercel at **https://closiq-liard.vercel.app** (login, cloud wardrobe shared with the phone app, responsive desktop/mobile web). Added garment **size** and **"where is it kept"** (Indian household places + custom) on web and mobile, and a free **studio photo** (white background, open-source U²-Net cut-out, no Gemini). Mobile linked to EAS (`@vudigapranav/closiq`) with over-the-air updates; first Android `preview` APK build started. Supabase was paused again and was restored; a daily Vercel Cron keeps it from pausing. **Workflow change at the user's request: commit and push straight to `main` (no PRs), then `git pull` into the local CLOSIQ folder.** Details in "DEPLOYMENT + FEATURES" below.
+
+---
+
+# DEPLOYMENT + FEATURES (2026-10-13)
+
+## Live
+* Website + `/api/*`: **https://closiq-liard.vercel.app** (Vercel project `closiq`, account `vudigapranav-7549`; `closiq.vercel.app` belongs to someone else). Deployed with the Vercel CLI, not yet Git-connected — redeploy with `vercel deploy --prod` or connect the GitHub repo in the Vercel dashboard for auto-deploys on push.
+* LIVE VERIFIED (curl): `/` 200; `/healthz` → `supabaseConfigured: true`, `geminiConfigured: false`; `/email-confirmed.html` 200; catalog WebP 200 `image/webp`; `POST /api/ai/studio-photo` without a token → 401 (also proves the onnxruntime module loads on Vercel); `/.env` returns the SPA, not a file; `/api/keepalive` 200; the bundle contains the public Supabase URL/anon key and NOT the Gemini key.
+* Vercel env: `SUPABASE_URL`, `SUPABASE_ANON_KEY` (production + preview). **Missing: `GEMINI_API_KEY`** — the user must add it (AI scan + stylist need it). Optional: `CRON_SECRET`.
+* NOT VERIFIED: a signed-in session on the live site (Claude does not enter passwords on remote hosts); the studio function with a real image on Vercel (model file inclusion); Gemini on Vercel.
+
+## Supabase
+* Project `wibinjtekmadwtbxygrd` was **INACTIVE again** at session start; restored via MCP. Data intact (1 user, 58 garments, 1 profile).
+* Migrations applied: `garments.storage_location text` (≤80) and `garments.size text` (≤24) — `supabase/sql/002_*`, `003_*`. Existing `garments_update_own` RLS covers edits.
+* Keep-alive: Vercel Cron `0 3 * * *` → `/api/keepalive` (anon PostgREST query; RLS returns []).
+* **Email login still needs the user**: Auth → SMTP (Gmail app password — chosen by the user), Auth → URL config: Site URL `https://closiq-liard.vercel.app/email-confirmed.html` and redirect URL `https://closiq-liard.vercel.app/**`. Supabase's built-in mailer only delivers to project team members.
+
+## Features
+* **Where is it kept** (`src/data/storageLocations.ts`, shared): grouped Indian presets (almirahs, loft, diwan box, with the dhobi/istriwala/darzi, native place…) + custom free text, offered again as "Your places". Web `StorageLocationField`, mobile `StorageLocationPicker`; set in Add Item, editable in item details; place filter on Wardrobe/Collection.
+* **Size** (`src/data/garmentSizes.ts`): category-aware chips (letter, chest, waist, UK shoe, Free size) + Other. Web `SizeField`, mobile `SizePicker`.
+* Mobile `updateUserGarmentDetails()` (optimistic, rolls back on a failed cloud write). Web debounces detail edits 600 ms per item.
+* **Studio photo** (`server/studioPhoto.js`, `POST /api/ai/studio-photo`): u2netp (Apache-2.0, 4.6 MB, `server/models/`) via onnxruntime-node; mask cleaned (largest shape, holes filled, halo specks removed); ORIGINAL pixels composited by sharp onto a 1024px white square with a soft shadow; ~0.25 s/photo. Runs in parallel with the AI scan; the user picks Original or Studio (web + mobile). Gemini image editing was tried first and rejected: free-tier quota is 0. Free Gemini segmentation was also unusable (models 404/503; robotics-ER polygon wrong). Quality on a busy synthetic background: clean garment, a few faint edge bits.
+* **Web login + cloud**: `src/services/cloud/{supabase,auth,wardrobeCloud}.ts`; `LoginScreen` (sign in/up, reset password, demo); `App.tsx` = splash → login → `SignedInApp` keyed by user id. Wardrobe, saved looks and Men/Women + layering prefs use the same rows as mobile. Weekly planner + theme stay browser-local. New real accounts start with an empty wardrobe (same as mobile). Web AI calls now send the Supabase token.
+* **Responsive**: `.app-nav` dock → left sidebar at ≥1024px; `.garment-grid` auto-fill; bottom sheets → centred dialogs on desktop; tablet column 760px.
+
+## Mobile / EAS
+* Linked: `@vudigapranav/closiq`, projectId `859d629b-60ac-4860-b325-16eee1c362d7`. `expo-updates` (runtimeVersion policy `appVersion`, channels development/preview/production) and `expo-file-system` added. Expo patch versions aligned; expo-doctor 20/21 (only the pre-existing non-square icon, B4).
+* EAS env (preview + production): `EXPO_PUBLIC_API_URL=https://closiq-liard.vercel.app`, `EXPO_PUBLIC_SUPABASE_URL`, `EXPO_PUBLIC_SUPABASE_ANON_KEY` (sensitive). Release-env gate passes with these values.
+* First Android `preview` APK: build `b35879a8-01a4-4e26-9539-35fdc348bfc6` (keystore generated and stored by EAS).
+* `.easignore` now excludes `.git` (eas-cli 24 uploaded a 352 MB archive because the shallow clone's pack held the test photos; no secrets were in it).
+* OTA: JS/asset changes → `eas update --channel preview`; native changes or a version bump → new build.
+
+## Verification this session
+* Web build + oxlint clean; mobile `tsc` clean; mobile tests 82/82; studio handler + Vercel function wrappers exercised locally; live smoke test above.
+* NOT TESTED: any UI in a browser or on a device (standing preference: code/build/API only), real sign-in, real uploads.
+
 ---
 
 # IMAGE SERVING FIX
