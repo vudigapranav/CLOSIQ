@@ -1,13 +1,9 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Alert,
   StyleSheet,
-  Text,
   View,
-  Image,
-  StatusBar,
-  Animated,
-  Dimensions
+  StatusBar
 } from 'react-native';
 // SDK 55+ makes edge-to-edge mandatory on Android, where React Native's own
 // SafeAreaView is a no-op (and is now deprecated) — content would render under
@@ -16,6 +12,7 @@ import {
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import type { Session } from '@supabase/supabase-js';
 import { COLORS } from './src/theme';
+import { IntroSplash } from './src/components/IntroSplash';
 import { BottomNavigation, NavTab } from './src/components/BottomNavigation';
 import { TodayScreen } from './src/screens/TodayScreen';
 import { CollectionScreen } from './src/screens/CollectionScreen';
@@ -39,8 +36,6 @@ import { loadSavedOutfits, saveOutfitToStorage, removeSavedOutfitFromStorage } f
 import { restoreSession, onAuthStateChange, signOut, isDemoUser } from './src/services/authService';
 import { setCurrentUserId, captureSession, isSessionCurrent } from './src/services/authSession';
 import { UserProfileData } from './src/types/onboarding';
-
-const { width } = Dimensions.get('window');
 
 function AppContent() {
   const [showSplash, setShowSplash] = useState(true);
@@ -79,9 +74,6 @@ function AppContent() {
   // already-active profile (Men, the default) being the case that used to
   // silently leave the parent showing a stale, empty wardrobe.
   const [wardrobeRefreshKey, setWardrobeRefreshKey] = useState(0);
-
-  const fadeAnim = useRef(new Animated.Value(0)).current;
-  const scaleAnim = useRef(new Animated.Value(0.95)).current;
 
   // Sprint M17 — checks for a restorable Supabase session once on launch,
   // then stays subscribed for every subsequent change (login, logout,
@@ -304,58 +296,10 @@ function AppContent() {
     recordRecentOutfit(outfit.items.map((i) => i.id));
   };
 
-  useEffect(() => {
-    // Launch splash animation sequence
-    Animated.parallel([
-      Animated.timing(fadeAnim, {
-        toValue: 1,
-        duration: 600,
-        useNativeDriver: true
-      }),
-      Animated.spring(scaleAnim, {
-        toValue: 1,
-        friction: 8,
-        tension: 40,
-        useNativeDriver: true
-      })
-    ]).start();
-
-    // Hold for 1.8 seconds then transition to main app
-    const timer = setTimeout(() => {
-      Animated.timing(fadeAnim, {
-        toValue: 0,
-        duration: 400,
-        useNativeDriver: true
-      }).start(() => {
-        setShowSplash(false);
-      });
-    }, 1800);
-
-    return () => clearTimeout(timer);
-  }, [fadeAnim, scaleAnim]);
-
+  // Cinematic intro (src/components/IntroSplash.tsx): full film once a day,
+  // a short cut otherwise; tap to skip.
   if (showSplash) {
-    return (
-      <SafeAreaView style={styles.splashContainer}>
-        <StatusBar barStyle="dark-content" />
-        <Animated.View
-          style={[
-            styles.splashContent,
-            {
-              opacity: fadeAnim,
-              transform: [{ scale: scaleAnim }]
-            }
-          ]}
-        >
-          <Image
-            source={require('./assets/closiq-logo.png')}
-            style={styles.splashLogo}
-            resizeMode="contain"
-          />
-          <Text style={styles.splashTagline}>AI Personal Wardrobe & Stylist</Text>
-        </Animated.View>
-      </SafeAreaView>
-    );
+    return <IntroSplash onFinish={() => setShowSplash(false)} />;
   }
 
   // Still checking for a restorable session — render nothing but the frame
@@ -477,28 +421,6 @@ function AppContent() {
 }
 
 const styles = StyleSheet.create({
-  splashContainer: {
-    flex: 1,
-    backgroundColor: COLORS.bg,
-    alignItems: 'center',
-    justifyContent: 'center'
-  },
-  splashContent: {
-    alignItems: 'center',
-    justifyContent: 'center'
-  },
-  splashLogo: {
-    width: width * 0.55,
-    height: 60,
-    marginBottom: 12
-  },
-  splashTagline: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: COLORS.primary,
-    letterSpacing: 1.2,
-    textTransform: 'uppercase'
-  },
   container: {
     flex: 1,
     backgroundColor: COLORS.bg
