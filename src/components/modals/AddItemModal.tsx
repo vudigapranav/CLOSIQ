@@ -1,10 +1,11 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { X, Camera, Upload, Sparkles, Check, AlertTriangle } from 'lucide-react';
 import { GarmentItem, GarmentCategory, FormalityLevel, LayeringRole, WardrobeProfile } from '../../types/wardrobe';
 import { getQuickAddSamples, CatalogEntry } from '../../data/garmentCatalog';
 import { normalizeSize } from '../../data/garmentSizes';
 import { analyzeCatalogGarment, VisionAnalysisResult } from '../../services/aiVisionScanner';
-import { analyzeGarmentImageWithGemini } from '../../services/ai';
+import { analyzeGarmentImageWithGemini, makeStudioPhoto } from '../../services/ai';
+import { fileToOptimizedJpegDataUrl } from '../../services/imageResize';
 import { GarmentImage } from '../ui/GarmentImage';
 import { PrimaryButton } from '../ui/PrimaryButton';
 import { CategoryChip } from '../ui/CategoryChip';
@@ -20,21 +21,6 @@ interface AddItemModalProps {
 }
 
 type Step = 'options' | 'scanning' | 'confirm' | 'error';
-
-/**
- * Reads the file as a base64 data URL rather than URL.createObjectURL — a
- * blob: URL is only valid for this page session, so after any reload the
- * uploaded photo would silently break (even though the stale URL string is
- * still sitting in localStorage). A data URL survives serialization/reload.
- */
-function readFileAsDataUrl(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(reader.result as string);
-    reader.onerror = () => reject(new Error('Could not read that file.'));
-    reader.readAsDataURL(file);
-  });
-}
 
 const SCAN_CAPTIONS = ['Detecting category…', 'Reading color & texture…', 'Finalizing details…'];
 
@@ -68,6 +54,12 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({ wardrobeProfile, cus
   const [aiConfidence, setAiConfidence] = useState(0.95);
   const [storageLocation, setStorageLocation] = useState<string | undefined>(undefined);
   const [size, setSize] = useState<string | undefined>(undefined);
+  // White-background "studio" version of an uploaded photo, made alongside
+  // the AI scan. The user picks which one to save.
+  const [studioImage, setStudioImage] = useState<string | null>(null);
+  const [studioStatus, setStudioStatus] = useState<'idle' | 'loading' | 'ready' | 'failed'>('idle');
+  const [useStudio, setUseStudio] = useState(true);
+  const studioRunRef = useRef(0);
   const [errorMessage, setErrorMessage] = useState('');
 
   useEffect(() => {
@@ -96,6 +88,9 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({ wardrobeProfile, cus
   };
 
   const handleSelectSample = async (entry: CatalogEntry) => {
+    studioRunRef.current += 1;
+    setStudioImage(null);
+    setStudioStatus('idle');
     setSelectedImage(entry.imagePath);
     setCaptionIndex(0);
     setStep('scanning');
@@ -121,10 +116,20 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({ wardrobeProfile, cus
     }
 
     try {
-      const dataUrl = await readFileAsDataUrl(file);
+      const dataUrl = await fileToOptimizedJpegDataUrl(file);
       setSelectedImage(dataUrl);
       setCaptionIndex(0);
       setStep('scanning');
+
+      const run = ++studioRunRef.current;
+      setStudioImage(null);
+      setStudioStatus('loading');
+      setUseStudio(true);
+      makeStudioPhoto(dataUrl).then((studio) => {
+        if (studioRunRef.current !== run) return;
+        setStudioImage(studio);
+        setStudioStatus(studio ? 'ready' : 'failed');
+      });
 
       const result = await analyzeGarmentImageWithGemini(dataUrl, category);
       applyAnalysis(result);
@@ -133,6 +138,8 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({ wardrobeProfile, cus
       setStep('error');
     }
   };
+
+  const chosenImage = useStudio && studioStatus === 'ready' && studioImage ? studioImage : selectedImage;
 
   const handleConfirmAdd = () => {
     if (!name.trim()) return;
@@ -149,7 +156,7 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({ wardrobeProfile, cus
       layeringRole,
       seasons: ['spring', 'autumn'],
       formality,
-      imageUrl: selectedImage,
+      imageUrl: chosenImage,
       brand: 'Personal Wardrobe',
       favorite: false,
       wearCount: 0,
@@ -179,7 +186,7 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({ wardrobeProfile, cus
         alignItems: 'flex-end',
         justifyContent: 'center'
       }}
-      className="animate-fade-in"
+      className="animate-fade-in sheet-backdrop"
       onClick={onClose}
     >
       <div
@@ -195,7 +202,7 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({ wardrobeProfile, cus
           boxShadow: 'var(--shadow-lg)',
           border: '1px solid var(--color-border)'
         }}
-        className="animate-slide-up"
+        className="animate-slide-up sheet"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
@@ -395,9 +402,47 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({ wardrobeProfile, cus
         {/* STEP 3: CONFIRMATION & EDIT FORM */}
         {step === 'confirm' && (
           <div className="animate-fade-in">
+            {studioStatus !== 'idle' && (
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 10, marginBottom: 14 }}>
+                {[
+                  { key: 'original', label: 'Original', src: selectedImage, selected: !(useStudio && studioStatus === 'ready') },
+                  { key: 'studio', label: 'Studio', src: studioImage, selected: useStudio && studioStatus === 'ready' }
+                ].map((choice) => (
+                  <button
+                    key={choice.key}
+                    type="button"
+                    disabled={choice.key === 'studio' && studioStatus !== 'ready'}
+                    onClick={() => setUseStudio(choice.key === 'studio')}
+                    aria-pressed={choice.selected}
+                    style={{
+                      padding: 6,
+                      borderRadius: 'var(--radius-md)',
+                      border: `2px solid ${choice.selected ? 'var(--color-primary)' : 'var(--color-border)'}`,
+                      backgroundColor: 'var(--color-surface-subtle)',
+                      cursor: choice.key === 'studio' && studioStatus !== 'ready' ? 'default' : 'pointer',
+                      color: choice.selected ? 'var(--color-primary)' : 'var(--color-text-secondary)',
+                      fontSize: '0.78rem',
+                      fontWeight: choice.selected ? 700 : 600
+                    }}
+                  >
+                    <div style={{ aspectRatio: '1', borderRadius: 8, overflow: 'hidden', backgroundColor: '#FFFFFF', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 6 }}>
+                      {choice.src ? (
+                        <img src={choice.src} alt={`${choice.label} photo`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                      ) : (
+                        <span style={{ fontSize: '0.72rem', color: 'var(--color-text-muted)', padding: 8 }}>
+                          {studioStatus === 'loading' ? 'Making studio photo…' : 'Couldn’t make a studio photo'}
+                        </span>
+                      )}
+                    </div>
+                    {choice.label}
+                  </button>
+                ))}
+              </div>
+            )}
+
             <div style={{ display: 'flex', gap: 12, marginBottom: 16, padding: 10, backgroundColor: 'var(--color-surface-subtle)', borderRadius: 'var(--radius-md)' }}>
               <div style={{ width: 64, height: 64, borderRadius: 8, overflow: 'hidden', flexShrink: 0 }}>
-                <GarmentImage src={selectedImage} alt="Garment" category={category} hexColor={hexColor} />
+                <GarmentImage src={chosenImage} alt="Garment" category={category} hexColor={hexColor} />
               </div>
               <div style={{ minWidth: 0 }}>
                 <span className="text-metadata" style={{ color: 'var(--color-primary)' }}>

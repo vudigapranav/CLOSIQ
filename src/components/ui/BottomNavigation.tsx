@@ -16,31 +16,17 @@ const TABS: { key: NavTab; label: string; icon: React.ReactNode }[] = [
   { key: 'profile', label: 'Profile', icon: <User size={19} /> }
 ];
 
+/**
+ * Floating taupe dock on phones and narrow windows; a left sidebar rail on
+ * desktop (>= 1024px). Layout lives in index.css (.app-nav) so the same
+ * markup can switch with a media query.
+ */
 export const BottomNavigation: React.FC<BottomNavigationProps> = ({
   activeTab,
   onTabChange
 }) => {
   return (
-    <nav
-      style={{
-        position: 'fixed',
-        bottom: 16,
-        left: '50%',
-        transform: 'translateX(-50%)',
-        width: 'calc(100% - 24px)',
-        maxWidth: 456,
-        backgroundColor: 'var(--color-surface)',
-        border: '1px solid var(--color-border)',
-        borderRadius: 'var(--radius-xl)',
-        boxShadow: 'var(--shadow-lg)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-around',
-        padding: '7px 6px',
-        zIndex: 50,
-        transition: 'background-color 0.25s ease'
-      }}
-    >
+    <nav className="app-nav" aria-label="Main">
       {TABS.map((tab) => {
         const isActive = activeTab === tab.key;
         // The AI Stylist tab carries a quiet, always-on accent so it reads as
@@ -52,35 +38,12 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
             onClick={() => onTabChange(tab.key)}
             aria-label={tab.label}
             aria-current={isActive ? 'page' : undefined}
-            style={{
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: 3,
-              flex: 1,
-              background: isActive ? 'var(--color-primary)' : isStylist ? 'var(--color-primary-alpha)' : 'transparent',
-              border: 'none',
-              color: isActive ? 'var(--color-text-on-primary)' : isStylist ? 'var(--color-primary)' : 'var(--color-text-muted)',
-              cursor: 'pointer',
-              padding: '8px 4px',
-              borderRadius: 'var(--radius-lg)',
-              transition: 'color 0.2s ease, background-color 0.2s ease'
-            }}
+            className={`app-nav__tab${isActive ? ' is-active' : ''}${isStylist ? ' is-stylist' : ''}`}
           >
-            {React.cloneElement(tab.icon as React.ReactElement, {
+            {React.cloneElement(tab.icon as React.ReactElement<{ strokeWidth?: number }>, {
               strokeWidth: isActive || isStylist ? 2.2 : 1.7
             })}
-            <span
-              style={{
-                fontSize: '0.64rem',
-                fontWeight: isActive ? 700 : 500,
-                letterSpacing: '0.01em',
-                whiteSpace: 'nowrap'
-              }}
-            >
-              {tab.label}
-            </span>
+            <span className="app-nav__label">{tab.label}</span>
           </button>
         );
       })}

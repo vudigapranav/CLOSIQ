@@ -204,7 +204,7 @@ export const CollectionScreen: React.FC<CollectionScreenProps> = ({
           description="Try a different category, place, or search term."
         />
       ) : (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 14 }}>
+        <div className="garment-grid">
           {filteredWardrobe.map((item) => (
             <ClothingCard
               key={item.id}

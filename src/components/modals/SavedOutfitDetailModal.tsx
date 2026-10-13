@@ -66,7 +66,7 @@ export const SavedOutfitDetailModal: React.FC<SavedOutfitDetailModalProps> = ({
         alignItems: 'flex-end',
         justifyContent: 'center'
       }}
-      className="animate-fade-in"
+      className="animate-fade-in sheet-backdrop"
       onClick={onClose}
       role="dialog"
       aria-modal="true"
@@ -85,7 +85,7 @@ export const SavedOutfitDetailModal: React.FC<SavedOutfitDetailModalProps> = ({
           boxShadow: 'var(--shadow-lg)',
           border: '1px solid var(--color-border)'
         }}
-        className="animate-slide-up hide-scrollbar"
+        className="animate-slide-up hide-scrollbar sheet"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header Bar */}

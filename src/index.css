@@ -294,3 +294,242 @@ html, body {
     animation: none !important;
   }
 }
+
+/* ===================================================================
+   Navigation dock / desktop sidebar (2026-10-13)
+   Phone & narrow windows: floating taupe pill dock at the bottom.
+   Desktop (>= 1024px): a left sidebar rail inside a wider app shell.
+   =================================================================== */
+.app-nav {
+  position: fixed;
+  bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+  left: 50%;
+  transform: translateX(-50%);
+  width: calc(100% - 24px);
+  max-width: 456px;
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-lg);
+  display: flex;
+  align-items: center;
+  justify-content: space-around;
+  padding: 7px 6px;
+  z-index: 50;
+  transition: background-color 0.25s ease;
+}
+
+.app-nav__tab {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  flex: 1;
+  background: transparent;
+  border: none;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  padding: 8px 4px;
+  border-radius: var(--radius-lg);
+  transition: color 0.2s ease, background-color 0.2s ease;
+}
+
+.app-nav__tab.is-stylist {
+  background: var(--color-primary-alpha);
+  color: var(--color-primary);
+}
+
+.app-nav__tab.is-active {
+  background: var(--color-primary);
+  color: var(--color-text-on-primary);
+}
+
+.app-nav__label {
+  font-size: 0.64rem;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+}
+
+.app-nav__tab.is-active .app-nav__label {
+  font-weight: 700;
+}
+
+/* Wardrobe grids: 2 columns on phones, more as the window widens. */
+.garment-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+@media (min-width: 640px) {
+  .garment-grid {
+    grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+    gap: 18px;
+  }
+}
+
+/* Room for the dock plus the phone's home-indicator area. */
+.app-shell {
+  padding-bottom: calc(104px + env(safe-area-inset-bottom, 0px));
+}
+
+/* Tablet: a roomier single column, still with the bottom dock. */
+@media (min-width: 640px) and (max-width: 1023px) {
+  .app-shell {
+    max-width: 760px;
+  }
+
+  .app-nav {
+    max-width: 520px;
+  }
+}
+
+/* Desktop: sidebar rail + wide content area. */
+@media (min-width: 1024px) {
+  .app-shell {
+    max-width: 1280px;
+    padding-bottom: 32px;
+    padding-left: 232px;
+  }
+
+  .app-shell main {
+    width: 100%;
+    max-width: 1040px;
+    margin: 0 auto;
+  }
+
+  .app-nav {
+    top: 96px;
+    bottom: auto;
+    left: max(16px, calc((100vw - 1280px) / 2 + 16px));
+    transform: none;
+    width: 200px;
+    max-width: none;
+    flex-direction: column;
+    align-items: stretch;
+    justify-content: flex-start;
+    gap: 4px;
+    padding: 10px;
+  }
+
+  .app-nav__tab {
+    flex: 0 0 auto;
+    flex-direction: row;
+    justify-content: flex-start;
+    gap: 12px;
+    padding: 11px 14px;
+  }
+
+  .app-nav__label {
+    font-size: 0.86rem;
+  }
+
+  /* Bottom sheets become centred dialogs. */
+  .sheet-backdrop {
+    align-items: center !important;
+    padding: 24px;
+  }
+
+  .sheet {
+    max-width: 560px !important;
+    border-radius: var(--radius-xl) !important;
+    max-height: 86vh !important;
+  }
+}
+
+/* ===================================================================
+   Web sign-in (2026-10-13): a single card on phones; a brand hero on the
+   left + card on the right on desktop.
+   =================================================================== */
+.login-layout {
+  width: 100%;
+  min-height: 100vh;
+  min-height: 100dvh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 64px;
+  padding: 32px 16px;
+  background: radial-gradient(120% 80% at 0% 0%, var(--color-bg-deep) 0%, var(--color-bg) 60%);
+}
+
+.login-hero {
+  display: none;
+  max-width: 420px;
+}
+
+.login-hero__tagline {
+  margin: 28px 0 14px;
+}
+
+.login-hero__copy {
+  font-size: 1rem;
+  line-height: 1.6;
+}
+
+.login-card {
+  width: 100%;
+  max-width: 420px;
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-lg);
+  padding: 28px 24px;
+}
+
+.login-card__logo {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 22px;
+}
+
+.login-demo {
+  width: 100%;
+  margin-top: 10px;
+  padding: 12px 20px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--color-primary);
+  background: var(--color-primary-alpha);
+  color: var(--color-primary);
+  font-weight: 600;
+  font-size: 0.86rem;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.login-demo:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+@media (min-width: 1024px) {
+  .login-hero {
+    display: block;
+  }
+
+  .login-card__logo {
+    display: none;
+  }
+
+  .login-card {
+    padding: 36px 32px;
+  }
+}
+
+/* Full-screen status messages (loading, configuration problems). */
+.app-status {
+  width: 100%;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  padding: 24px;
+  text-align: center;
+}

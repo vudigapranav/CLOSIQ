@@ -22,6 +22,18 @@ const ROUTES = {
 };
 
 function readJsonBody(req) {
+  // Vercel's Node runtime parses JSON bodies itself and drains the stream,
+  // exposing the result as req.body; plain Node / Vite leave it to us.
+  if (req.body !== undefined) {
+    if (typeof req.body === 'string') {
+      try {
+        return Promise.resolve(req.body ? JSON.parse(req.body) : {});
+      } catch {
+        return Promise.reject(new Error('Malformed JSON body'));
+      }
+    }
+    return Promise.resolve(req.body || {});
+  }
   return new Promise((resolve, reject) => {
     let body = '';
     req.on('data', (chunk) => {

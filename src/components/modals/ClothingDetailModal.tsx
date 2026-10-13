@@ -38,7 +38,7 @@ export const ClothingDetailModal: React.FC<ClothingDetailModalProps> = ({
         alignItems: 'flex-end',
         justifyContent: 'center'
       }}
-      className="animate-fade-in"
+      className="animate-fade-in sheet-backdrop"
       onClick={onClose}
     >
       <div
@@ -54,7 +54,7 @@ export const ClothingDetailModal: React.FC<ClothingDetailModalProps> = ({
           boxShadow: 'var(--shadow-lg)',
           border: '1px solid var(--color-border)'
         }}
-        className="animate-slide-up"
+        className="animate-slide-up sheet"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header Bar */}

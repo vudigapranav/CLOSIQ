@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Sparkles, Heart, Moon, Sun, Lightbulb, Trash2, Shirt, CalendarDays, Bell, Eye, Palette, Layers, ShieldAlert, TrendingUp, PieChart } from 'lucide-react';
+import { Sparkles, Heart, Moon, Sun, Lightbulb, Trash2, Shirt, CalendarDays, Bell, Eye, Palette, Layers, ShieldAlert, TrendingUp, PieChart, LogOut, UserCircle } from 'lucide-react';
 import { SectionHeader } from '../ui/SectionHeader';
 import { GarmentImage } from '../ui/GarmentImage';
 import { SegmentedControl } from '../ui/SegmentedControl';
@@ -20,6 +20,9 @@ interface ProfileScreenProps {
   onChangeLayeringPreference: (preference: LayeringPreference) => void;
   onNavigateToCollection?: () => void;
   onNavigateToPlanner?: () => void;
+  /** Signed-in account shown in Settings, with a Sign out action. */
+  userEmail?: string;
+  onSignOut?: () => void;
 }
 
 const LAYERING_OPTIONS: { value: LayeringPreference; label: string }[] = [
@@ -214,7 +217,9 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
   layeringPreference,
   onChangeLayeringPreference,
   onNavigateToCollection,
-  onNavigateToPlanner
+  onNavigateToPlanner,
+  userEmail,
+  onSignOut
 }) => {
   const [selectedSavedOutfit, setSelectedSavedOutfit] = useState<Outfit | null>(null);
 
@@ -719,7 +724,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
           </span>
         </div>
 
-        <div style={{ padding: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div style={{ padding: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: onSignOut ? '1px solid var(--color-border)' : 'none' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             {isDarkMode ? <Moon size={18} color="var(--color-primary)" /> : <Sun size={18} color="var(--color-primary-light)" />}
             <div>
@@ -744,6 +749,39 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
             {isDarkMode ? 'Light Mode' : 'Dark Mode'}
           </button>
         </div>
+
+        {onSignOut && (
+          <div style={{ padding: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
+              <UserCircle size={18} color="var(--color-text-muted)" />
+              <div style={{ minWidth: 0 }}>
+                <div style={{ fontSize: '0.88rem', fontWeight: 600, color: 'var(--color-text-primary)' }}>Account</div>
+                <div className="text-caption" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {userEmail || 'Signed in'}
+                </div>
+              </div>
+            </div>
+            <button
+              onClick={onSignOut}
+              style={{
+                padding: '6px 14px',
+                borderRadius: 'var(--radius-pill)',
+                fontSize: '0.78rem',
+                fontWeight: 600,
+                backgroundColor: 'var(--color-surface-subtle)',
+                color: 'var(--color-danger)',
+                border: '1px solid rgba(168,73,59,0.3)',
+                cursor: 'pointer',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 6,
+                flexShrink: 0
+              }}
+            >
+              <LogOut size={14} /> Sign out
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );

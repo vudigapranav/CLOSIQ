@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex" />
+    <title>CLOSIQ — Email confirmed</title>
+    <link rel="icon" href="/favicon.svg" />
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;600&family=Plus+Jakarta+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+    <!--
+      Supabase Auth "Site URL" landing page (2026-10-13). The confirmation link
+      in the sign-up email redirects here. The mobile app has no deep link, so
+      this page only tells the user to go back to the app and sign in. Expired
+      or already-used links arrive with #error=...; we show that instead.
+    -->
+    <style>
+      :root {
+        --color-bg: #F7F2E9;
+        --color-surface: #EFE7D9;
+        --color-primary: #6B5A3D;
+        --color-text-primary: #2B2723;
+        --color-text-secondary: #6B6459;
+        --color-border: rgba(43, 39, 35, 0.10);
+        --color-danger: #A8493B;
+        --font-display: 'Playfair Display', Georgia, serif;
+        --font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --color-bg: #1C1815;
+          --color-surface: #262019;
+          --color-primary: #C6A876;
+          --color-text-primary: #F5EFE4;
+          --color-text-secondary: #B3A996;
+          --color-border: rgba(245, 241, 228, 0.09);
+        }
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 24px 16px;
+        background: var(--color-bg);
+        color: var(--color-text-primary);
+        font-family: var(--font-family);
+      }
+      .card {
+        width: 100%;
+        max-width: 400px;
+        background: var(--color-surface);
+        border: 1px solid var(--color-border);
+        border-radius: 20px;
+        padding: 32px 24px;
+        text-align: center;
+      }
+      .logo-plate {
+        display: inline-block;
+        background: #F5F6F2;
+        border-radius: 14px;
+        padding: 10px 16px;
+        margin-bottom: 24px;
+      }
+      .logo-plate img { display: block; height: 32px; width: auto; }
+      h1 {
+        font-family: var(--font-display);
+        font-weight: 600;
+        font-size: 26px;
+        margin: 0 0 12px;
+      }
+      p {
+        margin: 0;
+        line-height: 1.55;
+        color: var(--color-text-secondary);
+        font-size: 15px;
+      }
+      .error h1 { color: var(--color-danger); }
+    </style>
+  </head>
+  <body>
+    <main class="card" id="card">
+      <div class="logo-plate"><img src="/brand/closiq-logo.png" alt="CLOSIQ" /></div>
+      <h1 id="title">Email confirmed</h1>
+      <p id="message">You're all set. Go back to the CLOSIQ app and sign in with your email and password.</p>
+    </main>
+    <script>
+      (function () {
+        var params = new URLSearchParams((location.hash || '').replace(/^#/, '') || location.search);
+        if (!params.get('error')) return;
+        document.getElementById('card').className = 'card error';
+        document.getElementById('title').textContent = 'Link expired';
+        document.getElementById('message').textContent =
+          'This confirmation link has expired or was already used. Open the CLOSIQ app and try signing in. If it says your email isn’t confirmed, sign up again to get a new link.';
+      })();
+    </script>
+  </body>

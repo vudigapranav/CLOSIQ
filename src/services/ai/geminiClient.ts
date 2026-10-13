@@ -7,11 +7,14 @@
  * Secret GEMINI_API_KEY is read strictly on the Node server side.
  */
 
+import { getAuthHeader } from '../cloud/supabase';
+
 export async function postJsonToApi<T>(endpoint: string, payload: any): Promise<{ ok: boolean; mode: 'gemini' | 'demo'; data?: T; error?: string }> {
   try {
     const res = await fetch(endpoint, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      // Every /api/ai/* route requires the signed-in user's Supabase token.
+      headers: { 'Content-Type': 'application/json', ...(await getAuthHeader()) },
       body: JSON.stringify(payload)
     });
 
