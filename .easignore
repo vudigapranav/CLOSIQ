@@ -32,6 +32,10 @@
 
 # ---- unused by the mobile build, large ----
 public/test samples/
+# eas-cli >= 24 uploads a shallow git clone and only deletes ignored *files*;
+# its .git pack still holds every tracked blob (incl. the 444 MB of test
+# photos), which made the archive 352 MB. Builds don't need git history.
+.git
 
 # ---- from /.gitignore ----
 logs
