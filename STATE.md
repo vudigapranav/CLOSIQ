@@ -6,7 +6,7 @@ This document tracks the live implementation status of **CLOSIQ**. It is updated
 
 ## Current Phase
 
-* **Phase**: Live deployment + new wardrobe features (2026-10-13) — **WEBSITE LIVE ON VERCEL; ANDROID APK BUILD STARTED; NOT DEVICE-VERIFIED**
+* **Phase**: Live deployment + new wardrobe features (2026-10-13) — **WEBSITE LIVE ON VERCEL; ANDROID APK BUILT; NOT DEVICE-VERIFIED**
 * **Status**: Website + AI backend deployed to Vercel at **https://closiq-liard.vercel.app** (login, cloud wardrobe shared with the phone app, responsive desktop/mobile web). Added garment **size** and **"where is it kept"** (Indian household places + custom) on web and mobile, and a free **studio photo** (white background, open-source U²-Net cut-out, no Gemini). Mobile linked to EAS (`@vudigapranav/closiq`) with over-the-air updates; first Android `preview` APK build started. Supabase was paused again and was restored; a daily Vercel Cron keeps it from pausing. **Workflow change at the user's request: commit and push straight to `main` (no PRs), then `git pull` into the local CLOSIQ folder.** Details in "DEPLOYMENT + FEATURES" below.
 
 ---
@@ -36,7 +36,7 @@ This document tracks the live implementation status of **CLOSIQ**. It is updated
 ## Mobile / EAS
 * Linked: `@vudigapranav/closiq`, projectId `859d629b-60ac-4860-b325-16eee1c362d7`. `expo-updates` (runtimeVersion policy `appVersion`, channels development/preview/production) and `expo-file-system` added. Expo patch versions aligned; expo-doctor 20/21 (only the pre-existing non-square icon, B4).
 * EAS env (preview + production): `EXPO_PUBLIC_API_URL=https://closiq-liard.vercel.app`, `EXPO_PUBLIC_SUPABASE_URL`, `EXPO_PUBLIC_SUPABASE_ANON_KEY` (sensitive). Release-env gate passes with these values.
-* First Android `preview` APK: build `b35879a8-01a4-4e26-9539-35fdc348bfc6` (keystore generated and stored by EAS).
+* First Android `preview` APK: build `b35879a8-01a4-4e26-9539-35fdc348bfc6` **FINISHED 2026-10-13 22:31** (keystore generated and stored by EAS). Install page: https://expo.dev/accounts/vudigapranav/projects/closiq/builds/b35879a8-01a4-4e26-9539-35fdc348bfc6. Not yet installed/tested on a device.
 * `.easignore` now excludes `.git` (eas-cli 24 uploaded a 352 MB archive because the shallow clone's pack held the test photos; no secrets were in it).
 * OTA: JS/asset changes → `eas update --channel preview`; native changes or a version bump → new build.
 
