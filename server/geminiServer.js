@@ -23,16 +23,61 @@ function getServerApiKey() {
 // ai.models.list() and a direct generateContent call. 'gemini-flash-latest'
 // is Google's rolling alias for the current-generation flash model, so it
 // won't go stale the same way a pinned version number will.
-const GEMINI_MODEL = 'gemini-flash-latest';
+//
+// 2026-10-13: on the free tier, individual models are often "high demand"
+// (503) for long stretches — a live probe had 4 of 5 flash models refusing
+// while gemini-3.5-flash-lite answered. Each model has its own free quota,
+// so a request now walks this list until one answers. Overridable with a
+// comma-separated GEMINI_MODELS env var without a code change.
+const GEMINI_MODELS = (process.env.GEMINI_MODELS ||
+  'gemini-flash-latest,gemini-3.5-flash-lite,gemini-flash-lite-latest,gemini-3.8-flash')
+  .split(',')
+  .map((m) => m.trim())
+  .filter(Boolean);
 
-// Sprint M20: hard per-request ceiling on every Gemini call. Previously
-// unbounded, so a stalled upstream held the HTTP request (and the phone's
-// spinner) open indefinitely. The mobile client's own timeout (40s,
-// mobile/src/services/apiRequest.ts) is deliberately longer, so the client
-// receives this server's honest "timed out" answer instead of racing it.
-// No automatic retries are configured (no `retryOptions`), so a 429 is
-// never silently re-sent against the quota.
-const GEMINI_TIMEOUT_MS = 30_000;
+// Sprint M20: hard ceiling on every Gemini request. Previously unbounded,
+// so a stalled upstream held the HTTP request (and the phone's spinner) open
+// indefinitely. Now a TOTAL budget across the model fallback chain; the
+// mobile client's own timeout (40s, mobile/src/services/apiRequest.ts) is
+// deliberately longer, so it receives this server's honest answer instead of
+// racing it. No SDK-level retries (`retryOptions`): a failed model is never
+// re-sent, only a different model is tried.
+const GEMINI_TIMEOUT_MS = 36_000;
+const MIN_ATTEMPT_MS = 4_000;
+
+/** Overloaded, missing or out-of-quota for THIS model — another may work. */
+function shouldTryNextModel(err) {
+  const status = err?.status ?? err?.code;
+  const message = String(err?.message || '');
+  return (
+    [404, 429, 500, 503].includes(Number(status)) ||
+    /"code":\s*(404|429|500|503)|UNAVAILABLE|RESOURCE_EXHAUSTED|NOT_FOUND|high demand|overloaded/i.test(message)
+  );
+}
+
+/**
+ * generateContent with the model fallback chain and one shared time budget.
+ * Throws the last error when every model fails or the budget runs out.
+ */
+async function generateWithFallback(apiKey, request) {
+  const deadline = Date.now() + GEMINI_TIMEOUT_MS;
+  let lastError = null;
+  for (const model of GEMINI_MODELS) {
+    const remaining = deadline - Date.now();
+    if (remaining < MIN_ATTEMPT_MS) break;
+    try {
+      const ai = new GoogleGenAI({ apiKey, httpOptions: { timeout: remaining } });
+      const response = await ai.models.generateContent({ ...request, model });
+      if (model !== GEMINI_MODELS[0]) console.log(`[Server Gemini] Served by fallback model ${model}`);
+      return response;
+    } catch (err) {
+      lastError = err;
+      if (!shouldTryNextModel(err)) throw err;
+      console.warn(`[Server Gemini] ${model} unavailable (${err?.status ?? err?.code ?? 'error'}), trying next model`);
+    }
+  }
+  throw lastError || new Error('Gemini request timed out');
+}
 
 /**
  * Coarse, non-sensitive classification of a Gemini failure, returned to the
@@ -83,7 +128,6 @@ export async function handleAnalyzeGarmentServer(body) {
   }
 
   try {
-    const ai = new GoogleGenAI({ apiKey, httpOptions: { timeout: GEMINI_TIMEOUT_MS } });
     const mimeType = body.mimeType || 'image/png';
     // Strip data URI prefix if present
     const base64Data = body.imageData.includes(';base64,')
@@ -109,8 +153,7 @@ Return structured JSON output matching this schema:
 }
 Category hint: ${body.categoryHint || 'tops'}.`;
 
-    const response = await ai.models.generateContent({
-      model: GEMINI_MODEL,
+    const response = await generateWithFallback(apiKey, {
       contents: [
         {
           role: 'user',
@@ -147,7 +190,6 @@ export async function handleGenerateOutfitServer(body) {
   }
 
   try {
-    const ai = new GoogleGenAI({ apiKey, httpOptions: { timeout: GEMINI_TIMEOUT_MS } });
 
     const userPrompt = {
       request: body.prompt,
@@ -186,8 +228,7 @@ Return structured JSON matching this schema:
   }
 }`;
 
-    const response = await ai.models.generateContent({
-      model: GEMINI_MODEL,
+    const response = await generateWithFallback(apiKey, {
       contents: [{ role: 'user', parts: [{ text: promptText }] }],
       config: {
         responseMimeType: 'application/json',
@@ -216,7 +257,6 @@ export async function handleSwapGarmentServer(body) {
   }
 
   try {
-    const ai = new GoogleGenAI({ apiKey, httpOptions: { timeout: GEMINI_TIMEOUT_MS } });
 
     const swapPrompt = {
       occasion: body.prompt,
@@ -243,8 +283,7 @@ Return structured JSON:
   "whyItWorks": "Short rationale for the swapped piece"
 }`;
 
-    const response = await ai.models.generateContent({
-      model: GEMINI_MODEL,
+    const response = await generateWithFallback(apiKey, {
       contents: [{ role: 'user', parts: [{ text: promptText }] }],
       config: {
         responseMimeType: 'application/json',

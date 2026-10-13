@@ -2,6 +2,7 @@ import { isAuthRetryableFetchError } from '@supabase/supabase-js';
 import type { Session } from '@supabase/supabase-js';
 import { supabase, supabaseConfigCheck } from './supabaseClient';
 import { classifyAuthError, AuthFailureKind } from './authErrors';
+import { API_BASE_URL } from '../config';
 
 /**
  * CLOSIQ Mobile — Authentication service (Sprint M17).
@@ -121,7 +122,16 @@ export async function signUp(email: string, password: string): Promise<AuthResul
   if (configProblem) return configProblem;
 
   return attemptAuth(async () => {
-  const { data, error } = await supabase.auth.signUp({ email: trimmedEmail, password });
+  // Without an explicit redirect, the confirmation email links to the
+  // project's Site URL — which defaulted to http://localhost:3000. Send
+  // people to the deployed "email confirmed" page instead (it must also be
+  // in Supabase → Auth → URL Configuration → Redirect URLs).
+  const emailRedirectTo = API_BASE_URL.startsWith('https://') ? `${API_BASE_URL}/email-confirmed.html` : undefined;
+  const { data, error } = await supabase.auth.signUp({
+    email: trimmedEmail,
+    password,
+    options: emailRedirectTo ? { emailRedirectTo } : undefined
+  });
   if (error) {
     const { kind, message } = classifyAuthError(error);
     return { ok: false, session: null, kind, message };
