@@ -20,6 +20,9 @@
       "adaptiveIcon": {
         "backgroundColor": "#F7F2E9",
         "foregroundImage": "./assets/closiq-logo.png"
+      },
+      "runtimeVersion": {
+        "policy": "appVersion"
       }
     },
     "web": {
@@ -51,6 +54,15 @@
       "@react-native-community/datetimepicker",
       "expo-status-bar",
       "expo-splash-screen"
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "859d629b-60ac-4860-b325-16eee1c362d7"
+      }
+    },
+    "owner": "vudigapranav",
+    "updates": {
+      "url": "https://u.expo.dev/859d629b-60ac-4860-b325-16eee1c362d7"
+    }
   }
 }
