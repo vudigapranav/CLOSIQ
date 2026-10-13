@@ -40,6 +40,11 @@ This document tracks the live implementation status of **CLOSIQ**. It is updated
 * `.easignore` now excludes `.git` (eas-cli 24 uploaded a 352 MB archive because the shallow clone's pack held the test photos; no secrets were in it).
 * OTA: JS/asset changes → `eas update --channel preview`; native changes or a version bump → new build.
 
+## Follow-up fixes (same day, after the user's first real sign-up + scan)
+* **Confirmation email linked to http://localhost:3000** — Supabase Auth Site URL is still the default. Mobile sign-up now passes `emailRedirectTo=<API host>/email-confirmed.html` (web already did). **Still requires the user** to set Site URL + Redirect URLs in the Supabase dashboard (no MCP/CLI access to Auth config here). The email itself was confirmed by Supabase before the failed redirect, which is why sign-in worked afterwards.
+* **"AI service not available" after the studio photo worked** — `GEMINI_API_KEY` is not on Vercel (`/healthz` geminiConfigured false); the studio cut-out is local and needs no key. Separately, the free tier was overloaded (live probe: 4 of 5 flash models 503/timeout). `server/geminiServer.js` now walks a model chain (`GEMINI_MODELS`) within a 36 s budget; a real scan succeeded via `gemini-3.5-flash-lite` in ~20 s.
+* Deployed to Vercel and published OTA update `7be1a3dc-9aff-4b54-b5be-85ad92def9a3` (channel/branch `preview`, runtime 1.0.0, Android). Verified from the exported bundle: API URL is the Vercel host, no LAN/placeholder host, intro + redirect fix present, no Gemini key.
+
 ## Verification this session
 * Web build + oxlint clean; mobile `tsc` clean; mobile tests 82/82; studio handler + Vercel function wrappers exercised locally; live smoke test above.
 * NOT TESTED: any UI in a browser or on a device (standing preference: code/build/API only), real sign-in, real uploads.
