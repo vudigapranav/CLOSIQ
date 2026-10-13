@@ -28,3 +28,6 @@ dist-ssr
 
 # Mobile test build output (mobile/tests, npm run test)
 mobile/.test-build
+
+# Vercel CLI project link
+.vercel
