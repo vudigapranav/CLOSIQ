@@ -71,6 +71,9 @@ This document tracks the live implementation status of **CLOSIQ**. It is updated
 * Web parity: same cloud rows; `OutfitRatingBar`; Today/Stylist rate + Later + Wear; shown looks recorded to outfit_history; Profile tabs + learning DNA. Fixed an old bug: Profile counted `'footwear'` instead of `'shoes'`.
 * Tests 92/92 (+6 `outfitBrain.test.ts`). Web build + lint clean; web sources type-check (only Vite `import.meta.env` noise outside Vite).
 
+## Latest APK (2026-10-14)
+* Build `4c16caf6-2562-4b00-949a-df8ee6f44310` from `aa8fe9a` (everything built in: Spark-hanger icon, outfit brain, AI fixes): https://expo.dev/artifacts/eas/Q02RnM5v733bWMY1pkbvl4YSL4wOabdJSe0JON8GD6E.apk — supersedes b35879a8 (Oct 13, old icon) and b4539959 (pre-brain). The user had reinstalled an older APK; on a fresh install an OTA update only applies on the second launch, so the rating bar never appeared.
+
 ## Verification this session
 * Web build + oxlint clean; mobile `tsc` clean; mobile tests 82/82; studio handler + Vercel function wrappers exercised locally; live smoke test above.
 * NOT TESTED: any UI in a browser or on a device (standing preference: code/build/API only), real sign-in, real uploads.
