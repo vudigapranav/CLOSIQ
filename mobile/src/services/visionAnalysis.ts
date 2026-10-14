@@ -39,16 +39,32 @@ function str(value: unknown, fallback: string): string {
   return typeof value === 'string' && value.trim() ? value : fallback;
 }
 
+const RETRYABLE_SCAN_FAILURES: ApiFailureReason[] = ['ai_unavailable', 'rate_limited', 'server_error'];
+const RETRY_ONLY_IF_FAILED_WITHIN_MS = 15_000;
+// 3 s gives a busy model a moment. Mutable only so tests can shorten it.
+export const scanRetry = { delayMs: 3_000 };
+
 export async function analyzeGarmentImageMobile(
   base64Data: string,
   mimeType = 'image/jpeg',
   categoryHint?: string
 ): Promise<VisionAnalysisOutcome> {
-  const result = await postApi('/api/ai/analyze-garment', {
-    imageData: base64Data,
-    mimeType,
-    categoryHint
-  });
+  const body = { imageData: base64Data, mimeType, categoryHint };
+  const startedAt = Date.now();
+  let result = await postApi('/api/ai/analyze-garment', body);
+
+  // Free-tier Gemini often refuses for a moment when Google is busy. Retry
+  // ONCE, after a short pause, but only when the first try failed fast (a
+  // refusal, not a long timeout — the user is already waiting) and only for
+  // failures a retry can fix (never offline / signed out). 2026-10-14.
+  if (
+    !result.ok &&
+    RETRYABLE_SCAN_FAILURES.includes(result.reason) &&
+    Date.now() - startedAt < RETRY_ONLY_IF_FAILED_WITHIN_MS
+  ) {
+    await new Promise((resolve) => setTimeout(resolve, scanRetry.delayMs));
+    result = await postApi('/api/ai/analyze-garment', body);
+  }
 
   if (!result.ok) {
     return { ok: false, reason: result.reason, message: describeApiFailure(result.reason) };

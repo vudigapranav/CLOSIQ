@@ -17,11 +17,19 @@ export async function analyzeGarmentImageWithGemini(
     ? 'image/webp'
     : 'image/png';
 
-  const res = await postJsonToApi<any>('/api/ai/analyze-garment', {
-    imageData: imageUrl,
-    mimeType,
-    categoryHint
-  });
+  const body = { imageData: imageUrl, mimeType, categoryHint };
+  const startedAt = Date.now();
+  let res = await postJsonToApi<any>('/api/ai/analyze-garment', body);
+
+  // Same rule as the phone app (mobile/src/services/visionAnalysis.ts): a busy
+  // free-tier AI is retried once after 3 s, only if it failed fast, and never
+  // when signed out or offline.
+  const error = String(res.error || '');
+  const retryable = !/HTTP 40[13]|Failed to fetch|NetworkError|Load failed/i.test(error);
+  if (!res.ok && retryable && Date.now() - startedAt < 15_000) {
+    await new Promise((resolve) => setTimeout(resolve, 3_000));
+    res = await postJsonToApi<any>('/api/ai/analyze-garment', body);
+  }
 
   if (!res.ok || !res.data) {
     // Honest fallback: keep the pixel-colour guess as a pre-fill, but never

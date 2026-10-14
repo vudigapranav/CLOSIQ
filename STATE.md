@@ -56,6 +56,12 @@ This document tracks the live implementation status of **CLOSIQ**. It is updated
 * Fallbacks made honest + smarter: mobile local engine = shared occasion-aware `generateAIOutfit`, no score; local swap same-category/closest formality, "Nothing to swap yet" otherwise. Web: `Outfit.source` + `matchLabel()` → "Local pick" instead of invented 91–99%; web photo-scan fallback no longer labelled "AI Analyzed" with random confidence.
 * Mobile tests 83/83 (+3 `aiOutfitMapping.test.ts`). Deployed to Vercel; OTA `91ded774-85a5-480f-bc2f-631d78872d03` (preview; verified Vercel host, no LAN host, no key). New APK with the Spark-hanger icon: build `b4539959-2b9d-44ef-a423-7b3e89347a04` FINISHED.
 
+## Scan reliability (2026-10-14, user chose "stay free + auto-retry")
+* Production logs: 7 scans — every one saw gemini-flash-latest return 503 and was served by gemini-3.5-flash-lite; the 7th failed because flash-latest hung until Google's own 504 DEADLINE_EXCEEDED, which the chain didn't treat as "next model". Not a quota/daily-limit problem.
+* Fixed (`dc95a84`): model order starts with gemini-3.5-flash-lite; 504/DEADLINE_EXCEEDED/timeouts move on; 20 s cap per attempt inside the 36 s budget. Local: 3 consecutive real scans OK in 2–3 s each.
+* Auto-retry: a failed scan is retried once after 3 s on mobile (`visionAnalysis.ts`, `scanRetry`) and web (`wardrobeVision.ts`) — only if it failed within 15 s, never when offline/signed out. Tests 86/86 (+3 `scanRetry.test.ts`).
+* Options declined by the user: paid Gemini tier (recommended for reliability); extra free keys (against Google's API terms, and failures were Google-side overload anyway).
+
 ## Verification this session
 * Web build + oxlint clean; mobile `tsc` clean; mobile tests 82/82; studio handler + Vercel function wrappers exercised locally; live smoke test above.
 * NOT TESTED: any UI in a browser or on a device (standing preference: code/build/API only), real sign-in, real uploads.
