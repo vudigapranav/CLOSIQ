@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  <!-- CLOSIQ app symbol "Spark hanger" (chosen 2026-10-14): a clothes hanger
+       whose hook is an AI sparkle. Master artwork for every app icon size —
+       regenerate with `node scripts/generate-app-icons.mjs`. The CLOSIQ
+       wordmark (closiq-logo.png) stays the official logo. -->
+  <g transform="translate(0 24)">
+    <path id="hanger" d="M512 500 L168 752 Q146 768 172 778 H852 Q878 768 856 752 Z" fill="none" stroke="#2A2F35" stroke-width="60" stroke-linejoin="round"/>
+    <path id="stem" d="M512 500 V418" stroke="#2A2F35" stroke-width="46" stroke-linecap="round"/>
+    <path id="spark" d="M512 168 C526 270 550 294 652 308 C550 322 526 346 512 448 C498 346 474 322 372 308 C474 294 498 270 512 168 Z" fill="#6B5A3D"/>
+  </g>
+</svg>
