@@ -4,7 +4,7 @@
     "slug": "closiq",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/closiq-logo.png",
+    "icon": "./assets/app-icon.png",
     "scheme": "closiq",
     "userInterfaceStyle": "light",
     "backgroundColor": "#F7F2E9",
@@ -19,14 +19,15 @@
       "package": "com.closiq.app",
       "adaptiveIcon": {
         "backgroundColor": "#F7F2E9",
-        "foregroundImage": "./assets/closiq-logo.png"
+        "foregroundImage": "./assets/adaptive-icon-foreground.png",
+        "monochromeImage": "./assets/adaptive-icon-monochrome.png"
       },
       "runtimeVersion": {
         "policy": "appVersion"
       }
     },
     "web": {
-      "favicon": "./assets/closiq-logo.png"
+      "favicon": "./assets/app-icon.png"
     },
     "plugins": [
       [
