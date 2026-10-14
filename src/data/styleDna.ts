@@ -57,15 +57,28 @@ function share(wardrobe: GarmentItem[], test: (item: GarmentItem) => boolean): n
   return Math.round((wardrobe.filter(test).length / wardrobe.length) * 100);
 }
 
-export function computeStyleDna(wardrobe: GarmentItem[]): StyleDnaAxis[] {
+function axesFor(items: GarmentItem[]): StyleDnaAxis[] {
   return [
-    { key: 'minimal', label: 'Minimalist', score: share(wardrobe, (i) => NEUTRALS.some((n) => i.color.toLowerCase().includes(n))) },
-    { key: 'tailored', label: 'Tailored', score: share(wardrobe, (i) => i.category === 'outerwear' || TAILORED.some((w) => text(i).includes(w))) },
-    { key: 'smart', label: 'Smart / Formal', score: share(wardrobe, (i) => i.formality !== 'casual') },
-    { key: 'street', label: 'Streetwear', score: share(wardrobe, (i) => STREET.some((w) => text(i).includes(w))) },
-    { key: 'ethnic', label: 'Indian Ethnic', score: share(wardrobe, (i) => ETHNIC.some((w) => text(i).includes(w))) },
-    { key: 'layered', label: 'Layering', score: share(wardrobe, (i) => i.layeringRole === 'base_layer' || i.layeringRole === 'outer_layer') }
+    { key: 'minimal', label: 'Minimalist', score: share(items, (i) => NEUTRALS.some((n) => i.color.toLowerCase().includes(n))) },
+    { key: 'tailored', label: 'Tailored', score: share(items, (i) => i.category === 'outerwear' || TAILORED.some((w) => text(i).includes(w))) },
+    { key: 'smart', label: 'Smart / Formal', score: share(items, (i) => i.formality !== 'casual') },
+    { key: 'street', label: 'Streetwear', score: share(items, (i) => STREET.some((w) => text(i).includes(w))) },
+    { key: 'ethnic', label: 'Indian Ethnic', score: share(items, (i) => ETHNIC.some((w) => text(i).includes(w))) },
+    { key: 'layered', label: 'Layering', score: share(items, (i) => i.layeringRole === 'base_layer' || i.layeringRole === 'outer_layer') }
   ];
+}
+
+/**
+ * `taste` = garments from looks the user rated "nice" or actually wore
+ * (src/services/outfitBrain.ts tasteGarments). With no taste yet, scores are
+ * purely the wardrobe's; once there is some, each score is half "what you
+ * own" and half "what you like to wear" — so the DNA learns from feedback.
+ */
+export function computeStyleDna(wardrobe: GarmentItem[], taste: GarmentItem[] = []): StyleDnaAxis[] {
+  const owned = axesFor(wardrobe);
+  if (taste.length === 0) return owned;
+  const liked = axesFor(taste);
+  return owned.map((axis, i) => ({ ...axis, score: Math.round((axis.score + liked[i].score) / 2) }));
 }
 
 const ARCHETYPE_BY_AXIS: Record<StyleDnaAxis['key'], { name: string; description: string }> = {
@@ -80,14 +93,28 @@ const ARCHETYPE_BY_AXIS: Record<StyleDnaAxis['key'], { name: string; description
 export interface StyleArchetype {
   name: string;
   description: string;
-  /** 'wardrobe' = read from their clothes; 'preferences' = from onboarding answers. */
-  source: 'wardrobe' | 'preferences' | 'none';
+  /** 'taste' = from looks they liked/wore; 'wardrobe' = read from their clothes;
+   *  'preferences' = from onboarding answers. */
+  source: 'taste' | 'wardrobe' | 'preferences' | 'none';
 }
 
 /** Needs a handful of pieces before the wardrobe, not the answers, decides. */
 const MIN_ITEMS_FOR_WARDROBE_ARCHETYPE = 3;
 
-export function styleArchetype(wardrobe: GarmentItem[], stylePreferences: string[]): StyleArchetype {
+/** Liked/worn looks needed before taste, not the wardrobe, names the archetype. */
+const MIN_TASTE_ITEMS_FOR_ARCHETYPE = 6; // ~2 outfits
+
+export function styleArchetype(wardrobe: GarmentItem[], stylePreferences: string[], taste: GarmentItem[] = []): StyleArchetype {
+  if (taste.length >= MIN_TASTE_ITEMS_FOR_ARCHETYPE) {
+    const top = [...axesFor(taste)].sort((a, b) => b.score - a.score)[0];
+    if (top && top.score > 0) {
+      return {
+        name: ARCHETYPE_BY_AXIS[top.key].name,
+        description: `${ARCHETYPE_BY_AXIS[top.key].description} Learned from the looks you liked and wore.`,
+        source: 'taste'
+      };
+    }
+  }
   if (wardrobe.length >= MIN_ITEMS_FOR_WARDROBE_ARCHETYPE) {
     const top = [...computeStyleDna(wardrobe)].sort((a, b) => b.score - a.score)[0];
     if (top && top.score > 0) return { ...ARCHETYPE_BY_AXIS[top.key], source: 'wardrobe' };

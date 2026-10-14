@@ -62,6 +62,15 @@ This document tracks the live implementation status of **CLOSIQ**. It is updated
 * Auto-retry: a failed scan is retried once after 3 s on mobile (`visionAnalysis.ts`, `scanRetry`) and web (`wardrobeVision.ts`) — only if it failed within 15 s, never when offline/signed out. Tests 86/86 (+3 `scanRetry.test.ts`).
 * Options declined by the user: paid Gemini tier (recommended for reliability); extra free keys (against Google's API terms, and failures were Google-side overload anyway).
 
+## Outfit brain (2026-10-14) — rate / wear / try later; dislikes never return
+* User request: rate every suggestion (I disliked it / It's okay / It's nice), "Wear today" and "Try next time"; a dislike is never shown again and is replaced at once; regenerating for the same occasion days later must not return the first outfit; Style DNA must learn from it.
+* Root cause of repeats: only the garments of the single most recent outfit were hard-excluded (web Home also auto-generates from seed 0 on every visit), so older combinations came straight back.
+* DB (`supabase/sql/004`): `outfit_feedback` (user_id+signature unique, rating dislike/okay/nice, RLS own rows) and `saved_outfits.status` ('try_later' | 'worn', default try_later).
+* Shared `src/services/outfitBrain.ts`: buildOutfitBrain (feedback + recently shown + worn looks), `isFreshCombination` (not disliked, not in last 6 shown), `brainContextForAI` (server rule 12: disliked = hard never; recent/okay = don't repeat; liked = taste), `pickLocalOutfit` (brain-aware local engine), `tasteGarments` → Style DNA blends owned + liked/worn; archetype from taste after ~2 liked looks.
+* Mobile: `outfitFeedbackStorage.ts`, `useOutfitFeedback` hook; OutfitResultCard rating row + Wear today / Try next time (Home, AI Stylist; Planner gets rating); AI results that are disliked/just shown are replaced by a fresh local pick; first generate no longer hard-excludes the last outfit's garments (regenerate still does); "Wear today"/Wear again → status worn + wear counts (`recordGarmentsWorn`); Profile Saved Looks tabs (Wearing / worn · Try next time) + "Learning from N looks".
+* Web parity: same cloud rows; `OutfitRatingBar`; Today/Stylist rate + Later + Wear; shown looks recorded to outfit_history; Profile tabs + learning DNA. Fixed an old bug: Profile counted `'footwear'` instead of `'shoes'`.
+* Tests 92/92 (+6 `outfitBrain.test.ts`). Web build + lint clean; web sources type-check (only Vite `import.meta.env` noise outside Vite).
+
 ## Verification this session
 * Web build + oxlint clean; mobile `tsc` clean; mobile tests 82/82; studio handler + Vercel function wrappers exercised locally; live smoke test above.
 * NOT TESTED: any UI in a browser or on a device (standing preference: code/build/API only), real sign-in, real uploads.

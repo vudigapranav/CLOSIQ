@@ -1,7 +1,7 @@
 import { GarmentItem, GarmentCategory, LayeringPreference } from '../../../src/types/wardrobe';
 import { OutfitPersonalizationContext } from './personalizationContext';
 import { postApi, describeApiFailure } from './apiRequest';
-import { generateAIOutfit } from '../../../src/services/aiStylist';
+import { isFreshCombination, pickLocalOutfit } from '../../../src/services/outfitBrain';
 
 export interface MobileOutfitResult {
   title: string;
@@ -82,13 +82,18 @@ export async function generateOutfitMobile(
   let notice: string | undefined;
   if (result.ok) {
     const resData = result.json as { mode?: string; data?: Record<string, any> };
+    let validIds: string[] = [];
     if (resData.data && Array.isArray(resData.data.garmentIds)) {
       // Validate returned IDs exist in closet
-      const validIds = resData.data.garmentIds.filter((id: string) =>
+      validIds = resData.data.garmentIds.filter((id: string) =>
         wardrobe.some((item) => item.id === id)
       );
 
-      if (validIds.length > 0) {
+      // The brain has the last word: a combination the user disliked, or one
+      // shown in the last few suggestions, is replaced by a fresh local pick
+      // even if the AI ignored rule 12.
+      const fresh = isFreshCombination(validIds, personalization?.brain);
+      if (validIds.length > 0 && fresh) {
         // The server's schema (server/geminiServer.js) is outfitName /
         // styleMatch / whyItWorks{overall,color,fit,occasion}. This used to
         // read title / styleScore / explanation.summary — names the AI never
@@ -117,22 +122,33 @@ export async function generateOutfitMobile(
         };
       }
     }
-    notice = 'The AI returned no usable pieces from your wardrobe.';
+    notice = validIds.length > 0
+      ? 'The AI suggested a look you disliked or saw recently.'
+      : 'The AI returned no usable pieces from your wardrobe.';
   } else {
     notice = describeApiFailure(result.reason);
   }
 
   // Deterministic fallback filtering excluded items
-  // Local engine (2026-10-14): the same occasion-aware picker the website
-  // uses (src/services/aiStylist.ts) — ranks every category by closeness to
-  // the occasion's formality and honours the layering preference — instead
-  // of "first top, first bottom, first shoes", which felt like shuffling.
-  // Regenerate excludes the previous pieces, so it moves to the next-best.
+  // Local engine: the website's occasion-aware picker, brain-aware — never a
+  // disliked combination, avoids recently shown / "okay" ones, leans toward
+  // pieces from liked looks (src/services/outfitBrain.ts). Regenerate's
+  // excluded pieces are left out when enough remain.
   const availableWardrobe = wardrobe.filter((i) => !excludeGarmentIds.includes(i.id));
-  const local = generateAIOutfit(availableWardrobe.length >= 2 ? availableWardrobe : wardrobe, {
-    prompt,
-    layeringPreference
-  });
+  const local = pickLocalOutfit(
+    availableWardrobe.length >= 2 ? availableWardrobe : wardrobe,
+    { prompt, layeringPreference },
+    personalization?.brain
+  );
+
+  if (!local) {
+    return {
+      ok: false,
+      mode: 'fallback',
+      data: { title: '', vibe: '', styleScore: 0, garmentIds: [], explanation: { summary: '' } },
+      error: "You've passed on every look CLOSIQ can make from these clothes. Add a few more pieces for fresh outfits."
+    };
+  }
 
   return {
     ok: true,

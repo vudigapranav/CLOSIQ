@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import type { Session, User } from '@supabase/supabase-js';
 import { AppHeader } from './components/ui/AppHeader';
 import { BottomNavigation, NavTab } from './components/ui/BottomNavigation';
@@ -14,7 +14,7 @@ import { AddItemModal } from './components/modals/AddItemModal';
 import { SplashScreen } from './components/ui/SplashScreen';
 import { ClosiqLogo } from './components/ui/ClosiqLogo';
 import { PrimaryButton } from './components/ui/PrimaryButton';
-import { GarmentItem, GarmentDetailsPatch, Outfit, WardrobeProfile, LayeringPreference, WeekDay, WeeklyPlanEntry } from './types/wardrobe';
+import { GarmentItem, GarmentDetailsPatch, Outfit, OutfitRating, WardrobeProfile, LayeringPreference, WeekDay, WeeklyPlanEntry } from './types/wardrobe';
 import { isSameOutfit } from './services/aiStylist';
 import { customStorageLocations } from './data/storageLocations';
 import { supabase, isCloudConfigured } from './services/cloud/supabase';
@@ -31,8 +31,14 @@ import {
   savePreferences,
   loadProfileBasics,
   saveProfileBasics,
-  ProfileBasics
+  ProfileBasics,
+  updateOutfitStatus,
+  loadOutfitFeedback,
+  rateOutfit,
+  loadRecentSignatures,
+  recordShownOutfit
 } from './services/cloud/wardrobeCloud';
+import { OutfitFeedback, buildOutfitBrain, comboSignature } from './services/outfitBrain';
 
 const WEEK_DAYS: WeekDay[] = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
@@ -195,6 +201,10 @@ const SignedInApp: React.FC<SignedInAppProps> = ({ user, isDarkMode, onToggleThe
   const [wardrobe, setWardrobe] = useState<GarmentItem[]>([]);
   const [savedOutfits, setSavedOutfits] = useState<Outfit[]>([]);
   const [basics, setBasics] = useState<ProfileBasics>({ name: '', stylePreferences: [] });
+  // The outfit brain (src/services/outfitBrain.ts): ratings + recently shown
+  // looks, the same cloud rows the phone app uses.
+  const [feedback, setFeedback] = useState<OutfitFeedback[]>([]);
+  const [recentSignatures, setRecentSignatures] = useState<string[]>([]);
   const [notice, setNotice] = useState<string | null>(null);
 
   // The weekly planner is browser-local (the mobile app's planner is a
@@ -227,6 +237,13 @@ const SignedInApp: React.FC<SignedInAppProps> = ({ user, isDarkMode, onToggleThe
         setWardrobe(items);
         setSavedOutfits(looks);
       }
+      // The brain is a nice-to-have: if it can't load, suggestions still work.
+      Promise.all([loadOutfitFeedback(userId), loadRecentSignatures(userId)])
+        .then(([ratings, recent]) => {
+          setFeedback(ratings);
+          setRecentSignatures(recent);
+        })
+        .catch((err) => console.warn('[CLOSIQ cloud] Outfit brain load failed:', err));
       setStatus('ready');
     } catch (err) {
       console.warn('[CLOSIQ cloud] Initial load failed:', err);
@@ -287,9 +304,23 @@ const SignedInApp: React.FC<SignedInAppProps> = ({ user, isDarkMode, onToggleThe
     pending.set(id, { patch: merged, timer });
   };
 
+  // "Later" saves with status try_later; "Wear this/today" with status worn.
+  // Saving an already-saved look with a new status moves it instead.
   const handleSaveOutfit = async (outfit: Outfit) => {
-    if (savedOutfits.some((o) => isSameOutfit(o, outfit))) return;
-    const saved = { ...outfit, saved: true };
+    const status = outfit.status ?? 'try_later';
+    const existing = savedOutfits.find((o) => isSameOutfit(o, outfit));
+    if (existing) {
+      if ((existing.status ?? 'try_later') === status) return;
+      setSavedOutfits((prev) => prev.map((o) => (o.id === existing.id ? { ...o, status } : o)));
+      try {
+        await updateOutfitStatus(userId, existing.id, status);
+      } catch (err) {
+        setSavedOutfits((prev) => prev.map((o) => (o.id === existing.id ? existing : o)));
+        fail('Couldn’t update that look', err);
+      }
+      return;
+    }
+    const saved = { ...outfit, saved: true, status };
     setSavedOutfits((prev) => [saved, ...prev]);
     try {
       await saveOutfit(userId, saved);
@@ -297,6 +328,39 @@ const SignedInApp: React.FC<SignedInAppProps> = ({ user, isDarkMode, onToggleThe
       setSavedOutfits((prev) => prev.filter((o) => o.id !== saved.id));
       fail('Couldn’t save that look', err);
     }
+  };
+
+  const brain = useMemo(
+    () => buildOutfitBrain(feedback, recentSignatures, savedOutfits),
+    [feedback, recentSignatures, savedOutfits]
+  );
+
+  const ratingFor = useCallback(
+    (outfit: Outfit): OutfitRating | null =>
+      feedback.find((f) => f.signature === comboSignature(outfit.items.map((i) => i.id)))?.rating ?? null,
+    [feedback]
+  );
+
+  const handleRateOutfit = async (outfit: Outfit, rating: OutfitRating) => {
+    const ids = outfit.items.map((i) => i.id);
+    const signature = comboSignature(ids);
+    const entry: OutfitFeedback = { signature, garmentIds: signature.split('|'), rating, occasion: outfit.occasion, updatedAt: new Date().toISOString() };
+    setFeedback((prev) => [entry, ...prev.filter((f) => f.signature !== signature)]);
+    try {
+      await rateOutfit(userId, ids, rating, outfit.occasion);
+    } catch (err) {
+      fail('Couldn’t save your rating', err);
+    }
+  };
+
+  // Every look shown goes into the shared outfit history, so the same
+  // combination isn't handed back next time (on the web or the phone).
+  const handleOutfitShown = (outfit: Outfit) => {
+    const ids = outfit.items.map((i) => i.id);
+    if (ids.length === 0) return;
+    const signature = comboSignature(ids);
+    setRecentSignatures((prev) => [signature, ...prev.filter((s) => s !== signature)].slice(0, 8));
+    recordShownOutfit(userId, ids).catch((err) => console.warn('[CLOSIQ cloud] Outfit history not saved:', err));
   };
 
   const removeSaved = async (target: Outfit) => {
@@ -335,6 +399,8 @@ const SignedInApp: React.FC<SignedInAppProps> = ({ user, isDarkMode, onToggleThe
     Promise.all(updates.map((u) => updateGarment(userId, profile, u.id, { wearCount: u.wearCount, lastWornDate: today }))).catch(
       (err) => fail('Couldn’t record what you wore', err)
     );
+    // Wearing it counts: the look moves to "Worn" in Saved Looks (2026-10-14).
+    handleSaveOutfit({ ...outfit, status: 'worn' });
   };
 
   const handleWearAgainOutfit = (outfit: Outfit) => {
@@ -480,6 +546,10 @@ const SignedInApp: React.FC<SignedInAppProps> = ({ user, isDarkMode, onToggleThe
             onSelectItemDetail={(item) => setSelectedDetailItem(item)}
             onNavigateToProfile={() => setActiveTab('profile')}
             userName={basics.name}
+            brain={brain}
+            ratingFor={ratingFor}
+            onRateOutfit={handleRateOutfit}
+            onOutfitShown={handleOutfitShown}
           />
         )}
         {activeTab === 'collection' && (
@@ -498,6 +568,11 @@ const SignedInApp: React.FC<SignedInAppProps> = ({ user, isDarkMode, onToggleThe
             onUnsaveOutfit={handleUnsaveOutfit}
             onSelectItemDetail={(item) => setSelectedDetailItem(item)}
             onOpenUpload={() => setIsAddItemOpen(true)}
+            onWearOutfit={handleWearOutfit}
+            brain={brain}
+            ratingFor={ratingFor}
+            onRateOutfit={handleRateOutfit}
+            onOutfitShown={handleOutfitShown}
           />
         )}
         {activeTab === 'planner' && (
@@ -527,6 +602,7 @@ const SignedInApp: React.FC<SignedInAppProps> = ({ user, isDarkMode, onToggleThe
             userEmail={user.email}
             userName={basics.name}
             stylePreferences={basics.stylePreferences}
+            brain={brain}
             onSignOut={signOut}
           />
         )}

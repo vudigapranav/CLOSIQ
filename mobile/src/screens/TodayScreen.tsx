@@ -14,7 +14,8 @@ import {
 } from 'react-native';
 import { Sparkles, Calendar, Thermometer, Shirt, ArrowRight, AlertCircle, RefreshCw } from 'lucide-react-native';
 import { COLORS, RADIUS } from '../theme';
-import { GarmentItem, WardrobeProfile, LayeringPreference, Outfit } from '../../../src/types/wardrobe';
+import { GarmentItem, WardrobeProfile, LayeringPreference, Outfit, OutfitRating, SavedLookStatus } from '../../../src/types/wardrobe';
+import { useOutfitFeedback } from '../hooks/useOutfitFeedback';
 import { generateOutfitMobile, swapGarmentMobile, MobileOutfitResult } from '../services/outfitStylist';
 import { isSameOutfitItems } from '../services/savedOutfitsStorage';
 import { isSyncPending } from '../services/cloudWriteFeedback';
@@ -191,7 +192,8 @@ export const TodayScreen: React.FC<TodayScreenProps> = ({
     const personalization = {
       userProfileContext: buildUserStyleContext(profile, layeringPreference, userProfile),
       weatherContext: buildWeatherContext(weather, temperatureUnit),
-      recentOutfitContext: recent.context
+      recentOutfitContext: recent.context,
+      brain: recent.brain
     };
     const res = await generateOutfitMobile(promptText, wardrobe, layeringPreference, recent.excludeGarmentIds, personalization);
 
@@ -224,7 +226,8 @@ export const TodayScreen: React.FC<TodayScreenProps> = ({
     const personalization = {
       userProfileContext: buildUserStyleContext(profile, layeringPreference, userProfileRef.current),
       weatherContext: buildWeatherContext(weatherRef.current, temperatureUnitRef.current),
-      recentOutfitContext: recent.context
+      recentOutfitContext: recent.context,
+      brain: recent.brain
     };
 
     const res = await generateOutfitMobile(promptText, wardrobe, layeringPreference, excludeIds, personalization);
@@ -305,20 +308,19 @@ export const TodayScreen: React.FC<TodayScreenProps> = ({
     [outfitResult, wardrobe]
   );
 
-  const isCurrentOutfitSaved = useMemo(
-    () =>
-      outfitResult
-        ? savedOutfits.some(
-            (o) =>
-              // A look whose cloud save failed is not saved — showing "Saved ✓"
-              // for it was a false success, and hid the only retry path.
-              !isSyncPending(o) && isSameOutfitItems(o.items.map((i) => i.id), outfitResult.data.garmentIds)
-          )
-        : false,
-    [outfitResult, savedOutfits]
-  );
+  // This look's Saved Looks status ("try next time" / "worn"), if saved.
+  const currentSavedStatus = useMemo<SavedLookStatus | null>(() => {
+    if (!outfitResult) return null;
+    const match = savedOutfits.find(
+      (o) =>
+        // A look whose cloud save failed is not saved — showing it as saved
+        // was a false success, and hid the only retry path.
+        !isSyncPending(o) && isSameOutfitItems(o.items.map((i) => i.id), outfitResult.data.garmentIds)
+    );
+    return match ? match.status ?? 'try_later' : null;
+  }, [outfitResult, savedOutfits]);
 
-  const handleSaveOutfit = useCallback(async () => {
+  const saveLook = useCallback(async (status: SavedLookStatus) => {
     if (!outfitResult || resolvedGarments.length === 0 || savingRef.current) return;
     savingRef.current = true;
 
@@ -348,7 +350,8 @@ export const TodayScreen: React.FC<TodayScreenProps> = ({
           versatilityNote: 'High pairing versatility'
         },
         saved: true,
-        dateCreated: new Date().toISOString()
+        dateCreated: new Date().toISOString(),
+        status
       };
 
       await onSaveOutfit(newOutfit);
@@ -357,6 +360,20 @@ export const TodayScreen: React.FC<TodayScreenProps> = ({
       savingRef.current = false;
     }
   }, [outfitResult, resolvedGarments, selectedOccasion, onSaveOutfit]);
+
+  const handleWearToday = useCallback(() => saveLook('worn'), [saveLook]);
+  const handleTryLater = useCallback(() => saveLook('try_later'), [saveLook]);
+
+  // The outfit brain: rate the look on screen. "I disliked it" is remembered
+  // (never shown again) and immediately replaced with a fresh suggestion.
+  const { rating, rate } = useOutfitFeedback(outfitResult?.data.garmentIds, selectedOccasion);
+  const handleRate = useCallback(
+    async (next: OutfitRating) => {
+      await rate(next);
+      if (next === 'dislike') handleRegenerateOutfit();
+    },
+    [rate, handleRegenerateOutfit]
+  );
 
   return (
     <ScrollView
@@ -536,10 +553,14 @@ export const TodayScreen: React.FC<TodayScreenProps> = ({
               styleScore={outfitResult.data.styleScore}
               garments={resolvedGarments}
               explanation={outfitResult.data.explanation}
-              isSaved={isCurrentOutfitSaved}
+              isSaved={currentSavedStatus !== null}
               onSelectGarmentForSwap={setSelectedGarmentForSwap}
               onRegenerate={handleRegenerateOutfit}
-              onSave={handleSaveOutfit}
+              rating={rating}
+              onRate={handleRate}
+              savedStatus={currentSavedStatus}
+              onWearToday={handleWearToday}
+              onTryLater={handleTryLater}
             />
           )}
         </>

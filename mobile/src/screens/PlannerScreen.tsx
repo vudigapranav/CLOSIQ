@@ -11,7 +11,8 @@ import {
 } from 'react-native';
 import { CalendarDays, Plus, Clock, ChevronDown, ChevronUp, Shirt, AlertCircle, X, ArrowRight } from 'lucide-react-native';
 import { COLORS, RADIUS } from '../theme';
-import { GarmentItem, WardrobeProfile, LayeringPreference, Outfit } from '../../../src/types/wardrobe';
+import { GarmentItem, WardrobeProfile, LayeringPreference, Outfit, OutfitRating } from '../../../src/types/wardrobe';
+import { useOutfitFeedback } from '../hooks/useOutfitFeedback';
 import { generateOutfitMobile, swapGarmentMobile, MobileOutfitResult } from '../services/outfitStylist';
 import { recordRecentOutfit } from '../services/outfitHistoryStorage';
 import { OutfitResultCard } from '../components/OutfitResultCard';
@@ -195,7 +196,8 @@ export const PlannerScreen: React.FC<PlannerScreenProps> = ({
           ? buildWeatherContext(weatherRef.current, currentUserProfile?.temperatureUnit || 'celsius')
           : undefined,
         plannerContext: buildPlannerContext(planningEvent),
-        recentOutfitContext: recent.context
+        recentOutfitContext: recent.context,
+        brain: recent.brain
       };
 
       const res = await generateOutfitMobile(prompt, wardrobe, layeringPreference, excludeIds, personalization);
@@ -225,6 +227,16 @@ export const PlannerScreen: React.FC<PlannerScreenProps> = ({
     if (!outfitResult) return;
     runGenerate(outfitResult.data.garmentIds);
   }, [outfitResult, runGenerate]);
+
+  // The outfit brain: a disliked look is remembered and replaced right away.
+  const { rating, rate } = useOutfitFeedback(outfitResult?.data.garmentIds, planningEvent?.occasion ?? 'Planned Outfit');
+  const handleRate = useCallback(
+    async (next: OutfitRating) => {
+      await rate(next);
+      if (next === 'dislike') handleRegenerate();
+    },
+    [rate, handleRegenerate]
+  );
 
   const handleSaveToEvent = useCallback(async () => {
     if (!planningEvent || !outfitResult || resolvedGarments.length === 0 || savingRef.current) return;
@@ -478,6 +490,8 @@ export const PlannerScreen: React.FC<PlannerScreenProps> = ({
                   onSelectGarmentForSwap={setSelectedGarmentForSwap}
                   onRegenerate={handleRegenerate}
                   onSave={handleSaveToEvent}
+                  rating={rating}
+                  onRate={handleRate}
                 />
               )}
             </>

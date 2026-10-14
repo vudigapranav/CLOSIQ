@@ -4,6 +4,7 @@ import { SectionHeader } from '../ui/SectionHeader';
 import { GarmentImage } from '../ui/GarmentImage';
 import { SegmentedControl } from '../ui/SegmentedControl';
 import { computeStyleDna, styleArchetype, stylePreferenceLabel } from '../../data/styleDna';
+import { OutfitBrain, tasteGarments } from '../../services/outfitBrain';
 import { GarmentItem, Outfit, WardrobeProfile, LayeringPreference } from '../../types/wardrobe';
 import { SavedOutfitDetailModal } from '../modals/SavedOutfitDetailModal';
 
@@ -26,6 +27,8 @@ interface ProfileScreenProps {
   /** From profiles.name / style_preferences (asked at onboarding). */
   userName?: string;
   stylePreferences?: string[];
+  /** The outfit brain: liked/worn looks teach Style DNA. */
+  brain?: OutfitBrain;
 }
 
 const LAYERING_OPTIONS: { value: LayeringPreference; label: string }[] = [
@@ -105,7 +108,7 @@ function calculateWardrobeInsights(
   // 3. Category Ratio & Outfit Combination Math
   const topsCount = wardrobe.filter((i) => i.category === 'tops').length;
   const bottomsCount = wardrobe.filter((i) => i.category === 'bottoms').length;
-  const shoesCount = wardrobe.filter((i) => i.category === 'footwear').length;
+  const shoesCount = wardrobe.filter((i) => i.category === 'shoes').length;
   const totalCombos = topsCount * Math.max(1, bottomsCount) * Math.max(1, shoesCount);
 
   if (topsCount > 0 && bottomsCount > 0) {
@@ -176,7 +179,8 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
   userEmail,
   onSignOut,
   userName = '',
-  stylePreferences = []
+  stylePreferences = [],
+  brain
 }) => {
   const [selectedSavedOutfit, setSelectedSavedOutfit] = useState<Outfit | null>(null);
 
@@ -185,8 +189,17 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
   };
 
   // Honest Style DNA (src/data/styleDna.ts): 0 until the user adds clothes.
-  const styleDNA = computeStyleDna(wardrobe);
-  const archetype = styleArchetype(wardrobe, stylePreferences);
+  // Style DNA = what you own, blended with what you liked and wore (the brain).
+  const taste = brain ? tasteGarments(brain, wardrobe) : [];
+  const styleDNA = computeStyleDna(wardrobe, taste);
+  const archetype = styleArchetype(wardrobe, stylePreferences, taste);
+  const learnedFrom = brain?.learnedFrom ?? 0;
+
+  // Saved Looks: what you're wearing / wore vs. what to try next time.
+  const [lookTab, setLookTab] = useState<'worn' | 'try_later'>('worn');
+  const wornLooks = savedOutfits.filter((o) => o.status === 'worn');
+  const laterLooks = savedOutfits.filter((o) => o.status !== 'worn');
+  const shownLooks = lookTab === 'worn' ? wornLooks : laterLooks;
   const displayName = userName || (userEmail ? userEmail.split('@')[0] : 'You');
   const wardrobeInsights = calculateWardrobeInsights(wardrobe, savedOutfits, layeringPreference);
 
@@ -254,6 +267,11 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
 
         <p className="text-body" style={{ fontSize: '0.85rem', lineHeight: 1.5 }}>
           {archetype.description}
+        </p>
+        <p className="text-caption" style={{ marginTop: 6, color: 'var(--color-primary)', fontWeight: 600 }}>
+          {learnedFrom === 0
+            ? 'Rate suggestions and tap "Wear today" — your Style DNA learns from every look.'
+            : `Learning from ${learnedFrom} look${learnedFrom === 1 ? '' : 's'} you rated or wore.`}
         </p>
         {stylePreferences.length > 0 && (
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 12 }}>
@@ -412,9 +430,38 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
       </div>
 
       {/* 3. Saved Looks Section */}
-      <SectionHeader title="Saved Looks" subtitle="Outfits pinned to your rotation" />
+      <SectionHeader title="Saved Looks" subtitle="What you wore, and what to try next time" />
 
-      {savedOutfits.length === 0 ? (
+      <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
+        {([
+          { key: 'worn', label: `Wearing / worn (${wornLooks.length})` },
+          { key: 'try_later', label: `Try next time (${laterLooks.length})` }
+        ] as const).map((tab) => {
+          const active = lookTab === tab.key;
+          return (
+            <button
+              key={tab.key}
+              type="button"
+              aria-pressed={active}
+              onClick={() => setLookTab(tab.key)}
+              style={{
+                padding: '7px 14px',
+                borderRadius: 'var(--radius-pill)',
+                border: `1px solid ${active ? 'var(--color-primary)' : 'var(--color-border-medium)'}`,
+                backgroundColor: active ? 'var(--color-primary)' : 'var(--color-surface)',
+                color: active ? 'var(--color-text-on-primary)' : 'var(--color-text-primary)',
+                fontSize: '0.78rem',
+                fontWeight: 600,
+                cursor: 'pointer'
+              }}
+            >
+              {tab.label}
+            </button>
+          );
+        })}
+      </div>
+
+      {shownLooks.length === 0 ? (
         <div
           style={{
             padding: '24px 20px',
@@ -445,15 +492,17 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
             <Heart size={20} color="var(--color-text-muted)" />
           </div>
           <p className="text-body" style={{ fontSize: '0.86rem', color: 'var(--color-text-primary)', fontWeight: 600 }}>
-            No saved outfits yet
+            {lookTab === 'worn' ? 'Nothing worn yet' : 'Nothing saved for later'}
           </p>
           <p className="text-caption" style={{ fontSize: '0.78rem', maxWidth: 280, lineHeight: 1.4 }}>
-            Tap "Save" on any outfit from Today or the AI Stylist to pin it to your personal rotation.
+            {lookTab === 'worn'
+              ? 'Tap "Wear this" on a suggestion — it shows up here and teaches your Style DNA.'
+              : 'Tap "Later" on a suggestion you want to wear another day.'}
           </p>
         </div>
       ) : (
         <div className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: 14, marginBottom: 24 }}>
-          {savedOutfits.map((look) => (
+          {shownLooks.map((look) => (
             <button
               key={look.id}
               onClick={() => setSelectedSavedOutfit(look)}

@@ -3,6 +3,8 @@ import { UserProfileData, TemperatureUnit } from '../types/onboarding';
 import { WeatherData } from '../types/weather';
 import { PlannerEvent } from '../types/planner';
 import { loadRecentOutfitSignatures } from './outfitHistoryStorage';
+import { loadOutfitFeedback } from './outfitFeedbackStorage';
+import { OutfitBrain, BrainAIContext, buildOutfitBrain, brainContextForAI } from '../../../src/services/outfitBrain';
 
 /**
  * Composes the personalization context sent alongside an outfit-generation
@@ -93,6 +95,9 @@ export interface RecentOutfitContext {
   savedLookVibes?: string[];
 }
 
+/** The soft history above plus the user's feedback rules (server rule 12). */
+export type RecentOutfitContextWithFeedback = RecentOutfitContext & Partial<BrainAIContext>;
+
 const RECENT_HISTORY_WINDOW = 3;
 const SAVED_VIBE_SAMPLE = 2;
 
@@ -109,11 +114,10 @@ const SAVED_VIBE_SAMPLE = 2;
  */
 export async function buildRecentOutfitContext(
   savedOutfits: Outfit[] = []
-): Promise<{ excludeGarmentIds: string[]; context?: RecentOutfitContext }> {
-  const signatures = await loadRecentOutfitSignatures();
-  if (signatures.length === 0) {
-    return { excludeGarmentIds: [] };
-  }
+): Promise<{ excludeGarmentIds: string[]; context?: RecentOutfitContextWithFeedback; brain: OutfitBrain }> {
+  // History and feedback are independent reads — fetch them together.
+  const [signatures, feedback] = await Promise.all([loadRecentOutfitSignatures(), loadOutfitFeedback()]);
+  const brain = buildOutfitBrain(feedback, signatures, savedOutfits);
 
   const recentGarmentIdCombinations = signatures
     .slice(0, RECENT_HISTORY_WINDOW)
@@ -124,12 +128,19 @@ export async function buildRecentOutfitContext(
     .map((o) => o.vibe)
     .filter(Boolean);
 
+  // 2026-10-14: no longer hard-excludes every garment of the last outfit.
+  // That starved small wardrobes and still let the outfit from two
+  // generations ago come straight back. Repeats are now prevented per exact
+  // COMBINATION by the brain (recent window + dislikes), enforced in
+  // generateOutfitMobile. Regenerate still excludes the current outfit's pieces.
   return {
-    excludeGarmentIds: recentGarmentIdCombinations[0] || [],
+    excludeGarmentIds: [],
     context: {
       recentGarmentIdCombinations,
-      savedLookVibes: savedLookVibes.length > 0 ? savedLookVibes : undefined
-    }
+      savedLookVibes: savedLookVibes.length > 0 ? savedLookVibes : undefined,
+      ...brainContextForAI(brain)
+    },
+    brain
   };
 }
 
@@ -137,5 +148,8 @@ export interface OutfitPersonalizationContext {
   userProfileContext?: UserStyleContext;
   weatherContext?: WeatherContext;
   plannerContext?: PlannerEventContext;
-  recentOutfitContext?: RecentOutfitContext;
+  recentOutfitContext?: RecentOutfitContextWithFeedback;
+  /** Client-side only (never sent): used to reject a disliked or just-shown
+   *  combination and to steer the local engine. */
+  brain?: OutfitBrain;
 }

@@ -2,12 +2,15 @@ import { postJsonToApi } from './geminiClient';
 import { validateAIOutfitResponse, RawAIOutfitResponse } from './validator';
 import { GarmentItem, Outfit, LayeringPreference, GarmentCategory, FormalityLevel } from '../../types/wardrobe';
 import { generateAIOutfit as demoGenerateAIOutfit } from '../aiStylist';
+import { OutfitBrain, brainContextForAI, isFreshCombination, pickLocalOutfit } from '../outfitBrain';
 
 export interface OutfitRequestOptions {
   prompt: string;
   temperature?: number;
   layeringPreference?: LayeringPreference;
   excludeGarmentIds?: string[];
+  /** The outfit brain (src/services/outfitBrain.ts): dislikes, recent looks, taste. */
+  brain?: OutfitBrain;
 }
 
 /** Formats structured wardrobe context for AI styling */
@@ -99,7 +102,18 @@ export async function generateAIOutfitWithGemini(
 ): Promise<Outfit> {
   // Local picks are marked as such and carry no score (2026-10-14 audit:
   // they used to be shown exactly like AI results, with an invented 91-99%).
-  const localPick = () => ({ ...demoGenerateAIOutfit(wardrobe, options, seed), source: 'local' as const, styleScore: 0 });
+  // Brain-aware: never a disliked combination, avoids recently shown ones.
+  // (Only when every possible combination is disliked does it fall back to
+  // the plain occasion pick, so the screen is never left empty.)
+  const localPick = () => {
+    const pool = (options.excludeGarmentIds || []).length > 0
+      ? wardrobe.filter((item) => !options.excludeGarmentIds!.includes(item.id))
+      : wardrobe;
+    const picked =
+      pickLocalOutfit(pool.length >= 2 ? pool : wardrobe, options, options.brain) ??
+      demoGenerateAIOutfit(wardrobe, options, seed);
+    return { ...picked, source: 'local' as const, styleScore: 0 };
+  };
 
   if (wardrobe.length === 0) {
     return localPick();
@@ -114,7 +128,14 @@ export async function generateAIOutfitWithGemini(
     excludeGarmentIds: options.excludeGarmentIds || [],
     seed,
     wardrobe: wardrobeContext,
-    wardrobeSummary
+    wardrobeSummary,
+    // Server rule 12: dislikes (hard), recent/okay (avoid repeating), liked (taste).
+    recentOutfitContext: options.brain
+      ? {
+          recentGarmentIdCombinations: options.brain.recent.slice(0, 3).map((sig) => sig.split('|')),
+          ...brainContextForAI(options.brain)
+        }
+      : undefined
   });
 
   if (!res.ok || !res.data) {
@@ -123,6 +144,11 @@ export async function generateAIOutfitWithGemini(
 
   // Pass raw AI response through strict validation layer on client
   const validated = validateAIOutfitResponse(res.data, wardrobe);
+
+  if (validated.valid && !isFreshCombination(validated.items.map((i) => i.id), options.brain)) {
+    // The AI repeated a disliked or just-shown look: the brain overrides it.
+    return localPick();
+  }
 
   if (!validated.valid || validated.items.length === 0) {
     console.warn('[CLOSIQ Stylist] AI output validation failed, falling back to demo engine:', validated.reason);

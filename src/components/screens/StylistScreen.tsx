@@ -1,10 +1,12 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Sparkles, RefreshCw, Heart, Eye, AlertTriangle, Plus, X } from 'lucide-react';
+import { Sparkles, RefreshCw, Clock, Eye, AlertTriangle, Plus, X, Check, ArrowRight } from 'lucide-react';
 import { PrimaryButton } from '../ui/PrimaryButton';
 import { SecondaryButton } from '../ui/SecondaryButton';
 import { EmptyState } from '../ui/EmptyState';
 import { GarmentImage } from '../ui/GarmentImage';
-import { GarmentItem, Outfit, GarmentCategory, LayeringPreference, matchLabel } from '../../types/wardrobe';
+import { GarmentItem, Outfit, GarmentCategory, LayeringPreference, OutfitRating, matchLabel } from '../../types/wardrobe';
+import { OutfitBrain } from '../../services/outfitBrain';
+import { OutfitRatingBar } from '../ui/OutfitRatingBar';
 import {
   STYLIST_SUGGESTION_CHIPS,
   generateAIOutfit,
@@ -23,6 +25,12 @@ interface StylistScreenProps {
   onUnsaveOutfit: (outfit: Outfit) => void;
   onSelectItemDetail?: (item: GarmentItem) => void;
   onOpenUpload?: () => void;
+  onWearOutfit?: (outfit: Outfit) => void;
+  /** The outfit brain (src/services/outfitBrain.ts): dislikes, recent looks, taste. */
+  brain?: OutfitBrain;
+  ratingFor?: (outfit: Outfit) => OutfitRating | null;
+  onRateOutfit?: (outfit: Outfit, rating: OutfitRating) => void;
+  onOutfitShown?: (outfit: Outfit) => void;
 }
 
 const GENERATION_CAPTIONS = ['Checking your wardrobe…', 'Curating your look…', 'Finding the right combination…'];
@@ -36,7 +44,12 @@ export const StylistScreen: React.FC<StylistScreenProps> = ({
   onSaveOutfit,
   onUnsaveOutfit,
   onSelectItemDetail,
-  onOpenUpload
+  onOpenUpload,
+  onWearOutfit,
+  brain,
+  ratingFor,
+  onRateOutfit,
+  onOutfitShown
 }) => {
   const [prompt, setPrompt] = useState('I have a college presentation tomorrow');
   const [selectedChip, setSelectedChip] = useState('College');
@@ -70,7 +83,7 @@ export const StylistScreen: React.FC<StylistScreenProps> = ({
       const effectivePrompt = selectedStyle ? `${basePrompt} — ${selectedStyle.toLowerCase()} style` : basePrompt;
       const next = await generateAIOutfitWithGemini(
         wardrobe,
-        { prompt: effectivePrompt, layeringPreference, excludeGarmentIds },
+        { prompt: effectivePrompt, layeringPreference, excludeGarmentIds, brain },
         seed
       );
       if (token !== generationToken.current) return;
@@ -78,6 +91,7 @@ export const StylistScreen: React.FC<StylistScreenProps> = ({
         setInfoMessage('This is your best match right now — add more pieces to unlock other combinations.');
       }
       setOutfit(next);
+      onOutfitShown?.(next);
     } catch {
       if (token !== generationToken.current) return;
       setErrorMessage("We couldn't put together a look just now. Please try again.");
@@ -164,15 +178,28 @@ export const StylistScreen: React.FC<StylistScreenProps> = ({
     ? getSwapCandidates(outfit, swappingCategory, wardrobe, layeringPreference)
     : [];
 
-  const isSaved = outfit ? savedOutfits.some((o) => isSameOutfit(o, outfit)) : false;
+  // This look's Saved Looks status: 'try_later' ("try next time") or 'worn'.
+  const savedStatus = outfit ? savedOutfits.find((o) => isSameOutfit(o, outfit))?.status ?? null : null;
 
-  const handleToggleSave = () => {
+  const handleTryLater = () => {
     if (!outfit) return;
-    if (isSaved) {
+    if (savedStatus === 'try_later') {
       onUnsaveOutfit(outfit);
-    } else {
-      onSaveOutfit(outfit);
+    } else if (savedStatus !== 'worn') {
+      onSaveOutfit({ ...outfit, status: 'try_later' });
     }
+  };
+
+  const handleWearToday = () => {
+    if (!outfit || savedStatus === 'worn') return;
+    onWearOutfit?.(outfit);
+  };
+
+  // "I disliked it" is remembered and immediately replaced with a fresh look.
+  const handleRate = (rating: OutfitRating) => {
+    if (!outfit) return;
+    onRateOutfit?.(outfit, rating);
+    if (rating === 'dislike') handleRegenerate();
   };
 
   const thinkingPanel = (
@@ -650,14 +677,28 @@ export const StylistScreen: React.FC<StylistScreenProps> = ({
               </p>
             </div>
 
-            {/* Actions: Save | Regenerate | Details — 3 columns so labels never wrap at 375px */}
+            {onRateOutfit && <OutfitRatingBar rating={ratingFor?.(outfit) ?? null} onRate={handleRate} />}
+
+            {onWearOutfit && (
+              <PrimaryButton
+                fullWidth
+                icon={savedStatus === 'worn' ? <Check size={16} /> : <ArrowRight size={16} />}
+                onClick={handleWearToday}
+                style={{ marginBottom: 10, ...(savedStatus === 'worn' ? { backgroundColor: 'var(--color-success)' } : {}) }}
+              >
+                {savedStatus === 'worn' ? 'Wearing today' : 'Wear today'}
+              </PrimaryButton>
+            )}
+
+            {/* Actions: Later | Regenerate | Details — 3 columns so labels never wrap at 375px */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
               <SecondaryButton
-                style={{ padding: '10px 4px', fontSize: '0.75rem', whiteSpace: 'nowrap', color: isSaved ? 'var(--color-danger)' : 'var(--color-text-primary)' }}
-                icon={<Heart size={14} fill={isSaved ? 'var(--color-danger)' : 'none'} />}
-                onClick={handleToggleSave}
+                style={{ padding: '10px 4px', fontSize: '0.75rem', whiteSpace: 'nowrap', color: savedStatus ? 'var(--color-primary)' : 'var(--color-text-primary)' }}
+                icon={<Clock size={14} />}
+                onClick={handleTryLater}
+                title="Save this look to try next time"
               >
-                {isSaved ? 'Saved' : 'Save'}
+                {savedStatus === 'try_later' ? 'Saved' : savedStatus === 'worn' ? 'Worn' : 'Later'}
               </SecondaryButton>
 
               <SecondaryButton

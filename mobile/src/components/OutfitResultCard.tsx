@@ -6,9 +6,10 @@ import {
   TouchableOpacity,
   Dimensions
 } from 'react-native';
-import { Sparkles, RefreshCw, RefreshCcw, Bookmark, BookmarkCheck } from 'lucide-react-native';
+import { Sparkles, RefreshCw, RefreshCcw, Bookmark, BookmarkCheck, Shirt, Clock } from 'lucide-react-native';
 import { COLORS, RADIUS } from '../theme';
-import { GarmentItem } from '../../../src/types/wardrobe';
+import { GarmentItem, OutfitRating, SavedLookStatus } from '../../../src/types/wardrobe';
+import { OUTFIT_RATING_OPTIONS } from '../../../src/services/outfitBrain';
 import { GarmentImage } from './GarmentImage';
 
 const { width } = Dimensions.get('window');
@@ -30,7 +31,16 @@ interface OutfitResultCardProps {
   notice?: string;
   onSelectGarmentForSwap: (garment: GarmentItem) => void;
   onRegenerate: () => void;
-  onSave: () => void;
+  /** Legacy single save button (Planner's "save to event"). Ignored when
+   *  onWearToday / onTryLater are given. */
+  onSave?: () => void;
+  /** The outfit brain (2026-10-14): rating + wear/try actions. */
+  rating?: OutfitRating | null;
+  onRate?: (rating: OutfitRating) => void;
+  /** This look's Saved Looks status, if it's already saved. */
+  savedStatus?: SavedLookStatus | null;
+  onWearToday?: () => void;
+  onTryLater?: () => void;
 }
 
 // Memoized: this card renders several garment images and re-renders on
@@ -48,8 +58,14 @@ export const OutfitResultCard = React.memo<OutfitResultCardProps>(({
   notice,
   onSelectGarmentForSwap,
   onRegenerate,
-  onSave
+  onSave,
+  rating,
+  onRate,
+  savedStatus,
+  onWearToday,
+  onTryLater
 }) => {
+  const brainActions = !!(onWearToday && onTryLater);
   return (
     <View style={styles.resultContainer}>
       {/* Card Header */}
@@ -123,34 +139,84 @@ export const OutfitResultCard = React.memo<OutfitResultCardProps>(({
           ))}
       </View>
 
-      {/* Action Bar: Regenerate & Save */}
+      {/* How do you rate this outfit? — the brain remembers (src/services/outfitBrain.ts) */}
+      {onRate && (
+        <View style={styles.rateBox}>
+          <Text style={styles.rateTitle}>How do you rate this outfit?</Text>
+          <View style={styles.rateRow}>
+            {OUTFIT_RATING_OPTIONS.map((option) => {
+              const selected = rating === option.value;
+              return (
+                <TouchableOpacity
+                  key={option.value}
+                  style={[styles.rateChip, selected && styles.rateChipSelected]}
+                  activeOpacity={0.8}
+                  onPress={() => onRate(option.value)}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected }}
+                >
+                  <Text style={styles.rateEmoji}>{option.emoji}</Text>
+                  <Text style={[styles.rateLabel, selected && styles.rateLabelSelected]}>{option.label}</Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+          {rating === 'dislike' && <Text style={styles.rateHint}>Got it — you won't see this look again.</Text>}
+        </View>
+      )}
+
+      {/* Action Bar */}
       <View style={styles.actionRow}>
         <TouchableOpacity
           style={styles.regenerateBtn}
           activeOpacity={0.8}
           onPress={onRegenerate}
+          accessibilityLabel="Regenerate"
         >
-          <RefreshCcw size={15} color={COLORS.textPrimary} style={{ marginRight: 6 }} />
-          <Text style={styles.regenerateBtnText}>Regenerate</Text>
+          <RefreshCcw size={15} color={COLORS.textPrimary} style={brainActions ? undefined : { marginRight: 6 }} />
+          {!brainActions && <Text style={styles.regenerateBtnText}>Regenerate</Text>}
         </TouchableOpacity>
 
-        <TouchableOpacity
-          style={[styles.saveBtn, isSaved && styles.savedBtn]}
-          activeOpacity={0.8}
-          onPress={onSave}
-        >
-          {isSaved ? (
-            <>
-              <BookmarkCheck size={16} color="#FFFFFF" style={{ marginRight: 6 }} />
-              <Text style={styles.saveBtnText}>Saved ✓</Text>
-            </>
-          ) : (
-            <>
-              <Bookmark size={16} color="#FFFFFF" style={{ marginRight: 6 }} />
-              <Text style={styles.saveBtnText}>Save Look</Text>
-            </>
-          )}
-        </TouchableOpacity>
+        {brainActions ? (
+          <>
+            <TouchableOpacity
+              style={[styles.tryBtn, savedStatus === 'try_later' && styles.tryBtnActive]}
+              activeOpacity={0.8}
+              onPress={onTryLater}
+            >
+              <Clock size={15} color={savedStatus === 'try_later' ? '#FFFFFF' : COLORS.primary} style={{ marginRight: 5 }} />
+              <Text style={[styles.tryBtnText, savedStatus === 'try_later' && styles.tryBtnTextActive]}>
+                {savedStatus === 'try_later' ? 'Saved for later' : 'Try next time'}
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.saveBtn, savedStatus === 'worn' && styles.savedBtn]}
+              activeOpacity={0.8}
+              onPress={onWearToday}
+            >
+              <Shirt size={15} color="#FFFFFF" style={{ marginRight: 5 }} />
+              <Text style={styles.saveBtnText}>{savedStatus === 'worn' ? 'Wearing ✓' : 'Wear today'}</Text>
+            </TouchableOpacity>
+          </>
+        ) : (
+          <TouchableOpacity
+            style={[styles.saveBtn, isSaved && styles.savedBtn]}
+            activeOpacity={0.8}
+            onPress={onSave}
+          >
+            {isSaved ? (
+              <>
+                <BookmarkCheck size={16} color="#FFFFFF" style={{ marginRight: 6 }} />
+                <Text style={styles.saveBtnText}>Saved ✓</Text>
+              </>
+            ) : (
+              <>
+                <Bookmark size={16} color="#FFFFFF" style={{ marginRight: 6 }} />
+                <Text style={styles.saveBtnText}>Save Look</Text>
+              </>
+            )}
+          </TouchableOpacity>
+        )}
       </View>
     </View>
   );
@@ -357,5 +423,78 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 13.5,
     fontWeight: '700'
+  },
+  tryBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    borderRadius: RADIUS.pill,
+    borderWidth: 1.5,
+    borderColor: COLORS.primary,
+    backgroundColor: COLORS.bg
+  },
+  tryBtnActive: {
+    backgroundColor: COLORS.primary
+  },
+  tryBtnText: {
+    color: COLORS.primary,
+    fontSize: 13,
+    fontWeight: '700'
+  },
+  tryBtnTextActive: {
+    color: '#FFFFFF'
+  },
+  rateBox: {
+    marginBottom: 16,
+    padding: 12,
+    borderRadius: RADIUS.md,
+    backgroundColor: COLORS.bg,
+    borderWidth: 1,
+    borderColor: COLORS.border
+  },
+  rateTitle: {
+    fontSize: 12.5,
+    fontWeight: '700',
+    color: COLORS.textSecondary,
+    marginBottom: 8
+  },
+  rateRow: {
+    flexDirection: 'row',
+    gap: 8
+  },
+  rateChip: {
+    flex: 1,
+    alignItems: 'center',
+    paddingVertical: 9,
+    borderRadius: RADIUS.md,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    backgroundColor: COLORS.surface
+  },
+  rateChipSelected: {
+    borderColor: COLORS.primary,
+    backgroundColor: COLORS.primaryAlpha
+  },
+  rateEmoji: {
+    fontSize: 18,
+    marginBottom: 3
+  },
+  rateLabel: {
+    fontSize: 11.5,
+    fontWeight: '600',
+    color: COLORS.textSecondary,
+    textAlign: 'center'
+  },
+  rateLabelSelected: {
+    color: COLORS.primary,
+    fontWeight: '800'
+  },
+  rateHint: {
+    marginTop: 8,
+    fontSize: 11.5,
+    color: COLORS.textMuted,
+    fontStyle: 'italic'
   }
 });

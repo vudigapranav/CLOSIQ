@@ -1,5 +1,6 @@
 import { supabase, SUPABASE_URL, GARMENT_IMAGES_BUCKET, SIGNED_URL_TTL_SECONDS } from './supabase';
-import { GarmentItem, GarmentDetailsPatch, LayeringPreference, Outfit, WardrobeProfile } from '../../types/wardrobe';
+import { GarmentItem, GarmentDetailsPatch, LayeringPreference, Outfit, OutfitRating, SavedLookStatus, WardrobeProfile } from '../../types/wardrobe';
+import { OutfitFeedback, comboSignature } from '../outfitBrain';
 import { normalizeStorageLocation } from '../../data/storageLocations';
 import { normalizeSize } from '../../data/garmentSizes';
 
@@ -242,6 +243,7 @@ type OutfitRow = {
   date_created: string;
   worn_today: boolean;
   missing_categories: string[] | null;
+  status: string | null;
 };
 
 export async function loadSavedOutfits(userId: string): Promise<Outfit[]> {
@@ -265,7 +267,8 @@ export async function loadSavedOutfits(userId: string): Promise<Outfit[]> {
       saved: true,
       dateCreated: row.date_created,
       wornToday: row.worn_today,
-      missingCategories: (row.missing_categories as Outfit['missingCategories']) || undefined
+      missingCategories: (row.missing_categories as Outfit['missingCategories']) || undefined,
+      status: row.status === 'worn' ? 'worn' : 'try_later'
     })
   );
   // Looks embed garment snapshots whose signed URLs expire; re-sign them.
@@ -286,8 +289,14 @@ export async function saveOutfit(userId: string, outfit: Outfit): Promise<void> 
     explanation: outfit.explanation,
     date_created: outfit.dateCreated,
     worn_today: outfit.wornToday || false,
-    missing_categories: outfit.missingCategories || []
+    missing_categories: outfit.missingCategories || [],
+    status: outfit.status ?? 'try_later'
   });
+  if (error) throw error;
+}
+
+export async function updateOutfitStatus(userId: string, outfitId: string, status: SavedLookStatus): Promise<void> {
+  const { error } = await supabase.from('saved_outfits').update({ status }).eq('user_id', userId).eq('outfit_id', outfitId);
   if (error) throw error;
 }
 
@@ -350,4 +359,65 @@ export async function saveProfileBasics(userId: string, basics: ProfileBasics): 
   if (basics.name) row.name = basics.name;
   const { error } = await supabase.from('profiles').upsert(row, { onConflict: 'id' });
   if (error) throw error;
+}
+
+// ---------- outfit brain: feedback + recently shown (same tables as mobile) ----------
+
+export async function loadOutfitFeedback(userId: string): Promise<OutfitFeedback[]> {
+  const { data, error } = await supabase
+    .from('outfit_feedback')
+    .select('signature, garment_ids, rating, occasion, updated_at')
+    .eq('user_id', userId)
+    .order('updated_at', { ascending: false })
+    .limit(500);
+  if (error) throw error;
+  return (data || []).map((row) => ({
+    signature: row.signature,
+    garmentIds: row.garment_ids || [],
+    rating: row.rating as OutfitRating,
+    occasion: row.occasion || undefined,
+    updatedAt: row.updated_at
+  }));
+}
+
+export async function rateOutfit(userId: string, garmentIds: string[], rating: OutfitRating, occasion?: string): Promise<OutfitFeedback> {
+  const signature = comboSignature(garmentIds);
+  const entry: OutfitFeedback = { signature, garmentIds: signature.split('|'), rating, occasion, updatedAt: new Date().toISOString() };
+  const { error } = await supabase.from('outfit_feedback').upsert(
+    { user_id: userId, signature, garment_ids: entry.garmentIds, rating, occasion: occasion ?? null, updated_at: entry.updatedAt },
+    { onConflict: 'user_id,signature' }
+  );
+  if (error) throw error;
+  return entry;
+}
+
+const RECENT_HISTORY = 8;
+
+export async function loadRecentSignatures(userId: string): Promise<string[]> {
+  const { data, error } = await supabase
+    .from('outfit_history')
+    .select('signature')
+    .eq('user_id', userId)
+    .order('last_seen_at', { ascending: false })
+    .limit(RECENT_HISTORY);
+  if (error) throw error;
+  return (data || []).map((row) => row.signature);
+}
+
+/** Notes that this combination was just shown (shared with mobile's outfit_history). */
+export async function recordShownOutfit(userId: string, garmentIds: string[]): Promise<void> {
+  const signature = comboSignature(garmentIds);
+  const now = new Date().toISOString();
+  const { data, error } = await supabase
+    .from('outfit_history')
+    .select('id')
+    .eq('user_id', userId)
+    .eq('signature', signature)
+    .maybeSingle();
+  if (error) throw error;
+  const write = data
+    ? supabase.from('outfit_history').update({ last_seen_at: now, garment_ids: garmentIds }).eq('id', data.id)
+    : supabase.from('outfit_history').insert({ user_id: userId, signature, garment_ids: garmentIds, last_seen_at: now });
+  const { error: writeError } = await write;
+  if (writeError) throw writeError;
 }

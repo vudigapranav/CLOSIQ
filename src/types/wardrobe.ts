@@ -83,7 +83,15 @@ export interface Outfit {
   /** 'ai' = chosen by the AI stylist; 'local' = CLOSIQ's on-device fallback
    *  (no AI evaluated it, so it carries no match score). */
   source?: 'ai' | 'local';
+  /** Saved Looks only: 'try_later' = "I'll try this next time";
+   *  'worn' = "I'm wearing / wore this". */
+  status?: SavedLookStatus;
 }
+
+export type SavedLookStatus = 'try_later' | 'worn';
+
+/** How the user rated a suggested outfit (stored per garment combination). */
+export type OutfitRating = 'dislike' | 'okay' | 'nice';
 
 /** "96% Match" only for an AI-scored outfit; never an invented number. */
 export function matchLabel(outfit: Pick<Outfit, 'source' | 'styleScore'>): string {

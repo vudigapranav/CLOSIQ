@@ -1,10 +1,12 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Sparkles, RefreshCw, Heart, Eye, Plus, AlertTriangle, ArrowRight, Check, Sun, ChevronRight } from 'lucide-react';
+import { Sparkles, RefreshCw, Clock, Eye, Plus, AlertTriangle, ArrowRight, Check, Sun, ChevronRight } from 'lucide-react';
 import { PrimaryButton } from '../ui/PrimaryButton';
 import { SecondaryButton } from '../ui/SecondaryButton';
 import { EmptyState } from '../ui/EmptyState';
 import { GarmentImage } from '../ui/GarmentImage';
-import { GarmentItem, Outfit, LayeringPreference, matchLabel } from '../../types/wardrobe';
+import { GarmentItem, Outfit, LayeringPreference, OutfitRating, matchLabel } from '../../types/wardrobe';
+import { OutfitBrain } from '../../services/outfitBrain';
+import { OutfitRatingBar } from '../ui/OutfitRatingBar';
 import { isSameOutfit, formatCategoryList } from '../../services/aiStylist';
 import { generateAIOutfitWithGemini } from '../../services/ai';
 
@@ -22,6 +24,11 @@ interface TodayScreenProps {
   onNavigateToProfile?: () => void;
   /** The signed-in user's first name for the greeting; omitted when unknown. */
   userName?: string;
+  /** The outfit brain (src/services/outfitBrain.ts): dislikes, recent looks, taste. */
+  brain?: OutfitBrain;
+  ratingFor?: (outfit: Outfit) => OutfitRating | null;
+  onRateOutfit?: (outfit: Outfit, rating: OutfitRating) => void;
+  onOutfitShown?: (outfit: Outfit) => void;
 }
 
 const OCCASIONS = ['College', 'Work', 'Date', 'Party', 'Casual', 'Travel'];
@@ -44,7 +51,11 @@ export const TodayScreen: React.FC<TodayScreenProps> = ({
   onOpenUpload,
   onSelectItemDetail,
   onNavigateToProfile,
-  userName
+  userName,
+  brain,
+  ratingFor,
+  onRateOutfit,
+  onOutfitShown
 }) => {
   const firstName = (userName || '').trim().split(/\s+/)[0];
   const greeting = firstName ? `${getGreeting()}, ${firstName}.` : `${getGreeting()}.`;
@@ -81,9 +92,10 @@ export const TodayScreen: React.FC<TodayScreenProps> = ({
     setErrorMessage(null);
     setShowBreakdown(false);
     try {
-      const generated = await generateAIOutfitWithGemini(wardrobe, { prompt: promptText, layeringPreference, excludeGarmentIds }, seed);
+      const generated = await generateAIOutfitWithGemini(wardrobe, { prompt: promptText, layeringPreference, excludeGarmentIds, brain }, seed);
       if (token !== generationToken.current) return;
       setOutfit(generated);
+      onOutfitShown?.(generated);
     } catch {
       if (token !== generationToken.current) return;
       setErrorMessage("We couldn't put together a look just now. Please try again.");
@@ -129,15 +141,16 @@ export const TodayScreen: React.FC<TodayScreenProps> = ({
     runGeneration(activePrompt, nextSeed, excludeIds);
   };
 
-  const isSaved = outfit ? savedOutfits.some((o) => isSameOutfit(o, outfit)) : false;
-  const isWorn = outfit ? wornOutfitId === outfit.id : false;
+  // This look's Saved Looks status: 'try_later' ("try next time") or 'worn'.
+  const savedStatus = outfit ? savedOutfits.find((o) => isSameOutfit(o, outfit))?.status ?? null : null;
+  const isWorn = outfit ? wornOutfitId === outfit.id || savedStatus === 'worn' : false;
 
-  const handleToggleSave = () => {
+  const handleTryLater = () => {
     if (!outfit) return;
-    if (isSaved) {
+    if (savedStatus === 'try_later') {
       onUnsaveOutfit(outfit);
-    } else {
-      onSaveOutfit(outfit);
+    } else if (savedStatus !== 'worn') {
+      onSaveOutfit({ ...outfit, status: 'try_later' });
     }
   };
 
@@ -145,6 +158,13 @@ export const TodayScreen: React.FC<TodayScreenProps> = ({
     if (!outfit || isWorn) return;
     onWearOutfit?.(outfit);
     setWornOutfitId(outfit.id);
+  };
+
+  // "I disliked it" is remembered and immediately replaced with a fresh look.
+  const handleRate = (rating: OutfitRating) => {
+    if (!outfit) return;
+    onRateOutfit?.(outfit, rating);
+    if (rating === 'dislike') handleSwapLook();
   };
 
   const recentlyAdded = [...wardrobe]
@@ -504,6 +524,8 @@ export const TodayScreen: React.FC<TodayScreenProps> = ({
             </p>
           </div>
 
+          {onRateOutfit && <OutfitRatingBar rating={ratingFor?.(outfit) ?? null} onRate={handleRate} />}
+
           {/* Action Buttons: "Wear this" is the hero action; View/Swap/Save
               share a secondary row so nothing wraps at 375px. */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
@@ -535,12 +557,12 @@ export const TodayScreen: React.FC<TodayScreenProps> = ({
               </SecondaryButton>
 
               <SecondaryButton
-                style={{ padding: '10px 4px', fontSize: '0.76rem', whiteSpace: 'nowrap', color: isSaved ? 'var(--color-danger)' : 'var(--color-text-primary)' }}
-                icon={<Heart size={14} fill={isSaved ? 'var(--color-danger)' : 'none'} />}
-                onClick={handleToggleSave}
-                title="Save Look"
+                style={{ padding: '10px 4px', fontSize: '0.76rem', whiteSpace: 'nowrap', color: savedStatus ? 'var(--color-primary)' : 'var(--color-text-primary)' }}
+                icon={<Clock size={14} />}
+                onClick={handleTryLater}
+                title="Save this look to try next time"
               >
-                {isSaved ? 'Saved' : 'Save'}
+                {savedStatus === 'try_later' ? 'Saved' : savedStatus === 'worn' ? 'Worn' : 'Later'}
               </SecondaryButton>
             </div>
           </div>

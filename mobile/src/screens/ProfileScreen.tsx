@@ -11,7 +11,9 @@ import {
 } from 'react-native';
 import { User, Layers, Heart, Sparkles, ChevronRight, Bookmark, Pencil, X, Check, LogOut, Mail } from 'lucide-react-native';
 import { COLORS, RADIUS } from '../theme';
-import { WardrobeProfile, LayeringPreference, Outfit, GarmentItem } from '../../../src/types/wardrobe';
+import { WardrobeProfile, LayeringPreference, Outfit, GarmentItem, SavedLookStatus } from '../../../src/types/wardrobe';
+import { OutfitFeedback, buildOutfitBrain, tasteGarments } from '../../../src/services/outfitBrain';
+import { loadOutfitFeedback } from '../services/outfitFeedbackStorage';
 import { SavedLookDetailModal } from '../components/SavedLookDetailModal';
 import { BodyTypeOptionCard } from '../components/BodyTypeOptionCard';
 import { GarmentImage } from '../components/GarmentImage';
@@ -97,8 +99,28 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
 
   // Honest Style DNA (src/data/styleDna.ts): 0 everywhere until the user
   // has clothes; the archetype comes from their onboarding answers until then.
-  const styleDna = computeStyleDna(wardrobe);
-  const archetype = styleArchetype(wardrobe, userProfile.stylePreferences);
+  // The outfit brain feeds Style DNA: looks rated "It's nice" or worn are the
+  // user's taste, blended with what they own (src/data/styleDna.ts).
+  const [feedback, setFeedback] = useState<OutfitFeedback[]>([]);
+  useEffect(() => {
+    let active = true;
+    loadOutfitFeedback().then((list) => {
+      if (active) setFeedback(list);
+    });
+    return () => {
+      active = false;
+    };
+  }, [savedOutfits]);
+  const brain = buildOutfitBrain(feedback, [], savedOutfits);
+  const taste = tasteGarments(brain, wardrobe);
+  const styleDna = computeStyleDna(wardrobe, taste);
+  const archetype = styleArchetype(wardrobe, userProfile.stylePreferences, taste);
+
+  // Saved Looks: what you're wearing / wore vs. what to try next time.
+  const [lookTab, setLookTab] = useState<SavedLookStatus>('worn');
+  const wornLooks = savedOutfits.filter((o) => o.status === 'worn');
+  const laterLooks = savedOutfits.filter((o) => o.status !== 'worn');
+  const shownLooks = lookTab === 'worn' ? wornLooks : laterLooks;
 
   return (
     <ScrollView
@@ -257,21 +279,43 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
           <Text style={styles.sectionTitle}>Saved Looks ({savedOutfits.length})</Text>
         </View>
 
-        {savedOutfits.length === 0 ? (
+        <View style={styles.lookTabs}>
+          {([
+            { key: 'worn', label: `Wearing / worn (${wornLooks.length})` },
+            { key: 'try_later', label: `Try next time (${laterLooks.length})` }
+          ] as { key: SavedLookStatus; label: string }[]).map((tab) => {
+            const active = lookTab === tab.key;
+            return (
+              <TouchableOpacity
+                key={tab.key}
+                style={[styles.lookTab, active && styles.lookTabActive]}
+                onPress={() => setLookTab(tab.key)}
+              >
+                <Text style={[styles.lookTabText, active && styles.lookTabTextActive]}>{tab.label}</Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+
+        {shownLooks.length === 0 ? (
           <View style={styles.emptySavedCard}>
             <Heart size={28} color={COLORS.primary} style={{ marginBottom: 8 }} />
-            <Text style={styles.emptySavedTitle}>No Saved Looks Yet</Text>
+            <Text style={styles.emptySavedTitle}>
+              {lookTab === 'worn' ? 'Nothing worn yet' : 'Nothing saved for later'}
+            </Text>
             <Text style={styles.emptySavedSubtitle}>
-              Generate an outfit on Today or Stylist and tap "Save Look" to store your favorite ensembles.
+              {lookTab === 'worn'
+                ? 'Get a suggestion on Home or AI Stylist and tap "Wear today" — it shows up here and teaches your Style DNA.'
+                : 'Tap "Try next time" on a suggestion you want to wear another day.'}
             </Text>
             <TouchableOpacity style={styles.createBtn} onPress={onNavigateToToday}>
-              <Text style={styles.createBtnText}>Create Your First Look</Text>
+              <Text style={styles.createBtnText}>Get a suggestion</Text>
               <ChevronRight size={14} color="#FFFFFF" style={{ marginLeft: 4 }} />
             </TouchableOpacity>
           </View>
         ) : (
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ paddingVertical: 4 }}>
-            {savedOutfits.map((outfit) => (
+            {shownLooks.map((outfit) => (
               <TouchableOpacity
                 key={outfit.id}
                 style={styles.savedOutfitCard}
@@ -288,10 +332,10 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                 </View>
 
                 <Text style={styles.savedOutfitTitle} numberOfLines={1}>{outfit.title}</Text>
-                <Text style={styles.savedOutfitOccasion}>{outfit.occasion} • {outfit.vibe}</Text>
+                <Text style={styles.savedOutfitOccasion}>{outfit.occasion}{outfit.vibe ? ` • ${outfit.vibe}` : ''}</Text>
 
                 <View style={styles.savedFooter}>
-                  <Text style={styles.savedScore}>{outfit.styleScore}% Match</Text>
+                  <Text style={styles.savedScore}>{outfit.styleScore > 0 ? `${outfit.styleScore}% Match` : 'Local pick'}</Text>
                   <Text style={styles.savedWearAction}>Open Look →</Text>
                 </View>
               </TouchableOpacity>
@@ -310,6 +354,11 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
         <View style={styles.insightsCard}>
           <Text style={styles.archetypeName}>{archetype.name}</Text>
           <Text style={styles.archetypeDesc}>{archetype.description}</Text>
+          <Text style={styles.learnedLine}>
+            {brain.learnedFrom === 0
+              ? 'Rate suggestions and tap "Wear today" — your Style DNA learns from every look.'
+              : `Learning from ${brain.learnedFrom} look${brain.learnedFrom === 1 ? '' : 's'} you rated or wore.`}
+          </Text>
 
           {styleDna.map((axis) => (
             <View key={axis.key} style={styles.dnaRow}>
@@ -787,6 +836,37 @@ const styles = StyleSheet.create({
     fontSize: 11.5,
     fontWeight: '600',
     color: COLORS.primary
+  },
+  lookTabs: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 12
+  },
+  lookTab: {
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: RADIUS.pill,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    backgroundColor: COLORS.surface
+  },
+  lookTabActive: {
+    backgroundColor: COLORS.primary,
+    borderColor: COLORS.primary
+  },
+  lookTabText: {
+    fontSize: 12.5,
+    fontWeight: '600',
+    color: COLORS.textPrimary
+  },
+  lookTabTextActive: {
+    color: '#FFFFFF'
+  },
+  learnedLine: {
+    fontSize: 11.5,
+    color: COLORS.primary,
+    fontWeight: '600',
+    marginBottom: 6
   },
   archetypeName: {
     fontSize: 17,

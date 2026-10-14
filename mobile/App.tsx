@@ -29,7 +29,8 @@ import {
   loadUserWardrobe,
   saveUserGarment,
   removeUserGarment,
-  updateUserGarmentDetails
+  updateUserGarmentDetails,
+  recordGarmentsWorn
 } from './src/services/wardrobeStorage';
 import { loadSavedOutfits, saveOutfitToStorage, removeSavedOutfitFromStorage } from './src/services/savedOutfitsStorage';
 import { restoreSession, onAuthStateChange, signOut } from './src/services/authService';
@@ -213,11 +214,17 @@ function AppContent() {
     if (isSessionCurrent(scope)) setWardrobe(updated);
   };
 
+  // "Try next time" saves with status try_later; "Wear today" saves with
+  // status worn AND counts a wear for every garment in the look.
   const handleSaveOutfit = async (outfit: Outfit): Promise<Outfit[]> => {
     const scope = captureSession();
     const updated = await saveOutfitToStorage(outfit);
     if (!isSessionCurrent(scope)) return savedOutfits;
     setSavedOutfits(updated);
+    if (outfit.status === 'worn') {
+      const worn = await recordGarmentsWorn(outfit.items.map((i) => i.id), profile);
+      if (isSessionCurrent(scope) && worn.length > 0) setWardrobe(worn);
+    }
     return updated;
   };
 
@@ -269,6 +276,9 @@ function AppContent() {
     // A worn look shouldn't be immediately re-recommended either — same
     // recent-outfit memory Today/Stylist use for generate/regenerate/save.
     recordRecentOutfit(outfit.items.map((i) => i.id));
+    // Wearing it counts: it moves to "Worn" in Saved Looks (added there if it
+    // came from the Planner) and each garment gets a wear (2026-10-14).
+    handleSaveOutfit({ ...outfit, saved: true, status: 'worn' });
   };
 
   // Cinematic intro (src/components/IntroSplash.tsx): full film once a day,

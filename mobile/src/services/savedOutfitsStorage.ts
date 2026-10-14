@@ -48,7 +48,8 @@ function rowToOutfit(row: Tables<'saved_outfits'>): Outfit {
     saved: true,
     dateCreated: row.date_created,
     wornToday: row.worn_today,
-    missingCategories: ((row.missing_categories as unknown) as Outfit['missingCategories']) || undefined
+    missingCategories: ((row.missing_categories as unknown) as Outfit['missingCategories']) || undefined,
+    status: row.status === 'worn' ? 'worn' : 'try_later'
   };
 }
 
@@ -130,9 +131,15 @@ export async function saveOutfitToStorage(outfit: Outfit): Promise<Outfit[]> {
   // An already-synced look is genuinely a no-op. A look still marked
   // pending is NOT — tapping Save again is the user's way to retry it, so
   // it must reach the cloud call instead of being silently swallowed here.
+  const wantedStatus = outfit.status ?? 'try_later';
+  // Same look saved again with a different status ("try later" → "wearing
+  // it today"): update the status instead of duplicating the look.
+  if (duplicate && !isSyncPending(duplicate) && (duplicate.status ?? 'try_later') !== wantedStatus) {
+    return updateSavedOutfitStatus(duplicate.id, wantedStatus);
+  }
   if (duplicate && !isSyncPending(duplicate)) return existing;
 
-  const withSaved = clearPending({ ...(duplicate ?? outfit), saved: true });
+  const withSaved = clearPending({ ...(duplicate ?? outfit), saved: true, status: wantedStatus });
   const others = existing.filter((o) => o.id !== withSaved.id);
   const optimistic = [withSaved, ...others];
   await writeCache(scope, optimistic);
@@ -161,7 +168,8 @@ export async function saveOutfitToStorage(outfit: Outfit): Promise<Outfit[]> {
         explanation: withSaved.explanation as unknown as never,
         date_created: withSaved.dateCreated,
         worn_today: withSaved.wornToday || false,
-        missing_categories: withSaved.missingCategories || []
+        missing_categories: withSaved.missingCategories || [],
+        status: withSaved.status ?? 'try_later'
       });
       if (error) throw error;
     }
@@ -206,6 +214,32 @@ export async function removeSavedOutfitFromStorage(id: string): Promise<Outfit[]
     return existing;
   }
 
+  return updated;
+}
+
+/** Moves a saved look between "Try next time" and "Worn". */
+export async function updateSavedOutfitStatus(id: string, status: 'try_later' | 'worn'): Promise<Outfit[]> {
+  const scope = captureSession();
+  const userId = scope.userId;
+  const existing = await readCache(scope);
+  const updated = existing.map((o) => (o.id === id ? { ...o, status } : o));
+  await writeCache(scope, updated);
+  if (!userId) return updated;
+
+  const ok = await runCloudWrite({
+    scope,
+    title: 'Look not updated',
+    message: "This look's status couldn't be saved to your account. Try again in a moment.",
+    run: async () => {
+      const { error } = await supabase.from('saved_outfits').update({ status }).eq('user_id', userId).eq('outfit_id', id);
+      if (error) throw error;
+    }
+  });
+  if (!isSessionCurrent(scope)) return [];
+  if (!ok) {
+    await writeCache(scope, existing);
+    return existing;
+  }
   return updated;
 }
 

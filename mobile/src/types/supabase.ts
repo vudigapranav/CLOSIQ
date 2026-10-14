@@ -127,6 +127,39 @@ export type Database = {
         }
         Relationships: []
       }
+      outfit_feedback: {
+        Row: {
+          created_at: string
+          garment_ids: string[]
+          id: string
+          occasion: string | null
+          rating: string
+          signature: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          garment_ids?: string[]
+          id?: string
+          occasion?: string | null
+          rating: string
+          signature: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          garment_ids?: string[]
+          id?: string
+          occasion?: string | null
+          rating?: string
+          signature?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       outfit_history: {
         Row: {
           created_at: string
@@ -249,6 +282,7 @@ export type Database = {
           missing_categories: string[]
           occasion: string
           outfit_id: string
+          status: string
           style_score: number | null
           temperature: number | null
           title: string
@@ -267,6 +301,7 @@ export type Database = {
           missing_categories?: string[]
           occasion?: string
           outfit_id: string
+          status?: string
           style_score?: number | null
           temperature?: number | null
           title?: string
@@ -285,6 +320,7 @@ export type Database = {
           missing_categories?: string[]
           occasion?: string
           outfit_id?: string
+          status?: string
           style_score?: number | null
           temperature?: number | null
           title?: string

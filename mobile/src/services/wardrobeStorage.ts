@@ -421,3 +421,36 @@ export async function updateUserGarmentDetails(
   }
   return updated;
 }
+
+/**
+ * "Wearing it today" (2026-10-14): +1 wear count and today's date as last
+ * worn, for every garment in the look. Best-effort per garment — a failed
+ * cloud write keeps the local count (it's a statistic, not the user's data).
+ */
+export async function recordGarmentsWorn(ids: string[], profile: WardrobeProfile): Promise<GarmentItem[]> {
+  const scope = captureSession();
+  const userId = scope.userId;
+  const today = new Date().toISOString().split('T')[0];
+  const worn = new Set(ids);
+  const existingCache = await loadCachedWardrobe(scope, profile);
+  const updated = existingCache.map((item) =>
+    worn.has(item.id) ? { ...item, wearCount: (item.wearCount || 0) + 1, lastWornDate: today } : item
+  );
+  await AsyncStorage.setItem(storageKey(scope, profile), JSON.stringify(updated));
+  if (!userId || !isSessionCurrent(scope)) return updated;
+
+  await Promise.all(
+    updated
+      .filter((item) => worn.has(item.id))
+      .map(async (item) => {
+        const { error } = await supabase
+          .from('garments')
+          .update({ wear_count: item.wearCount, last_worn_date: today })
+          .eq('user_id', userId)
+          .eq('garment_id', item.id)
+          .eq('wardrobe_profile', profile);
+        if (error) console.warn('Wear count not saved to the cloud for', item.id, error);
+      })
+  );
+  return isSessionCurrent(scope) ? updated : [];
+}
