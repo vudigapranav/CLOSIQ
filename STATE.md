@@ -45,6 +45,11 @@ This document tracks the live implementation status of **CLOSIQ**. It is updated
 * **"AI service not available" after the studio photo worked** — `GEMINI_API_KEY` is not on Vercel (`/healthz` geminiConfigured false); the studio cut-out is local and needs no key. Separately, the free tier was overloaded (live probe: 4 of 5 flash models 503/timeout). `server/geminiServer.js` now walks a model chain (`GEMINI_MODELS`) within a 36 s budget; a real scan succeeded via `gemini-3.5-flash-lite` in ~20 s.
 * Deployed to Vercel and published OTA update `7be1a3dc-9aff-4b54-b5be-85ad92def9a3` (channel/branch `preview`, runtime 1.0.0, Android). Verified from the exported bundle: API URL is the Vercel host, no LAN/placeholder host, intro + redirect fix present, no Gemini key.
 
+## Demo account removed + honest Style DNA (2026-10-14)
+* At the user's request the shared demo login is gone from web and mobile (button, demo@login shortcut, demo-wardrobe seeding, `demo_missing`). Closes release blocker **B7**. The demo **user and its 58 garments still exist in Supabase** — deleting them is a separate, irreversible decision for the user.
+* Style DNA (`src/data/styleDna.ts`, shared): scores = share of the user's own wardrobe per trait (incl. new "Indian Ethnic"); a new account shows 0 everywhere. Web onboarding now asks name + style preferences (saved to `profiles.name` / `style_preferences` without touching mobile's other profile fields). Removed hard-coded placeholders: web Profile "Pranav / Elevated Architectural Minimalist" + invented 85/80/88% scores, web Home "Good morning, Pranav", mobile "Modern Minimalist"; deleted unused `src/data/initialWardrobe.ts`.
+* Tests 80/80 (6 demo tests → 1 no-demo guard; +3 Style DNA). Deployed to Vercel (verified live bundle: no demo, no "Pranav", style step present). OTA `dbc6d3bb-6f56-4239-9a19-7345eecf9f6a` on `preview` (verified: Vercel API host, no LAN host, no demo, no Gemini key).
+
 ## Verification this session
 * Web build + oxlint clean; mobile `tsc` clean; mobile tests 82/82; studio handler + Vercel function wrappers exercised locally; live smoke test above.
 * NOT TESTED: any UI in a browser or on a device (standing preference: code/build/API only), real sign-in, real uploads.
