@@ -23,7 +23,7 @@ import {
   refreshGarmentImages,
   storageReferenceUrl
 } from '../src/services/garmentImages';
-import { loadUserWardrobe, seedDemoWardrobeIfNeeded } from '../src/services/wardrobeStorage';
+import { loadUserWardrobe } from '../src/services/wardrobeStorage';
 import { loadSavedOutfits } from '../src/services/savedOutfitsStorage';
 import { loadPlannerEvents } from '../src/services/plannerStorage';
 import { isSyncPending } from '../src/services/cloudWriteFeedback';
@@ -219,24 +219,4 @@ test('an upload whose signing fails at load keeps a re-signable reference, not a
 
   assert.notEqual(item.imageUrl, '');
   assert.equal(storagePathFromUrl(item.imageUrl), `${USER}/upload.jpg`);
-});
-
-test('the demo seed stores RELATIVE /wardrobe paths, so no host can go stale again', async () => {
-  reset();
-  const inserted: TableCall[] = [];
-  setSupabase(
-    createFakeSupabase({
-      onTable: (call: TableCall) => {
-        if (call.op === 'insert') inserted.push(call);
-        return { data: [], error: null, count: 0 };
-      }
-    }).client
-  );
-
-  assert.equal(await seedDemoWardrobeIfNeeded(), true);
-  const rows = inserted.flatMap((c) => c.payload as { image_url: string }[]);
-  assert.ok(rows.length > 0);
-  for (const row of rows) {
-    assert.match(row.image_url, /^\/wardrobe\//, `seed row stored a host-qualified URL: ${row.image_url}`);
-  }
 });

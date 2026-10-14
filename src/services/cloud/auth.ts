@@ -7,20 +7,10 @@ import { supabase } from './supabase';
  * errors map to a handful of plain messages.
  */
 
-// Same demo account as mobile: what the user types vs. the real backing login.
-export const DEMO_DISPLAY_EMAIL = 'demo@login';
-export const DEMO_DISPLAY_PASSWORD = 'demo@123';
-const DEMO_BACKING_EMAIL = 'demo.account@closiq.app';
-const DEMO_BACKING_PASSWORD = 'demo@123';
-
 export interface AuthOutcome {
   ok: boolean;
   /** Shown to the user — an error on failure, or a "check your email" note. */
   message?: string;
-}
-
-export function isDemoEmail(email: string | undefined | null): boolean {
-  return (email || '').toLowerCase() === DEMO_BACKING_EMAIL;
 }
 
 function friendlyError(err: { message?: string; status?: number; code?: string } | null): string {
@@ -36,17 +26,8 @@ function friendlyError(err: { message?: string; status?: number; code?: string }
 }
 
 export async function signIn(email: string, password: string): Promise<AuthOutcome> {
-  const trimmed = email.trim();
-  const isDemo = trimmed.toLowerCase() === DEMO_DISPLAY_EMAIL && password === DEMO_DISPLAY_PASSWORD;
-  const { error } = await supabase.auth.signInWithPassword({
-    email: isDemo ? DEMO_BACKING_EMAIL : trimmed,
-    password: isDemo ? DEMO_BACKING_PASSWORD : password
-  });
+  const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
   return error ? { ok: false, message: friendlyError(error) } : { ok: true };
-}
-
-export async function signInDemo(): Promise<AuthOutcome> {
-  return signIn(DEMO_DISPLAY_EMAIL, DEMO_DISPLAY_PASSWORD);
 }
 
 export async function signUp(email: string, password: string): Promise<AuthOutcome> {

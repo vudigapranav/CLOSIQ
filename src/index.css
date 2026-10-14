@@ -475,28 +475,6 @@ html, body {
   margin-bottom: 22px;
 }
 
-.login-demo {
-  width: 100%;
-  margin-top: 10px;
-  padding: 12px 20px;
-  border-radius: var(--radius-pill);
-  border: 1px solid var(--color-primary);
-  background: var(--color-primary-alpha);
-  color: var(--color-primary);
-  font-weight: 600;
-  font-size: 0.86rem;
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-}
-
-.login-demo:disabled {
-  opacity: 0.6;
-  cursor: default;
-}
-
 @media (min-width: 1024px) {
   .login-hero {
     display: block;

@@ -3,7 +3,7 @@ import { Sparkles, Heart, Moon, Sun, Lightbulb, Trash2, Shirt, CalendarDays, Bel
 import { SectionHeader } from '../ui/SectionHeader';
 import { GarmentImage } from '../ui/GarmentImage';
 import { SegmentedControl } from '../ui/SegmentedControl';
-import { INITIAL_PROFILE } from '../../data/initialWardrobe';
+import { computeStyleDna, styleArchetype, stylePreferenceLabel } from '../../data/styleDna';
 import { GarmentItem, Outfit, WardrobeProfile, LayeringPreference } from '../../types/wardrobe';
 import { SavedOutfitDetailModal } from '../modals/SavedOutfitDetailModal';
 
@@ -23,6 +23,9 @@ interface ProfileScreenProps {
   /** Signed-in account shown in Settings, with a Sign out action. */
   userEmail?: string;
   onSignOut?: () => void;
+  /** From profiles.name / style_preferences (asked at onboarding). */
+  userName?: string;
+  stylePreferences?: string[];
 }
 
 const LAYERING_OPTIONS: { value: LayeringPreference; label: string }[] = [
@@ -30,54 +33,6 @@ const LAYERING_OPTIONS: { value: LayeringPreference; label: string }[] = [
   { value: 'sometimes', label: 'Sometimes' },
   { value: 'usually', label: 'Usually' }
 ];
-
-function calculateStyleDNA(wardrobe: GarmentItem[], savedOutfits: Outfit[], layeringPreference: LayeringPreference) {
-  if (wardrobe.length === 0) {
-    return [
-      { label: 'Elevated Minimalist', score: 85 },
-      { label: 'Classic Tailoring', score: 80 },
-      { label: 'Smart Casual', score: 88 },
-      { label: 'Experimental Layering', score: layeringPreference === 'avoid' ? 30 : layeringPreference === 'usually' ? 85 : 55 }
-    ];
-  }
-
-  const neutralColors = ['navy', 'black', 'white', 'beige', 'grey', 'gray', 'charcoal', 'cream', 'khaki', 'tan', 'slate'];
-  const neutralCount = wardrobe.filter((item) =>
-    neutralColors.some((nc) => item.color.toLowerCase().includes(nc))
-  ).length;
-  const neutralRatio = neutralCount / wardrobe.length;
-
-  const tailoringCount = wardrobe.filter(
-    (item) =>
-      item.category === 'outerwear' ||
-      item.name.toLowerCase().includes('blazer') ||
-      item.name.toLowerCase().includes('trouser') ||
-      item.name.toLowerCase().includes('oxford') ||
-      item.name.toLowerCase().includes('coat') ||
-      item.name.toLowerCase().includes('suit')
-  ).length;
-
-  const layeringCount = wardrobe.filter(
-    (item) => item.layeringRole === 'base_layer' || item.layeringRole === 'outer_layer'
-  ).length;
-
-  const minimalistScore = Math.min(98, Math.max(60, Math.round(70 + neutralRatio * 25)));
-  const tailoringScore = Math.min(95, Math.max(50, Math.round(60 + (tailoringCount / Math.max(1, wardrobe.length)) * 50)));
-  const smartCasualScore = Math.min(96, Math.max(75, Math.round(82 + (savedOutfits.length > 0 ? 6 : 2))));
-
-  let layeringScore = 50;
-  if (layeringPreference === 'avoid') layeringScore = 35;
-  else if (layeringPreference === 'usually') layeringScore = 88;
-  else layeringScore = 65;
-  if (layeringCount > 2) layeringScore = Math.min(95, layeringScore + 10);
-
-  return [
-    { label: 'Elevated Minimalist', score: minimalistScore },
-    { label: 'Classic Tailoring', score: tailoringScore },
-    { label: 'Smart Casual', score: smartCasualScore },
-    { label: 'Experimental Layering', score: layeringScore }
-  ];
-}
 
 export interface WardrobeInsightCard {
   id: string;
@@ -219,7 +174,9 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
   onNavigateToCollection,
   onNavigateToPlanner,
   userEmail,
-  onSignOut
+  onSignOut,
+  userName = '',
+  stylePreferences = []
 }) => {
   const [selectedSavedOutfit, setSelectedSavedOutfit] = useState<Outfit | null>(null);
 
@@ -227,7 +184,10 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
     if (onRemoveSavedOutfit) onRemoveSavedOutfit(id);
   };
 
-  const styleDNA = calculateStyleDNA(wardrobe, savedOutfits, layeringPreference);
+  // Honest Style DNA (src/data/styleDna.ts): 0 until the user adds clothes.
+  const styleDNA = computeStyleDna(wardrobe);
+  const archetype = styleArchetype(wardrobe, stylePreferences);
+  const displayName = userName || (userEmail ? userEmail.split('@')[0] : 'You');
   const wardrobeInsights = calculateWardrobeInsights(wardrobe, savedOutfits, layeringPreference);
 
   return (
@@ -266,12 +226,12 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
               fontWeight: 600,
               flexShrink: 0
             }}
-            aria-label={INITIAL_PROFILE.name}
+            aria-label={displayName}
           >
-            {INITIAL_PROFILE.name.charAt(0).toUpperCase()}
+            {displayName.charAt(0).toUpperCase()}
           </div>
           <div>
-            <h2 className="text-section-heading">{INITIAL_PROFILE.name}</h2>
+            <h2 className="text-section-heading">{displayName}</h2>
             <div
               style={{
                 display: 'inline-flex',
@@ -287,14 +247,33 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
               }}
             >
               <Sparkles size={12} />
-              <span>{INITIAL_PROFILE.styleArchetype}</span>
+              <span>{archetype.name}</span>
             </div>
           </div>
         </div>
 
         <p className="text-body" style={{ fontSize: '0.85rem', lineHeight: 1.5 }}>
-          {INITIAL_PROFILE.archetypeDescription}
+          {archetype.description}
         </p>
+        {stylePreferences.length > 0 && (
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 12 }}>
+            {stylePreferences.map((style) => (
+              <span
+                key={style}
+                style={{
+                  padding: '3px 10px',
+                  borderRadius: 'var(--radius-pill)',
+                  fontSize: '0.72rem',
+                  fontWeight: 600,
+                  border: '1px solid var(--color-border-medium)',
+                  color: 'var(--color-text-secondary)'
+                }}
+              >
+                {stylePreferenceLabel(style)}
+              </span>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Quick Links */}
@@ -347,7 +326,10 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
       </div>
 
       {/* 1. Style DNA Section */}
-      <SectionHeader title="Style DNA" subtitle="Inferred aesthetic tendencies" />
+      <SectionHeader
+        title="Style DNA"
+        subtitle={wardrobe.length === 0 ? 'Starts at zero — add your clothes to build it' : 'Share of your wardrobe showing each trait'}
+      />
 
       <div
         style={{

@@ -34,7 +34,6 @@ export type AuthFailureKind =
   | 'weak_password'
   | 'invalid_email'
   | 'email_not_confirmed'
-  | 'demo_missing'
   | 'unknown';
 
 export interface ClassifiedAuthError {

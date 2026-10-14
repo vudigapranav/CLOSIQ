@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import type { Session, User } from '@supabase/supabase-js';
 import { AppHeader } from './components/ui/AppHeader';
 import { BottomNavigation, NavTab } from './components/ui/BottomNavigation';
-import { OnboardingScreen } from './components/screens/OnboardingScreen';
+import { OnboardingScreen, OnboardingResult } from './components/screens/OnboardingScreen';
 import { TodayScreen } from './components/screens/TodayScreen';
 import { CollectionScreen } from './components/screens/CollectionScreen';
 import { StylistScreen } from './components/screens/StylistScreen';
@@ -28,7 +28,10 @@ import {
   saveOutfit,
   removeOutfit,
   loadPreferences,
-  savePreferences
+  savePreferences,
+  loadProfileBasics,
+  saveProfileBasics,
+  ProfileBasics
 } from './services/cloud/wardrobeCloud';
 
 const WEEK_DAYS: WeekDay[] = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
@@ -191,6 +194,7 @@ const SignedInApp: React.FC<SignedInAppProps> = ({ user, isDarkMode, onToggleThe
   const [layeringPreference, setLayeringPreference] = useState<LayeringPreference>('sometimes');
   const [wardrobe, setWardrobe] = useState<GarmentItem[]>([]);
   const [savedOutfits, setSavedOutfits] = useState<Outfit[]>([]);
+  const [basics, setBasics] = useState<ProfileBasics>({ name: '', stylePreferences: [] });
   const [notice, setNotice] = useState<string | null>(null);
 
   // The weekly planner is browser-local (the mobile app's planner is a
@@ -214,7 +218,8 @@ const SignedInApp: React.FC<SignedInAppProps> = ({ user, isDarkMode, onToggleThe
   const loadAll = useCallback(async () => {
     setStatus('loading');
     try {
-      const prefs = await loadPreferences(userId);
+      const [prefs, profileBasics] = await Promise.all([loadPreferences(userId), loadProfileBasics(userId)]);
+      setBasics(profileBasics);
       if (prefs) {
         setWardrobeProfile(prefs.profile);
         setLayeringPreference(prefs.layeringPreference);
@@ -353,9 +358,14 @@ const SignedInApp: React.FC<SignedInAppProps> = ({ user, isDarkMode, onToggleThe
   const persistPreferences = (profile: WardrobeProfile, layering: LayeringPreference) =>
     savePreferences(userId, { profile, layeringPreference: layering }).catch((err) => fail('Couldn’t save your preferences', err));
 
-  const handleCompleteOnboarding = async (profile: WardrobeProfile, layering: LayeringPreference) => {
+  const handleCompleteOnboarding = async ({ profile, layering, name, stylePreferences }: OnboardingResult) => {
     setLayeringPreference(layering);
-    await persistPreferences(profile, layering);
+    const nextBasics = { name: name || basics.name, stylePreferences };
+    setBasics(nextBasics);
+    await Promise.all([
+      persistPreferences(profile, layering),
+      saveProfileBasics(userId, nextBasics).catch((err) => fail('Couldn’t save your style answers', err))
+    ]);
     setWardrobeProfile(profile);
     try {
       // A new account's wardrobe starts empty — CLOSIQ styles what you own.
@@ -514,6 +524,8 @@ const SignedInApp: React.FC<SignedInAppProps> = ({ user, isDarkMode, onToggleThe
             onNavigateToCollection={() => setActiveTab('collection')}
             onNavigateToPlanner={() => setActiveTab('planner')}
             userEmail={user.email}
+            userName={basics.name}
+            stylePreferences={basics.stylePreferences}
             onSignOut={signOut}
           />
         )}

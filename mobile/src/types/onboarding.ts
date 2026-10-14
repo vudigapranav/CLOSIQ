@@ -27,26 +27,11 @@ export const SKIN_TONE_OPTIONS: { value: SkinTone; label: string; swatch: string
   { value: 'prefer_not_to_say', label: 'Prefer not to say', swatch: '' }
 ];
 
-export type StylePreference =
-  | 'minimal'
-  | 'casual'
-  | 'streetwear'
-  | 'smart_casual'
-  | 'classic'
-  | 'sporty'
-  | 'oversized'
-  | 'clean_contemporary';
-
-export const STYLE_PREFERENCE_OPTIONS: { value: StylePreference; label: string }[] = [
-  { value: 'minimal', label: 'Minimal' },
-  { value: 'casual', label: 'Casual' },
-  { value: 'streetwear', label: 'Streetwear' },
-  { value: 'smart_casual', label: 'Smart Casual' },
-  { value: 'classic', label: 'Classic' },
-  { value: 'sporty', label: 'Sporty' },
-  { value: 'oversized', label: 'Oversized' },
-  { value: 'clean_contemporary', label: 'Clean / Contemporary' }
-];
+// The style list is shared with the web app (src/data/styleDna.ts) so both
+// write the same profiles.style_preferences values.
+import type { StylePreference } from '../../../src/data/styleDna';
+export type { StylePreference };
+export { STYLE_PREFERENCE_OPTIONS } from '../../../src/data/styleDna';
 
 export type TemperatureUnit = 'celsius' | 'fahrenheit';
 

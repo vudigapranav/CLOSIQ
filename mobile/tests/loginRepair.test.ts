@@ -7,7 +7,7 @@
  * programmed Supabase double. No network, no cloud, no account creation.
  */
 import './helpers/installMocks';
-import { setSupabase, resetAlerts, setSupabaseConfigCheck } from './helpers/installMocks';
+import { setSupabase, setSupabaseConfigCheck } from './helpers/installMocks';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -16,7 +16,7 @@ import { MOBILE_ROOT } from './helpers/sourcePaths';
 
 import { classifyAuthError } from '../src/services/authErrors';
 import { checkSupabaseConfig } from '../src/services/supabaseConfig';
-import { signIn, signUp, signInDemo, signOut } from '../src/services/authService';
+import { signIn, signUp, signOut } from '../src/services/authService';
 
 /** Records every auth method the code calls, so "never signs up" is provable. */
 function authDouble(handlers: Record<string, () => unknown>) {
@@ -46,42 +46,17 @@ const invalidCreds = () => ({ data: { session: null }, error: { message: 'Invali
 const iosDnsError = () =>
   new Error('A server with the specified hostname could not be found.');
 
-// ---------------------------------------------------------------- demo
+// ------------------------------------------------------- no demo account
+// 2026-10-13: the shared demo account was removed at the user's request —
+// it made every visitor's uploads land in one shared wardrobe.
 
-test('the demo button NEVER creates an account when sign-in fails', async () => {
-  resetAlerts();
+test('there is no demo sign-in left anywhere in the auth flow', async () => {
+  assert.doesNotMatch(LOGIN_SOURCE, /demo/i, 'LoginScreen must not offer a demo account');
   const double = authDouble({ signInWithPassword: invalidCreds });
   setSupabase(double.client);
-
-  const result = await signInDemo();
-
+  const result = await signIn('demo@login', 'demo@123');
   assert.equal(result.ok, false);
-  assert.equal(double.calls.includes('signUp'), false, 'signUp must never be called by the demo button');
-  assert.deepEqual(double.calls, ['signInWithPassword'], 'exactly one sign-in attempt, no retry loop');
-  assert.equal(result.kind, 'demo_missing');
-  assert.match(result.message ?? '', /won't create it automatically/i);
-});
-
-test('a demo transport failure is not reported as a missing account, and still never signs up', async () => {
-  const double = authDouble({ signInWithPassword: iosDnsError });
-  setSupabase(double.client);
-
-  const result = await signInDemo();
-
-  assert.equal(result.kind, 'dns');
-  assert.equal(double.calls.includes('signUp'), false);
-});
-
-test('the demo button signs into an existing account normally', async () => {
-  const double = authDouble({
-    signInWithPassword: () => ({ data: { session: { access_token: 't' } }, error: null })
-  });
-  setSupabase(double.client);
-
-  const result = await signInDemo();
-
-  assert.equal(result.ok, true);
-  assert.ok(result.session);
+  assert.equal(result.kind, 'invalid_credentials', 'the old demo shortcut is just an ordinary (wrong) login now');
   assert.deepEqual(double.calls, ['signInWithPassword']);
 });
 
@@ -90,8 +65,7 @@ test('the demo button signs into an existing account normally', async () => {
 test('a THROWN auth rejection becomes an honest result instead of an unhandled rejection', async () => {
   for (const [name, call] of [
     ['signIn', () => signIn('a@b.com', 'pw')],
-    ['signUp', () => signUp('a@b.com', 'password1')],
-    ['signInDemo', () => signInDemo()]
+    ['signUp', () => signUp('a@b.com', 'password1')]
   ] as const) {
     setSupabase(authDouble({ signInWithPassword: iosDnsError, signUp: iosDnsError }).client);
     const result = await call();
@@ -201,14 +175,14 @@ test('LoginScreen guards duplicate taps synchronously and clears loading in fina
   assert.match(LOGIN_SOURCE, /const inFlightRef = useRef\(false\)/);
   assert.equal(
     (LOGIN_SOURCE.match(/if \(inFlightRef\.current\) return;/g) ?? []).length,
-    2,
-    'both submit and demo must use the synchronous ref guard'
+    1,
+    'submit must use the synchronous ref guard'
   );
   assert.doesNotMatch(LOGIN_SOURCE, /if \(loading\) return;/, 'the async state guard must be gone');
   assert.equal(
     (LOGIN_SOURCE.match(/\} finally \{\s*\n\s*(\/\/[^\n]*\n\s*)*\s*inFlightRef\.current = false;\s*\n\s*setLoading\(false\);/g) ?? []).length,
-    2,
-    'both handlers must clear the ref and loading in a finally block'
+    1,
+    'the submit handler must clear the ref and loading in a finally block'
   );
 });
 
@@ -310,7 +284,7 @@ test('an unusable config is refused BEFORE any network call is attempted', async
   setSupabaseConfigCheck({ ok: false, problem: 'placeholder', message: 'Build configuration problem.' });
 
   try {
-    for (const call of [() => signIn('a@b.com', 'pw'), () => signUp('a@b.com', 'password1'), () => signInDemo()]) {
+    for (const call of [() => signIn('a@b.com', 'pw'), () => signUp('a@b.com', 'password1')]) {
       const result = await call();
       assert.equal(result.ok, false);
       assert.equal(result.kind, 'config');

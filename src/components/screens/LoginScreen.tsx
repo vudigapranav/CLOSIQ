@@ -1,8 +1,8 @@
 import React, { useRef, useState } from 'react';
-import { Eye, EyeOff, Sparkles } from 'lucide-react';
+import { Eye, EyeOff } from 'lucide-react';
 import { ClosiqLogo } from '../ui/ClosiqLogo';
 import { PrimaryButton } from '../ui/PrimaryButton';
-import { signIn, signInDemo, signUp, sendPasswordReset, AuthOutcome } from '../../services/cloud/auth';
+import { signIn, signUp, sendPasswordReset, AuthOutcome } from '../../services/cloud/auth';
 
 type Mode = 'signin' | 'signup' | 'reset';
 
@@ -167,17 +167,6 @@ export const LoginScreen: React.FC = () => {
         <PrimaryButton fullWidth type="submit" disabled={busy}>
           {busy ? 'Please wait…' : mode === 'signin' ? 'Sign in' : mode === 'signup' ? 'Create account' : 'Send reset link'}
         </PrimaryButton>
-
-        {mode === 'signin' && (
-          <button
-            type="button"
-            disabled={busy}
-            onClick={() => run(signInDemo)}
-            className="login-demo"
-          >
-            <Sparkles size={15} /> Try the demo wardrobe
-          </button>
-        )}
 
         <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, marginTop: 18, flexWrap: 'wrap' }}>
           {mode === 'signin' ? (

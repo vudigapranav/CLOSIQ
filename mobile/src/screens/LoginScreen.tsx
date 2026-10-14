@@ -11,9 +11,9 @@ import {
   Platform,
   ActivityIndicator
 } from 'react-native';
-import { Eye, EyeOff, AlertCircle, CheckCircle2, Sparkles } from 'lucide-react-native';
+import { Eye, EyeOff, AlertCircle, CheckCircle2 } from 'lucide-react-native';
 import { COLORS, RADIUS } from '../theme';
-import { signIn, signUp, signInDemo, DEMO_DISPLAY_EMAIL, DEMO_DISPLAY_PASSWORD } from '../services/authService';
+import { signIn, signUp } from '../services/authService';
 import { isSupabaseConfigured, supabaseConfigCheck } from '../services/supabaseClient';
 
 type Mode = 'login' | 'signup';
@@ -21,8 +21,8 @@ type Mode = 'login' | 'signup';
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 /**
- * App.tsx doesn't need a callback prop here — a successful signIn/signUp/
- * signInDemo() triggers Supabase's own onAuthStateChange, which App.tsx is
+ * App.tsx doesn't need a callback prop here — a successful signIn/signUp
+ * triggers Supabase's own onAuthStateChange, which App.tsx is
  * already listening to (see authService.ts/App.tsx) and reacts to by
  * unmounting this screen on its own. This screen only ever talks to
  * authService.ts, never touches session state directly.
@@ -69,7 +69,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ sessionNotice }) => {
     }
 
     if (mode === 'signup') {
-      // Real validation matters here (no demo shortcut applies to signup) —
+      // Real validation matters here —
       // fast, specific feedback before ever hitting the network.
       if (!EMAIL_RE.test(trimmedEmail)) {
         setErrorMessage('Enter a valid email address.');
@@ -111,23 +111,6 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ sessionNotice }) => {
     }
     // result.session exists — App.tsx's onAuthStateChange listener takes it
     // from here (unmounts this screen, moves to the onboarding/main gate).
-  };
-
-  const handleDemoLogin = async () => {
-    if (inFlightRef.current) return;
-    resetMessages();
-    inFlightRef.current = true;
-    setLoading(true);
-    let result;
-    try {
-      result = await signInDemo();
-    } finally {
-      inFlightRef.current = false;
-      setLoading(false);
-    }
-    if (!result.ok) {
-      setErrorMessage(result.message || 'Unable to sign into the demo account.');
-    }
   };
 
   return (
@@ -260,23 +243,6 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ sessionNotice }) => {
           </Text>
         </TouchableOpacity>
 
-        {mode === 'login' && (
-          <View style={styles.demoSection}>
-            <View style={styles.divider} />
-            <TouchableOpacity
-              style={styles.demoBtn}
-              activeOpacity={0.8}
-              onPress={handleDemoLogin}
-              disabled={loading}
-            >
-              <Sparkles size={14} color={COLORS.primary} style={{ marginRight: 6 }} />
-              <Text style={styles.demoBtnText}>Try Demo Account</Text>
-            </TouchableOpacity>
-            <Text style={styles.demoHint}>
-              {DEMO_DISPLAY_EMAIL} / {DEMO_DISPLAY_PASSWORD} — preloaded with a sample wardrobe
-            </Text>
-          </View>
-        )}
       </ScrollView>
     </KeyboardAvoidingView>
   );
@@ -402,33 +368,4 @@ const styles = StyleSheet.create({
     color: COLORS.primary,
     fontWeight: '700'
   },
-  demoSection: {
-    marginTop: 28,
-    alignItems: 'center'
-  },
-  divider: {
-    height: 1,
-    backgroundColor: COLORS.border,
-    alignSelf: 'stretch',
-    marginBottom: 20
-  },
-  demoBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 9,
-    borderRadius: RADIUS.pill,
-    backgroundColor: COLORS.primaryAlpha
-  },
-  demoBtnText: {
-    fontSize: 12.5,
-    fontWeight: '700',
-    color: COLORS.primary
-  },
-  demoHint: {
-    fontSize: 10.5,
-    color: COLORS.textMuted,
-    marginTop: 8,
-    textAlign: 'center'
-  }
 });

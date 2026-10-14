@@ -29,11 +29,10 @@ import {
   loadUserWardrobe,
   saveUserGarment,
   removeUserGarment,
-  updateUserGarmentDetails,
-  seedDemoWardrobeIfNeeded
+  updateUserGarmentDetails
 } from './src/services/wardrobeStorage';
 import { loadSavedOutfits, saveOutfitToStorage, removeSavedOutfitFromStorage } from './src/services/savedOutfitsStorage';
-import { restoreSession, onAuthStateChange, signOut, isDemoUser } from './src/services/authService';
+import { restoreSession, onAuthStateChange, signOut } from './src/services/authService';
 import { setCurrentUserId, captureSession, isSessionCurrent } from './src/services/authSession';
 import { UserProfileData } from './src/types/onboarding';
 
@@ -87,35 +86,11 @@ function AppContent() {
 
     function applySession(session: Session | null) {
       const nextUserId = session?.user?.id ?? null;
-      const isDemo = !!nextUserId && isDemoUser(session?.user?.email);
       setCurrentUserId(nextUserId);
       if (!mounted) return;
       if (nextUserId) setSessionNotice(null);
       setUserEmail(session?.user?.email ?? null);
       setUserId(nextUserId);
-
-      if (isDemo) {
-        // Deliberately NOT awaited inside the auth callback. Supabase
-        // documents `onAuthStateChange` handlers as needing to return
-        // promptly — awaiting Supabase calls from inside one can deadlock
-        // the auth client's internal lock, which would leave the app stuck
-        // on the blank session frame. Seeding is idempotent background
-        // provisioning (only writes anything the first time this specific
-        // demo account has an empty wardrobe), so it runs alongside the
-        // normal per-user loads below rather than gating them. A brand-new
-        // real account never reaches this branch, so it's never seeded.
-        const scope = captureSession();
-        seedDemoWardrobeIfNeeded()
-          .then((seeded) => {
-            // Only refresh if the seed genuinely wrote something for the
-            // session that asked for it — a failed seed must not be
-            // reported or treated as a completed cloud wardrobe.
-            if (seeded && isSessionCurrent(scope)) {
-              setWardrobeRefreshKey((k) => k + 1);
-            }
-          })
-          .catch((err) => console.warn('Demo wardrobe seeding failed:', err));
-      }
     }
 
     restoreSession().then(({ session, restoreFailed }) => {

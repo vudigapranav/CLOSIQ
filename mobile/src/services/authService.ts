@@ -49,15 +49,6 @@ async function attemptAuth(run: () => Promise<AuthResult>): Promise<AuthResult> 
   }
 }
 
-// The brief's literal demo credentials — what the user actually types.
-// Supabase requires a real-looking email (a TLD/domain), so "demo@login"
-// is translated internally to a real backing account; the UI-facing
-// literals below are what's shown/typed, never the backing email.
-export const DEMO_DISPLAY_EMAIL = 'demo@login';
-export const DEMO_DISPLAY_PASSWORD = 'demo@123';
-const DEMO_BACKING_EMAIL = 'demo.account@closiq.app';
-const DEMO_BACKING_PASSWORD = 'demo@123';
-
 export async function getCurrentSession(): Promise<Session | null> {
   const { data } = await supabase.auth.getSession();
   return data.session;
@@ -98,9 +89,6 @@ export function onAuthStateChange(callback: (session: Session | null) => void): 
 
 export async function signIn(email: string, password: string): Promise<AuthResult> {
   const trimmedEmail = email.trim();
-  if (trimmedEmail.toLowerCase() === DEMO_DISPLAY_EMAIL && password === DEMO_DISPLAY_PASSWORD) {
-    return signInDemo();
-  }
 
   const configProblem = configFailure();
   if (configProblem) return configProblem;
@@ -150,46 +138,6 @@ export async function signUp(email: string, password: string): Promise<AuthResul
   });
 }
 
-/**
- * Signs into the fixed demo account, self-provisioning it on first use so
- * this doesn't depend on someone having manually created it via the
- * Supabase dashboard first. Demo wardrobe seeding (see wardrobeStorage.ts)
- * happens separately, keyed off `isDemoUser()`, once a session exists.
- */
-export async function signInDemo(): Promise<AuthResult> {
-  const configProblem = configFailure();
-  if (configProblem) return configProblem;
-
-  return attemptAuth(async () => {
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email: DEMO_BACKING_EMAIL,
-      password: DEMO_BACKING_PASSWORD
-    });
-
-    if (!error) return { ok: true, session: data.session };
-
-    const classified = classifyAuthError(error);
-
-    // Login repair (2026-09-12): this used to fall back to `signUp()` (and
-    // then a second sign-in) whenever sign-in failed. That is wrong twice
-    // over: a transport failure like DNS is not "the account is missing",
-    // and creating accounts is never a demo button's job — it silently
-    // provisioned a shared account, and against a reachable-but-wrong
-    // project it would create an account there. Demo now ONLY signs in.
-    if (classified.kind === 'invalid_credentials') {
-      return {
-        ok: false,
-        session: null,
-        kind: 'demo_missing',
-        message:
-          "The demo account isn't set up on this project. CLOSIQ won't create it automatically — ask the team to provision it, or log in with your own account."
-      };
-    }
-
-    return { ok: false, session: null, kind: classified.kind, message: classified.message };
-  });
-}
-
 export async function signOut(): Promise<{ ok: boolean; message?: string }> {
   try {
     const { error } = await supabase.auth.signOut();
@@ -204,10 +152,6 @@ export async function signOut(): Promise<{ ok: boolean; message?: string }> {
     console.warn(`[CLOSIQ] Sign-out threw (${classified.kind})`);
     return { ok: false, message: classified.message };
   }
-}
-
-export function isDemoUser(email?: string | null): boolean {
-  return (email || '').toLowerCase() === DEMO_BACKING_EMAIL;
 }
 
 /** For attaching to /api/ai/* requests — empty object (no header) if

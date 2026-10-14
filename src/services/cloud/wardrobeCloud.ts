@@ -321,3 +321,33 @@ export async function savePreferences(userId: string, prefs: CloudPreferences): 
   );
   if (error) throw error;
 }
+
+// ---------- profile basics (name + style preferences) ----------
+
+export interface ProfileBasics {
+  name: string;
+  stylePreferences: string[];
+}
+
+export async function loadProfileBasics(userId: string): Promise<ProfileBasics> {
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('name, style_preferences')
+    .eq('id', userId)
+    .maybeSingle();
+  if (error) throw error;
+  return { name: data?.name || '', stylePreferences: data?.style_preferences || [] };
+}
+
+/**
+ * Saves only what the web onboarding asks for. Upsert touches just these
+ * columns, so body type, skin tone and the mobile app's own
+ * onboarding_completed flag are left alone; a blank name never overwrites
+ * one set on the phone.
+ */
+export async function saveProfileBasics(userId: string, basics: ProfileBasics): Promise<void> {
+  const row: Record<string, unknown> = { id: userId, style_preferences: basics.stylePreferences };
+  if (basics.name) row.name = basics.name;
+  const { error } = await supabase.from('profiles').upsert(row, { onConflict: 'id' });
+  if (error) throw error;
+}

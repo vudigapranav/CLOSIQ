@@ -15,6 +15,7 @@ import { WardrobeProfile, LayeringPreference, Outfit, GarmentItem } from '../../
 import { SavedLookDetailModal } from '../components/SavedLookDetailModal';
 import { BodyTypeOptionCard } from '../components/BodyTypeOptionCard';
 import { GarmentImage } from '../components/GarmentImage';
+import { computeStyleDna, styleArchetype } from '../../../src/data/styleDna';
 import {
   UserProfileData,
   BodyType,
@@ -92,7 +93,12 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
 
   const dominantCategory = Object.keys(categoryCounts).length > 0
     ? Object.entries(categoryCounts).sort((a, b) => b[1] - a[1])[0][0]
-    : 'tops';
+    : null;
+
+  // Honest Style DNA (src/data/styleDna.ts): 0 everywhere until the user
+  // has clothes; the archetype comes from their onboarding answers until then.
+  const styleDna = computeStyleDna(wardrobe);
+  const archetype = styleArchetype(wardrobe, userProfile.stylePreferences);
 
   return (
     <ScrollView
@@ -298,27 +304,39 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
       <View style={styles.section}>
         <View style={styles.sectionHeaderRow}>
           <Sparkles size={16} color={COLORS.primary} />
-          <Text style={styles.sectionTitle}>Wardrobe Insights</Text>
+          <Text style={styles.sectionTitle}>Style DNA</Text>
         </View>
 
         <View style={styles.insightsCard}>
-          <View style={styles.insightRow}>
+          <Text style={styles.archetypeName}>{archetype.name}</Text>
+          <Text style={styles.archetypeDesc}>{archetype.description}</Text>
+
+          {styleDna.map((axis) => (
+            <View key={axis.key} style={styles.dnaRow}>
+              <View style={styles.dnaLabelRow}>
+                <Text style={styles.insightLabel}>{axis.label}</Text>
+                <Text style={styles.dnaScore}>{axis.score}%</Text>
+              </View>
+              <View style={styles.dnaTrack}>
+                <View style={[styles.dnaFill, { width: `${axis.score}%` }]} />
+              </View>
+            </View>
+          ))}
+
+          <View style={[styles.insightRow, { marginTop: 4 }]}>
             <Text style={styles.insightLabel}>Cataloged Garments</Text>
-            <Text style={styles.insightVal}>{wardrobe.length} Pieces</Text>
+            <Text style={styles.insightVal}>{wardrobe.length} {wardrobe.length === 1 ? 'Piece' : 'Pieces'}</Text>
           </View>
 
           <View style={styles.insightRow}>
             <Text style={styles.insightLabel}>Primary Category</Text>
-            <Text style={styles.insightVal}>{dominantCategory.toUpperCase()}</Text>
-          </View>
-
-          <View style={styles.insightRow}>
-            <Text style={styles.insightLabel}>Style Archetype</Text>
-            <Text style={styles.insightVal}>Modern Minimalist</Text>
+            <Text style={styles.insightVal}>{dominantCategory ? dominantCategory.toUpperCase() : '—'}</Text>
           </View>
 
           <Text style={styles.insightGuidance}>
-            "Style DNA and versatility scores automatically refine as you add new pieces and save outfits."
+            {wardrobe.length === 0
+              ? 'Your Style DNA starts at zero. Add your clothes and it fills in from what you actually own.'
+              : 'Scores are the share of your own wardrobe showing each trait, and update as you add pieces.'}
           </Text>
         </View>
       </View>
@@ -769,6 +787,40 @@ const styles = StyleSheet.create({
     fontSize: 11.5,
     fontWeight: '600',
     color: COLORS.primary
+  },
+  archetypeName: {
+    fontSize: 17,
+    fontWeight: '800',
+    color: COLORS.primary
+  },
+  archetypeDesc: {
+    fontSize: 12.5,
+    color: COLORS.textSecondary,
+    lineHeight: 18,
+    marginBottom: 6
+  },
+  dnaRow: {
+    gap: 5
+  },
+  dnaLabelRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between'
+  },
+  dnaScore: {
+    fontSize: 12.5,
+    fontWeight: '700',
+    color: COLORS.primary
+  },
+  dnaTrack: {
+    height: 6,
+    borderRadius: RADIUS.pill,
+    backgroundColor: COLORS.surfaceSubtle,
+    overflow: 'hidden'
+  },
+  dnaFill: {
+    height: '100%',
+    backgroundColor: COLORS.primary,
+    borderRadius: RADIUS.pill
   },
   insightGuidance: {
     fontSize: 11.5,

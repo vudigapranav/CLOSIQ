@@ -27,7 +27,7 @@ import { loadUserWardrobe } from '../src/services/wardrobeStorage';
 import { loadSavedOutfits } from '../src/services/savedOutfitsStorage';
 import { loadPlannerEvents } from '../src/services/plannerStorage';
 import { isSyncPending } from '../src/services/cloudWriteFeedback';
-import { saveUserGarment, removeUserGarment, seedDemoWardrobeIfNeeded } from '../src/services/wardrobeStorage';
+import { saveUserGarment, removeUserGarment } from '../src/services/wardrobeStorage';
 import { saveOutfitToStorage, removeSavedOutfitFromStorage } from '../src/services/savedOutfitsStorage';
 import { addPlannerEvent, deletePlannerEvent, updatePlannerEvent } from '../src/services/plannerStorage';
 import { saveUserProfile } from '../src/services/userProfileStorage';
@@ -270,25 +270,6 @@ test('a rejected saved-look delete leaves the look in place', async () => {
   assert.equal(remaining.length, 1);
   assert.equal(JSON.parse(store.get(key) as string).length, 1);
   assertNoSyncPromise();
-});
-
-test('a failed demo seed is not reported as a completed cloud wardrobe', async () => {
-  reset();
-  setSupabase(
-    createFakeSupabase({
-      onTable: (call: TableCall) =>
-        call.op === 'insert' ? { data: null, error: new Error('insert failed') } : { data: [], error: null, count: 0 }
-    }).client
-  );
-
-  assert.equal(await seedDemoWardrobeIfNeeded(), false);
-});
-
-test('a successful demo seed reports success', async () => {
-  reset();
-  setSupabase(createFakeSupabase({ onTable: () => ({ data: [], error: null, count: 0 }) }).client);
-
-  assert.equal(await seedDemoWardrobeIfNeeded(), true);
 });
 
 // ---------------------------------------------------------------------------

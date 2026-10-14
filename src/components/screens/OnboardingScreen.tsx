@@ -3,12 +3,20 @@ import { ArrowRight, ArrowLeft, Shirt, Sparkles, CalendarDays } from 'lucide-rea
 import { PrimaryButton } from '../ui/PrimaryButton';
 import { ClosiqLogo } from '../ui/ClosiqLogo';
 import { WardrobeProfile, LayeringPreference } from '../../types/wardrobe';
+import { STYLE_PREFERENCE_OPTIONS, StylePreference } from '../../data/styleDna';
 
-interface OnboardingScreenProps {
-  onComplete: (profile: WardrobeProfile, layering: LayeringPreference) => void;
+export interface OnboardingResult {
+  profile: WardrobeProfile;
+  layering: LayeringPreference;
+  name: string;
+  stylePreferences: StylePreference[];
 }
 
-type OnboardingStep = 'welcome' | 'setup';
+interface OnboardingScreenProps {
+  onComplete: (result: OnboardingResult) => void;
+}
+
+type OnboardingStep = 'welcome' | 'you' | 'setup';
 
 const LAYERING_OPTIONS: { value: LayeringPreference; label: string; description: string }[] = [
   { value: 'avoid', label: 'Avoid', description: 'Skip base layers unless I ask' },
@@ -25,7 +33,7 @@ const WELCOME_POINTS = [
 function ProgressDots({ step }: { step: OnboardingStep }) {
   return (
     <div style={{ display: 'flex', justifyContent: 'center', gap: 6, marginBottom: 28 }}>
-      {(['welcome', 'setup'] as OnboardingStep[]).map((s) => (
+      {(['welcome', 'you', 'setup'] as OnboardingStep[]).map((s) => (
         <span
           key={s}
           style={{
@@ -45,6 +53,11 @@ export const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onComplete }
   const [step, setStep] = useState<OnboardingStep>('welcome');
   const [profile, setProfile] = useState<WardrobeProfile | null>(null);
   const [layering, setLayering] = useState<LayeringPreference>('sometimes');
+  const [name, setName] = useState('');
+  const [styles, setStyles] = useState<StylePreference[]>([]);
+
+  const toggleStyle = (value: StylePreference) =>
+    setStyles((prev) => (prev.includes(value) ? prev.filter((v) => v !== value) : [...prev, value]));
 
   if (step === 'welcome') {
     return (
@@ -108,8 +121,76 @@ export const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onComplete }
         </div>
 
         <div style={{ marginTop: 32 }}>
-          <PrimaryButton fullWidth icon={<ArrowRight size={18} />} onClick={() => setStep('setup')}>
+          <PrimaryButton fullWidth icon={<ArrowRight size={18} />} onClick={() => setStep('you')}>
             Get Started
+          </PrimaryButton>
+        </div>
+      </div>
+    );
+  }
+
+  // About you: name + the styles that feel like you. These seed Style DNA's
+  // starting point; the scores themselves stay at 0 until clothes are added.
+  if (step === 'you') {
+    return (
+      <div className="animate-fade-in" style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', padding: '20px 24px 32px' }}>
+        <ProgressDots step={step} />
+
+        <button
+          onClick={() => setStep('welcome')}
+          aria-label="Back"
+          style={{ display: 'inline-flex', alignItems: 'center', gap: 4, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-text-muted)', fontSize: '0.78rem', fontWeight: 600, padding: 0, marginBottom: 20, alignSelf: 'flex-start' }}
+        >
+          <ArrowLeft size={14} /> Back
+        </button>
+
+        <div style={{ flex: 1 }}>
+          <h1 className="text-screen-heading" style={{ fontSize: '1.5rem', marginBottom: 4 }}>What should we call you?</h1>
+          <p className="text-body" style={{ marginBottom: 16 }}>Shown on your profile.</p>
+          <input
+            type="text"
+            value={name}
+            maxLength={40}
+            autoComplete="given-name"
+            placeholder="Your name"
+            onChange={(e) => setName(e.target.value)}
+            style={{ width: '100%', padding: '13px 14px', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border-medium)', backgroundColor: 'var(--color-surface-elevated)', color: 'var(--color-text-primary)', fontSize: '0.95rem', marginBottom: 36 }}
+          />
+
+          <h2 className="text-screen-heading" style={{ fontSize: '1.5rem', marginBottom: 4 }}>Which styles feel like you?</h2>
+          <p className="text-body" style={{ marginBottom: 16 }}>
+            Pick any. This is your starting point — your Style DNA builds from the clothes you add.
+          </p>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+            {STYLE_PREFERENCE_OPTIONS.map((option) => {
+              const active = styles.includes(option.value);
+              return (
+                <button
+                  key={option.value}
+                  type="button"
+                  aria-pressed={active}
+                  onClick={() => toggleStyle(option.value)}
+                  style={{
+                    padding: '9px 16px',
+                    borderRadius: 'var(--radius-pill)',
+                    border: `1.5px solid ${active ? 'var(--color-primary)' : 'var(--color-border-medium)'}`,
+                    backgroundColor: active ? 'var(--color-primary)' : 'var(--color-surface)',
+                    color: active ? 'var(--color-text-on-primary)' : 'var(--color-text-primary)',
+                    fontSize: '0.84rem',
+                    fontWeight: 600,
+                    cursor: 'pointer'
+                  }}
+                >
+                  {option.label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        <div style={{ marginTop: 32 }}>
+          <PrimaryButton fullWidth icon={<ArrowRight size={18} />} onClick={() => setStep('setup')}>
+            {styles.length === 0 ? 'Skip for now' : 'Continue'}
           </PrimaryButton>
         </div>
       </div>
@@ -130,7 +211,7 @@ export const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onComplete }
 
       <div style={{ marginBottom: 8 }}>
         <button
-          onClick={() => setStep('welcome')}
+          onClick={() => setStep('you')}
           aria-label="Back"
           style={{
             display: 'inline-flex',
@@ -247,7 +328,7 @@ export const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onComplete }
           icon={<ArrowRight size={18} />}
           disabled={!profile}
           style={{ opacity: profile ? 1 : 0.5, cursor: profile ? 'pointer' : 'not-allowed' }}
-          onClick={() => profile && onComplete(profile, layering)}
+          onClick={() => profile && onComplete({ profile, layering, name: name.trim(), stylePreferences: styles })}
         >
           Enter CLOSIQ
         </PrimaryButton>
