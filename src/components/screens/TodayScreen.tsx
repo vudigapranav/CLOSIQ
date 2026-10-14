@@ -4,7 +4,7 @@ import { PrimaryButton } from '../ui/PrimaryButton';
 import { SecondaryButton } from '../ui/SecondaryButton';
 import { EmptyState } from '../ui/EmptyState';
 import { GarmentImage } from '../ui/GarmentImage';
-import { GarmentItem, Outfit, LayeringPreference } from '../../types/wardrobe';
+import { GarmentItem, Outfit, LayeringPreference, matchLabel } from '../../types/wardrobe';
 import { isSameOutfit, formatCategoryList } from '../../services/aiStylist';
 import { generateAIOutfitWithGemini } from '../../services/ai';
 
@@ -366,7 +366,7 @@ export const TodayScreen: React.FC<TodayScreenProps> = ({
                 flexShrink: 0
               }}
             >
-              {outfit.styleScore}% Match
+              {matchLabel(outfit)}
             </div>
           </div>
 

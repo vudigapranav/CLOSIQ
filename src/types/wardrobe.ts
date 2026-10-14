@@ -80,6 +80,14 @@ export interface Outfit {
   wornToday?: boolean;
   /** Core categories (tops/bottoms/shoes) the wardrobe had nothing to fill — lets the UI explain a sparse outfit instead of looking broken. */
   missingCategories?: GarmentCategory[];
+  /** 'ai' = chosen by the AI stylist; 'local' = CLOSIQ's on-device fallback
+   *  (no AI evaluated it, so it carries no match score). */
+  source?: 'ai' | 'local';
+}
+
+/** "96% Match" only for an AI-scored outfit; never an invented number. */
+export function matchLabel(outfit: Pick<Outfit, 'source' | 'styleScore'>): string {
+  return outfit.source === 'local' || !outfit.styleScore ? 'Local pick' : `${outfit.styleScore}% Match`;
 }
 
 export interface UserProfile {

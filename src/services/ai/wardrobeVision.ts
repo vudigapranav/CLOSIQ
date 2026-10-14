@@ -24,7 +24,15 @@ export async function analyzeGarmentImageWithGemini(
   });
 
   if (!res.ok || !res.data) {
-    return demoAnalyzePhoto(imageUrl, categoryHint);
+    // Honest fallback: keep the pixel-colour guess as a pre-fill, but never
+    // label it as AI (no "AI Analyzed" tag, no invented confidence).
+    const guess = await demoAnalyzePhoto(imageUrl, categoryHint);
+    return {
+      ...guess,
+      aiAnalyzed: false,
+      aiConfidence: 0,
+      tags: guess.tags.filter((tag) => tag !== 'AI Analyzed')
+    };
   }
 
   const json = res.data;
@@ -55,6 +63,7 @@ export async function analyzeGarmentImageWithGemini(
     layeringRole,
     tags: Array.isArray(json.tags) ? json.tags : ['Custom Upload', json.color || 'Garment'],
     aiConfidence: typeof json.aiConfidence === 'number' ? json.aiConfidence : 0.95,
-    pairingNotes: json.pairingNotes || 'Pairs naturally with your existing neutral essentials.'
+    pairingNotes: json.pairingNotes || '',
+    aiAnalyzed: true
   };
 }

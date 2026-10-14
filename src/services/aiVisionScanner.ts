@@ -19,6 +19,9 @@ export interface VisionAnalysisResult {
    *  it deliberately leaves this undefined rather than inventing a label. */
   style?: string;
   layeringRole?: LayeringRole;
+  /** false = the AI couldn't read the photo; the fields are only a colour
+   *  guess for the user to check (2026-10-14 audit). */
+  aiAnalyzed?: boolean;
 }
 
 const NAMED_PALETTE: { name: string; hex: string }[] = [

@@ -283,7 +283,11 @@ export const TodayScreen: React.FC<TodayScreenProps> = ({
         }
       });
     } else {
-      Alert.alert('Swap Error', 'Unable to swap garment. Please try again.');
+      if (res.error === 'no_alternative') {
+        Alert.alert('Nothing to swap yet', res.data.whyItWorks);
+      } else {
+        Alert.alert('Swap Error', 'Unable to swap garment. Please try again.');
+      }
     }
   };
 

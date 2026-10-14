@@ -52,6 +52,7 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({ wardrobeProfile, cus
   const [tags, setTags] = useState<string[]>([]);
   const [pairingNotes, setPairingNotes] = useState('');
   const [aiConfidence, setAiConfidence] = useState(0.95);
+  const [aiAnalyzed, setAiAnalyzed] = useState(true);
   const [storageLocation, setStorageLocation] = useState<string | undefined>(undefined);
   const [size, setSize] = useState<string | undefined>(undefined);
   // White-background "studio" version of an uploaded photo, made alongside
@@ -84,6 +85,7 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({ wardrobeProfile, cus
     setTags(result.tags);
     setPairingNotes(result.pairingNotes);
     setAiConfidence(result.aiConfidence);
+    setAiAnalyzed(result.aiAnalyzed !== false);
     setStep('confirm');
   };
 
@@ -445,9 +447,15 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({ wardrobeProfile, cus
                 <GarmentImage src={chosenImage} alt="Garment" category={category} hexColor={hexColor} />
               </div>
               <div style={{ minWidth: 0 }}>
-                <span className="text-metadata" style={{ color: 'var(--color-primary)' }}>
-                  AI Auto-Detected · {Math.round(aiConfidence * 100)}% confidence
-                </span>
+                {aiAnalyzed ? (
+                  <span className="text-metadata" style={{ color: 'var(--color-primary)' }}>
+                    AI Auto-Detected{aiConfidence > 0 ? ` · ${Math.round(aiConfidence * 100)}% confidence` : ''}
+                  </span>
+                ) : (
+                  <span className="text-metadata" style={{ color: 'var(--color-danger)' }}>
+                    AI couldn’t read this photo — check the name and colour below
+                  </span>
+                )}
                 <div style={{ fontSize: '0.92rem', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{name}</div>
                 <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>Category: {category} · Color: {color}</div>
               </div>

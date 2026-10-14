@@ -1,6 +1,6 @@
 import React, { useEffect } from 'react';
 import { X, Sparkles, AlertTriangle, Trash2, ArrowRight, Shirt } from 'lucide-react';
-import { GarmentItem, Outfit } from '../../types/wardrobe';
+import { GarmentItem, Outfit, matchLabel } from '../../types/wardrobe';
 import { GarmentImage } from '../ui/GarmentImage';
 import { PrimaryButton } from '../ui/PrimaryButton';
 
@@ -148,7 +148,7 @@ export const SavedOutfitDetailModal: React.FC<SavedOutfitDetailModalProps> = ({
                 whiteSpace: 'nowrap'
               }}
             >
-              {outfit.styleScore}% Match
+              {matchLabel(outfit)}
             </div>
             <span className="text-caption" style={{ fontSize: '0.7rem' }}>
               {validItems.length} of {outfit.items.length} pieces owned

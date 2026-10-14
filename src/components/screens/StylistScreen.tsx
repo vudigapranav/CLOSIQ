@@ -4,7 +4,7 @@ import { PrimaryButton } from '../ui/PrimaryButton';
 import { SecondaryButton } from '../ui/SecondaryButton';
 import { EmptyState } from '../ui/EmptyState';
 import { GarmentImage } from '../ui/GarmentImage';
-import { GarmentItem, Outfit, GarmentCategory, LayeringPreference } from '../../types/wardrobe';
+import { GarmentItem, Outfit, GarmentCategory, LayeringPreference, matchLabel } from '../../types/wardrobe';
 import {
   STYLIST_SUGGESTION_CHIPS,
   generateAIOutfit,
@@ -482,7 +482,7 @@ export const StylistScreen: React.FC<StylistScreenProps> = ({
                   flexShrink: 0
                 }}
               >
-                {outfit.styleScore}% Match
+                {matchLabel(outfit)}
               </div>
             </div>
 

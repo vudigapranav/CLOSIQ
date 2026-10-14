@@ -22,6 +22,8 @@ interface OutfitResultCardProps {
   explanation: {
     summary: string;
     colorHarmony?: string;
+    occasionFit?: string;
+    fit?: string;
   };
   isSaved: boolean;
   /** Why the local engine was used instead of Gemini (Sprint M20). */
@@ -68,7 +70,7 @@ export const OutfitResultCard = React.memo<OutfitResultCardProps>(({
             engine (the only case that carries a `notice`), its pick is a
             simple category fill — "90% Match" was an invented score
             (Sprint M20). A re-shown saved look keeps its original score. */}
-        {!(mode === 'fallback' && notice) && (
+        {!(mode === 'fallback' && notice) && styleScore > 0 && (
           <View style={styles.matchScoreBadge}>
             <Text style={styles.matchScoreText}>{styleScore}% Match</Text>
           </View>
@@ -113,10 +115,12 @@ export const OutfitResultCard = React.memo<OutfitResultCardProps>(({
           <Sparkles size={14} color={COLORS.primary} />
           <Text style={styles.whyTitle}>Why It Works</Text>
         </View>
-        <Text style={styles.whySummary}>"{explanation.summary}"</Text>
-        {explanation.colorHarmony ? (
-          <Text style={styles.whyDetail}>• {explanation.colorHarmony}</Text>
-        ) : null}
+        {!!explanation.summary && <Text style={styles.whySummary}>"{explanation.summary}"</Text>}
+        {[explanation.occasionFit, explanation.colorHarmony, explanation.fit]
+          .filter((line): line is string => !!line)
+          .map((line) => (
+            <Text key={line} style={styles.whyDetail}>• {line}</Text>
+          ))}
       </View>
 
       {/* Action Bar: Regenerate & Save */}

@@ -1,6 +1,7 @@
 import { GarmentItem, GarmentCategory, LayeringPreference } from '../../../src/types/wardrobe';
 import { OutfitPersonalizationContext } from './personalizationContext';
 import { postApi, describeApiFailure } from './apiRequest';
+import { generateAIOutfit } from '../../../src/services/aiStylist';
 
 export interface MobileOutfitResult {
   title: string;
@@ -11,6 +12,7 @@ export interface MobileOutfitResult {
     summary: string;
     colorHarmony?: string;
     occasionFit?: string;
+    fit?: string;
   };
 }
 
@@ -87,18 +89,29 @@ export async function generateOutfitMobile(
       );
 
       if (validIds.length > 0) {
+        // The server's schema (server/geminiServer.js) is outfitName /
+        // styleMatch / whyItWorks{overall,color,fit,occasion}. This used to
+        // read title / styleScore / explanation.summary — names the AI never
+        // sends — so every real AI outfit showed "<prompt> Outfit", an
+        // invented 88% and generic copy (2026-10-14 audit). The old names
+        // are kept only as a fallback.
+        const d = resData.data;
+        const why = typeof d.whyItWorks === 'object' && d.whyItWorks ? d.whyItWorks : {};
+        const score = Number(d.styleMatch ?? d.styleScore);
         return {
           ok: true,
           mode: resData.mode === 'gemini' ? 'gemini' : 'fallback',
           data: {
-            title: resData.data.title || `${prompt} Outfit`,
-            vibe: resData.data.vibe || 'Smart Editorial',
-            styleScore: resData.data.styleScore || 88,
+            title: d.outfitName || d.title || `${prompt.charAt(0).toUpperCase() + prompt.slice(1)} Look`,
+            vibe: d.vibe || '',
+            styleScore: Number.isFinite(score) && score > 0 ? Math.round(Math.min(score, 100)) : 0,
             garmentIds: validIds,
             explanation: {
-              summary: resData.data.explanation?.summary || 'Tailored to your active wardrobe and occasion needs.',
-              colorHarmony: resData.data.explanation?.colorHarmony,
-              occasionFit: resData.data.explanation?.occasionFit
+              summary:
+                why.overall || (typeof d.whyItWorks === 'string' ? d.whyItWorks : '') || d.explanation?.summary || '',
+              colorHarmony: why.color || d.explanation?.colorHarmony,
+              occasionFit: why.occasion || d.explanation?.occasionFit,
+              fit: why.fit
             }
           }
         };
@@ -110,35 +123,28 @@ export async function generateOutfitMobile(
   }
 
   // Deterministic fallback filtering excluded items
+  // Local engine (2026-10-14): the same occasion-aware picker the website
+  // uses (src/services/aiStylist.ts) — ranks every category by closeness to
+  // the occasion's formality and honours the layering preference — instead
+  // of "first top, first bottom, first shoes", which felt like shuffling.
+  // Regenerate excludes the previous pieces, so it moves to the next-best.
   const availableWardrobe = wardrobe.filter((i) => !excludeGarmentIds.includes(i.id));
-  const activeSet = availableWardrobe.length >= 2 ? availableWardrobe : wardrobe;
-
-  const top = activeSet.find((i) => i.category === 'tops') || activeSet[0];
-  const bottom = activeSet.find((i) => i.category === 'bottoms') || activeSet[1] || activeSet[0];
-  const shoes = activeSet.find((i) => i.category === 'shoes') || activeSet[2] || activeSet[0];
-  const outerwear = layeringPreference !== 'avoid'
-    ? activeSet.find((i) => i.category === 'outerwear')
-    : undefined;
-
-  const fallbackIds = [top.id, bottom.id, shoes.id];
-  if (outerwear && !fallbackIds.includes(outerwear.id)) {
-    fallbackIds.push(outerwear.id);
-  }
-  const uniqueFallbackIds = Array.from(new Set(fallbackIds)).filter(Boolean);
+  const local = generateAIOutfit(availableWardrobe.length >= 2 ? availableWardrobe : wardrobe, {
+    prompt,
+    layeringPreference
+  });
 
   return {
     ok: true,
     mode: 'fallback',
-    notice: `${notice} Showing a simple pick from CLOSIQ's local engine instead.`,
+    notice: `${notice} Showing a pick from CLOSIQ's local engine instead.`,
     data: {
-      title: `${prompt.charAt(0).toUpperCase() + prompt.slice(1)} Ensemble`,
-      vibe: top.style || 'Elevated Everyday',
-      styleScore: 90,
-      garmentIds: uniqueFallbackIds,
-      explanation: {
-        summary: `Pairs ${top.name} with ${bottom.name} for a balanced, occasion-appropriate look tailored to your ${prompt} request.`,
-        colorHarmony: `Harmonizes ${top.color} and ${bottom.color} tones with natural visual contrast.`
-      }
+      title: local.title,
+      vibe: local.vibe,
+      // No AI evaluated this pick, so it carries no match score.
+      styleScore: 0,
+      garmentIds: local.items.map((item) => item.id),
+      explanation: { summary: local.explanation.summary }
     }
   };
 }
@@ -196,21 +202,37 @@ export async function swapGarmentMobile(
     notice = describeApiFailure(result.reason);
   }
 
-  // Fallback swap algorithm: find alternative garment in same category
-  const candidates = wardrobe.filter(
-    (item) => item.category === targetCategory && item.id !== targetGarmentIdToSwap
-  );
-  const replacement = candidates.length > 0
-    ? candidates[Math.floor(Math.random() * candidates.length)]
-    : wardrobe.find((item) => item.id !== targetGarmentIdToSwap) || wardrobe[0];
+  // Local swap (2026-10-14): another piece from the SAME category, closest in
+  // formality to the one being replaced — not a random pick, and never a
+  // piece from a different category.
+  const current = wardrobe.find((item) => item.id === targetGarmentIdToSwap);
+  const FORMALITY_ORDER = ['casual', 'smart_casual', 'formal', 'evening'];
+  const rank = (f: string) => FORMALITY_ORDER.indexOf(f);
+  const candidates = wardrobe
+    .filter((item) => item.category === targetCategory && item.id !== targetGarmentIdToSwap && !currentOutfitGarmentIds.includes(item.id))
+    .sort((a, b) => Math.abs(rank(a.formality) - rank(current?.formality ?? 'casual')) - Math.abs(rank(b.formality) - rank(current?.formality ?? 'casual')));
 
+  if (candidates.length === 0) {
+    return {
+      ok: false,
+      mode: 'fallback',
+      notice,
+      error: 'no_alternative',
+      data: {
+        replacementGarmentId: targetGarmentIdToSwap,
+        whyItWorks: 'There is no other piece in this category in your wardrobe yet — add one to swap.'
+      }
+    };
+  }
+
+  const replacement = candidates[0];
   return {
     ok: true,
     mode: 'fallback',
     notice: `${notice} Swapped using CLOSIQ's local engine instead.`,
     data: {
       replacementGarmentId: replacement.id,
-      whyItWorks: `Swapped to ${replacement.name} (${replacement.color}) for fresh visual contrast while maintaining occasion suitability.`
+      whyItWorks: `${replacement.name} (${replacement.color}) is the closest match in formality to the piece it replaces.`
     }
   };
 }

@@ -97,8 +97,12 @@ export async function generateAIOutfitWithGemini(
   options: OutfitRequestOptions,
   seed = 0
 ): Promise<Outfit> {
+  // Local picks are marked as such and carry no score (2026-10-14 audit:
+  // they used to be shown exactly like AI results, with an invented 91-99%).
+  const localPick = () => ({ ...demoGenerateAIOutfit(wardrobe, options, seed), source: 'local' as const, styleScore: 0 });
+
   if (wardrobe.length === 0) {
-    return demoGenerateAIOutfit(wardrobe, options, seed);
+    return localPick();
   }
 
   const wardrobeContext = formatWardrobeContext(wardrobe);
@@ -114,7 +118,7 @@ export async function generateAIOutfitWithGemini(
   });
 
   if (!res.ok || !res.data) {
-    return demoGenerateAIOutfit(wardrobe, options, seed);
+    return localPick();
   }
 
   // Pass raw AI response through strict validation layer on client
@@ -122,7 +126,7 @@ export async function generateAIOutfitWithGemini(
 
   if (!validated.valid || validated.items.length === 0) {
     console.warn('[CLOSIQ Stylist] AI output validation failed, falling back to demo engine:', validated.reason);
-    return demoGenerateAIOutfit(wardrobe, options, seed);
+    return localPick();
   }
 
   return {
@@ -142,7 +146,8 @@ export async function generateAIOutfitWithGemini(
       versatilityNote: 'Selected from your personal wardrobe.'
     },
     saved: false,
-    dateCreated: new Date().toISOString().split('T')[0]
+    dateCreated: new Date().toISOString().split('T')[0],
+    source: 'ai'
   };
 }
 
