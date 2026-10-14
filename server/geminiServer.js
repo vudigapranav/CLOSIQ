@@ -30,7 +30,10 @@ function getServerApiKey() {
 // so a request now walks this list until one answers. Overridable with a
 // comma-separated GEMINI_MODELS env var without a code change.
 const GEMINI_MODELS = (process.env.GEMINI_MODELS ||
-  'gemini-flash-latest,gemini-3.5-flash-lite,gemini-flash-lite-latest,gemini-3.8-flash')
+  // 2026-10-14 production logs: gemini-flash-latest refused (503) or hung
+  // (504) on every scan while gemini-3.5-flash-lite answered every time, so
+  // the model that actually works goes first.
+  'gemini-3.5-flash-lite,gemini-flash-latest,gemini-flash-lite-latest,gemini-3.1-flash-lite,gemini-3.8-flash')
   .split(',')
   .map((m) => m.trim())
   .filter(Boolean);
@@ -43,6 +46,8 @@ const GEMINI_MODELS = (process.env.GEMINI_MODELS ||
 // racing it. No SDK-level retries (`retryOptions`): a failed model is never
 // re-sent, only a different model is tried.
 const GEMINI_TIMEOUT_MS = 36_000;
+// One hanging model may not eat the whole budget: cut it off and move on.
+const ATTEMPT_TIMEOUT_MS = 20_000;
 const MIN_ATTEMPT_MS = 4_000;
 
 /** Overloaded, missing or out-of-quota for THIS model — another may work. */
@@ -50,8 +55,10 @@ function shouldTryNextModel(err) {
   const status = err?.status ?? err?.code;
   const message = String(err?.message || '');
   return (
-    [404, 429, 500, 503].includes(Number(status)) ||
-    /"code":\s*(404|429|500|503)|UNAVAILABLE|RESOURCE_EXHAUSTED|NOT_FOUND|high demand|overloaded/i.test(message)
+    [404, 429, 500, 503, 504].includes(Number(status)) ||
+    /"code":\s*(404|429|500|503|504)|UNAVAILABLE|RESOURCE_EXHAUSTED|NOT_FOUND|DEADLINE_EXCEEDED|high demand|overloaded/i.test(message) ||
+    // Our own per-attempt cut-off (or a dropped connection) — try the next model.
+    err?.name === 'AbortError' || err?.name === 'TimeoutError' || /abort|timed? ?out|fetch failed/i.test(message)
   );
 }
 
@@ -66,7 +73,7 @@ async function generateWithFallback(apiKey, request) {
     const remaining = deadline - Date.now();
     if (remaining < MIN_ATTEMPT_MS) break;
     try {
-      const ai = new GoogleGenAI({ apiKey, httpOptions: { timeout: remaining } });
+      const ai = new GoogleGenAI({ apiKey, httpOptions: { timeout: Math.min(remaining, ATTEMPT_TIMEOUT_MS) } });
       const response = await ai.models.generateContent({ ...request, model });
       if (model !== GEMINI_MODELS[0]) console.log(`[Server Gemini] Served by fallback model ${model}`);
       return response;
