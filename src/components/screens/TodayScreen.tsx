@@ -20,6 +20,8 @@ interface TodayScreenProps {
   onNavigateToCollection?: () => void;
   onSelectItemDetail?: (item: GarmentItem) => void;
   onNavigateToProfile?: () => void;
+  /** The signed-in user's first name for the greeting; omitted when unknown. */
+  userName?: string;
 }
 
 const OCCASIONS = ['College', 'Work', 'Date', 'Party', 'Casual', 'Travel'];
@@ -41,8 +43,11 @@ export const TodayScreen: React.FC<TodayScreenProps> = ({
   onWearOutfit,
   onOpenUpload,
   onSelectItemDetail,
-  onNavigateToProfile
+  onNavigateToProfile,
+  userName
 }) => {
+  const firstName = (userName || '').trim().split(/\s+/)[0];
+  const greeting = firstName ? `${getGreeting()}, ${firstName}.` : `${getGreeting()}.`;
   const [selectedOccasion, setSelectedOccasion] = useState('College');
   const [customInput, setCustomInput] = useState('');
   const [variationSeed, setVariationSeed] = useState(0);
@@ -159,7 +164,7 @@ export const TodayScreen: React.FC<TodayScreenProps> = ({
     return (
       <div style={{ padding: '20px 20px 32px' }}>
         <div style={{ marginBottom: 24 }}>
-          <h1 className="text-screen-heading">{getGreeting()}, Pranav.</h1>
+          <h1 className="text-screen-heading">{greeting}</h1>
           <p className="text-body" style={{ marginTop: 2 }}>Let's find your look.</p>
         </div>
 
@@ -183,7 +188,7 @@ export const TodayScreen: React.FC<TodayScreenProps> = ({
       <div style={{ marginBottom: 22 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10 }}>
           <div>
-            <h1 className="text-screen-heading">{getGreeting()}, Pranav.</h1>
+            <h1 className="text-screen-heading">{greeting}</h1>
             <p className="text-body" style={{ marginTop: 2 }}>Let's find your look.</p>
           </div>
           {outfit && (

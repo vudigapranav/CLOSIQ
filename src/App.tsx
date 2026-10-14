@@ -479,6 +479,7 @@ const SignedInApp: React.FC<SignedInAppProps> = ({ user, isDarkMode, onToggleThe
             onNavigateToCollection={() => setActiveTab('collection')}
             onSelectItemDetail={(item) => setSelectedDetailItem(item)}
             onNavigateToProfile={() => setActiveTab('profile')}
+            userName={basics.name}
           />
         )}
         {activeTab === 'collection' && (
