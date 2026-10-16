@@ -10,7 +10,7 @@ import {
 } from 'react-native';
 import { Shirt, Plus, MapPin } from 'lucide-react-native';
 import { COLORS, RADIUS } from '../theme';
-import { GarmentItem, GarmentDetailsPatch, WardrobeProfile } from '../../../src/types/wardrobe';
+import { GarmentItem, GarmentDetailsPatch, LayeringPreference, WardrobeProfile } from '../../../src/types/wardrobe';
 import { AddItemModal } from '../components/AddItemModal';
 import { GarmentDetailModal } from '../components/GarmentDetailModal';
 import { GarmentImage } from '../components/GarmentImage';
@@ -33,6 +33,7 @@ interface CollectionScreenProps {
   onGarmentAdded: (garment: GarmentItem) => void;
   onGarmentRemoved: (id: string) => void;
   onGarmentDetailsChanged: (id: string, patch: GarmentDetailsPatch) => void;
+  layeringPreference?: LayeringPreference;
 }
 
 interface GarmentCardProps {
@@ -75,7 +76,8 @@ export const CollectionScreen: React.FC<CollectionScreenProps> = ({
   wardrobe,
   onGarmentAdded,
   onGarmentRemoved,
-  onGarmentDetailsChanged
+  onGarmentDetailsChanged,
+  layeringPreference
 }) => {
   const [selectedCategory, setSelectedCategory] = useState<string>('All');
   // '' = every place. The place row only appears once some item has a place.
@@ -237,6 +239,9 @@ export const CollectionScreen: React.FC<CollectionScreenProps> = ({
         onRemove={onGarmentRemoved}
         onUpdateItem={onGarmentDetailsChanged}
         customPlaces={customPlaces}
+        wardrobe={wardrobe}
+        layeringPreference={layeringPreference}
+        onSelectItem={handleSelectGarment}
       />
     </View>
   );

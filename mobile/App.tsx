@@ -353,6 +353,7 @@ function AppContent() {
             onGarmentAdded={handleGarmentAdded}
             onGarmentRemoved={handleGarmentRemoved}
             onGarmentDetailsChanged={handleGarmentDetailsChanged}
+            layeringPreference={layeringPreference}
           />
         )}
         {activeTab === 'planner' && (

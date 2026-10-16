@@ -1,6 +1,8 @@
-import React from 'react';
-import { X, Tag, Sparkles, Layers, Trash2 } from 'lucide-react';
-import { GarmentItem, GarmentDetailsPatch } from '../../types/wardrobe';
+import React, { useEffect, useMemo, useRef } from 'react';
+import { X, Tag, Sparkles, Layers, Trash2, Shirt } from 'lucide-react';
+import { GarmentItem, GarmentDetailsPatch, LayeringPreference } from '../../types/wardrobe';
+import { OutfitBrain } from '../../services/outfitBrain';
+import { emptyPairingHint, suggestPairings } from '../../services/pairingSuggestions';
 import { GarmentImage } from '../ui/GarmentImage';
 import { StorageLocationField } from '../ui/StorageLocationField';
 import { SizeField } from '../ui/SizeField';
@@ -12,6 +14,12 @@ interface ClothingDetailModalProps {
   /** Persists an edited size / "where is it kept" place for this item. */
   onUpdateItem: (id: string, patch: GarmentDetailsPatch) => void;
   customPlaces?: string[];
+  /** The user's wardrobe — "Pairs well with" only ever suggests pieces from it. */
+  wardrobe?: GarmentItem[];
+  brain?: OutfitBrain;
+  layeringPreference?: LayeringPreference;
+  /** Opens a suggested piece in this same sheet. */
+  onSelectItem?: (item: GarmentItem) => void;
 }
 
 export const ClothingDetailModal: React.FC<ClothingDetailModalProps> = ({
@@ -19,8 +27,24 @@ export const ClothingDetailModal: React.FC<ClothingDetailModalProps> = ({
   onClose,
   onDeleteItem,
   onUpdateItem,
-  customPlaces = []
+  customPlaces = [],
+  wardrobe = [],
+  brain,
+  layeringPreference,
+  onSelectItem
 }) => {
+  const sheetRef = useRef<HTMLDivElement>(null);
+  const pairingGroups = useMemo(
+    () => (item ? suggestPairings(item, wardrobe, { brain, layeringPreference }) : []),
+    [item, wardrobe, brain, layeringPreference]
+  );
+  const visibleGroups = pairingGroups.filter((g) => g.suggestions.length > 0);
+
+  // Opening a suggested piece swaps the item in place; start it from the top.
+  useEffect(() => {
+    sheetRef.current?.scrollTo({ top: 0 });
+  }, [item?.id]);
+
   if (!item) return null;
 
   // Calculate simulated outfit usage count based on wearCount or item id hash
@@ -54,6 +78,7 @@ export const ClothingDetailModal: React.FC<ClothingDetailModalProps> = ({
           boxShadow: 'var(--shadow-lg)',
           border: '1px solid var(--color-border)'
         }}
+        ref={sheetRef}
         className="animate-slide-up sheet"
         onClick={(e) => e.stopPropagation()}
       >
@@ -146,24 +171,26 @@ export const ClothingDetailModal: React.FC<ClothingDetailModalProps> = ({
           />
         </div>
 
-        {/* Best Paired With Section */}
-        <div
-          style={{
-            padding: 16,
-            backgroundColor: 'var(--color-surface-subtle)',
-            borderRadius: 'var(--radius-md)',
-            borderLeft: '3px solid var(--color-primary)',
-            marginBottom: 20
-          }}
-        >
-          <div className="text-metadata" style={{ color: 'var(--color-primary)', marginBottom: 4, display: 'flex', alignItems: 'center', gap: 4 }}>
-            <Sparkles size={13} />
-            Best paired with
+        {/* Styling notes from the scan, when there are any */}
+        {item.pairingNotes && (
+          <div
+            style={{
+              padding: 16,
+              backgroundColor: 'var(--color-surface-subtle)',
+              borderRadius: 'var(--radius-md)',
+              borderLeft: '3px solid var(--color-primary)',
+              marginBottom: 20
+            }}
+          >
+            <div className="text-metadata" style={{ color: 'var(--color-primary)', marginBottom: 4, display: 'flex', alignItems: 'center', gap: 4 }}>
+              <Sparkles size={13} />
+              Styling notes
+            </div>
+            <p className="text-body" style={{ fontSize: '0.84rem', lineHeight: 1.45, color: 'var(--color-text-primary)' }}>
+              {item.pairingNotes}
+            </p>
           </div>
-          <p className="text-body" style={{ fontSize: '0.84rem', lineHeight: 1.45, color: 'var(--color-text-primary)' }}>
-            {item.pairingNotes || 'Combines gracefully with tailored neutral bottoms, silk blouses, or clean white leather sneakers.'}
-          </p>
-        </div>
+        )}
 
         {/* Style Tags */}
         <div style={{ marginBottom: 24 }}>
@@ -188,6 +215,98 @@ export const ClothingDetailModal: React.FC<ClothingDetailModalProps> = ({
             ))}
           </div>
         </div>
+
+        {/* Pairs well with — pieces from the user's own wardrobe */}
+        <section style={{ marginBottom: 24 }} aria-label="Pairs well with">
+          <div className="text-metadata" style={{ color: 'var(--color-primary)', marginBottom: 2, display: 'flex', alignItems: 'center', gap: 4 }}>
+            <Sparkles size={13} /> Pairs well with
+          </div>
+          <p className="text-body" style={{ fontSize: '0.78rem', color: 'var(--color-text-secondary)', marginBottom: 12 }}>
+            Picked from your wardrobe for this {item.subcategory.toLowerCase() || 'piece'}
+          </p>
+
+          {visibleGroups.length === 0 ? (
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 10,
+                padding: 14,
+                borderRadius: 'var(--radius-md)',
+                backgroundColor: 'var(--color-surface-subtle)',
+                border: '1px solid var(--color-border)',
+                fontSize: '0.8rem',
+                color: 'var(--color-text-secondary)'
+              }}
+            >
+              <Shirt size={18} style={{ flexShrink: 0, color: 'var(--color-primary)' }} />
+              {emptyPairingHint(pairingGroups)}
+            </div>
+          ) : (
+            visibleGroups.map((group) => (
+              <div key={group.category} style={{ marginBottom: 14 }}>
+                <div style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--color-text-primary)', marginBottom: 8 }}>
+                  {group.title}
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 10 }}>
+                  {group.suggestions.map(({ item: piece, reason }) => (
+                    <button
+                      key={piece.id}
+                      type="button"
+                      onClick={() => onSelectItem?.(piece)}
+                      title={`Open ${piece.name}`}
+                      style={{
+                        display: 'flex',
+                        flexDirection: 'column',
+                        textAlign: 'left',
+                        padding: 0,
+                        border: '1px solid var(--color-border)',
+                        borderRadius: 'var(--radius-md)',
+                        backgroundColor: 'var(--color-surface-elevated)',
+                        overflow: 'hidden',
+                        cursor: onSelectItem ? 'pointer' : 'default',
+                        color: 'inherit',
+                        font: 'inherit'
+                      }}
+                    >
+                      <div style={{ width: '100%', aspectRatio: '1 / 1.1', backgroundColor: 'var(--color-surface-subtle)' }}>
+                        <GarmentImage src={piece.imageUrl} alt={piece.name} category={piece.category} hexColor={piece.hexColor} />
+                      </div>
+                      <div style={{ padding: '8px 8px 10px' }}>
+                        <div
+                          style={{
+                            fontSize: '0.74rem',
+                            fontWeight: 700,
+                            color: 'var(--color-text-primary)',
+                            whiteSpace: 'nowrap',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis'
+                          }}
+                        >
+                          {piece.name}
+                        </div>
+                        <div
+                          style={{
+                            fontSize: '0.66rem',
+                            lineHeight: 1.3,
+                            color: 'var(--color-text-secondary)',
+                            marginTop: 2,
+                            display: '-webkit-box',
+                            WebkitLineClamp: 2,
+                            WebkitBoxOrient: 'vertical',
+                            overflow: 'hidden'
+                          }}
+                        >
+                          {reason}
+                        </div>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ))
+          )}
+        </section>
 
         {/* Actions */}
         <div style={{ display: 'flex', gap: 10 }}>

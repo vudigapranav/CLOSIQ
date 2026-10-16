@@ -619,6 +619,10 @@ const SignedInApp: React.FC<SignedInAppProps> = ({ user, isDarkMode, onToggleThe
           onDeleteItem={handleDeleteItem}
           onUpdateItem={handleUpdateItem}
           customPlaces={customStorageLocations(wardrobe)}
+          wardrobe={wardrobe}
+          brain={brain}
+          layeringPreference={layeringPreference}
+          onSelectItem={setSelectedDetailItem}
         />
       )}
 

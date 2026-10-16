@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   StyleSheet,
   View,
@@ -9,7 +9,10 @@ import {
 } from 'react-native';
 import { X, Trash2, Sparkles, Shirt } from 'lucide-react-native';
 import { COLORS, RADIUS } from '../theme';
-import { GarmentItem, GarmentDetailsPatch } from '../../../src/types/wardrobe';
+import { GarmentItem, GarmentDetailsPatch, LayeringPreference } from '../../../src/types/wardrobe';
+import { OutfitFeedback, buildOutfitBrain } from '../../../src/services/outfitBrain';
+import { emptyPairingHint, suggestPairings } from '../../../src/services/pairingSuggestions';
+import { loadOutfitFeedback } from '../services/outfitFeedbackStorage';
 import { GarmentImage } from './GarmentImage';
 import { StorageLocationPicker } from './StorageLocationPicker';
 import { SizePicker } from './SizePicker';
@@ -21,6 +24,11 @@ interface GarmentDetailModalProps {
   /** Persists an edited size / "where is it kept" place for this item. */
   onUpdateItem: (id: string, patch: GarmentDetailsPatch) => void;
   customPlaces?: string[];
+  /** The user's wardrobe — "Pairs well with" only ever suggests pieces from it. */
+  wardrobe?: GarmentItem[];
+  layeringPreference?: LayeringPreference;
+  /** Opens a suggested piece in this same sheet. */
+  onSelectItem?: (item: GarmentItem) => void;
 }
 
 export const GarmentDetailModal: React.FC<GarmentDetailModalProps> = ({
@@ -28,8 +36,34 @@ export const GarmentDetailModal: React.FC<GarmentDetailModalProps> = ({
   onClose,
   onRemove,
   onUpdateItem,
-  customPlaces = []
+  customPlaces = [],
+  wardrobe = [],
+  layeringPreference,
+  onSelectItem
 }) => {
+  // Outfit ratings, so looks the user loved together rank first. Read once
+  // each time the sheet opens; suggestions show immediately without them.
+  const isOpen = Boolean(item);
+  const [feedback, setFeedback] = useState<OutfitFeedback[]>([]);
+  useEffect(() => {
+    if (!isOpen) return;
+    let active = true;
+    loadOutfitFeedback()
+      .then((list) => {
+        if (active) setFeedback(list);
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, [isOpen]);
+
+  const pairingGroups = useMemo(
+    () => (item ? suggestPairings(item, wardrobe, { brain: buildOutfitBrain(feedback), layeringPreference }) : []),
+    [item, wardrobe, feedback, layeringPreference]
+  );
+  const visibleGroups = pairingGroups.filter((g) => g.suggestions.length > 0);
+
   if (!item) return null;
 
   return (
@@ -53,7 +87,7 @@ export const GarmentDetailModal: React.FC<GarmentDetailModalProps> = ({
             </TouchableOpacity>
           </View>
 
-          <ScrollView showsVerticalScrollIndicator={false}>
+          <ScrollView key={item.id} showsVerticalScrollIndicator={false}>
             {/* Garment Image */}
             <View style={styles.imageFrame}>
               <GarmentImage uri={item.imageUrl} style={styles.garmentImg} iconSize={28} />
@@ -113,6 +147,57 @@ export const GarmentDetailModal: React.FC<GarmentDetailModalProps> = ({
                 <Text style={styles.noteBody}>"{item.pairingNotes}"</Text>
               </View>
             )}
+
+            {/* Pairs well with — pieces from the user's own wardrobe */}
+            <View style={styles.pairSection}>
+              <View style={styles.noteHeader}>
+                <Sparkles size={13} color={COLORS.primary} />
+                <Text style={styles.pairTitle}>Pairs well with</Text>
+              </View>
+              <Text style={styles.pairSubtitle}>
+                Picked from your wardrobe for this {item.subcategory.toLowerCase() || 'piece'}
+              </Text>
+
+              {visibleGroups.length === 0 ? (
+                <View style={styles.pairEmpty}>
+                  <Shirt size={18} color={COLORS.primary} />
+                  <Text style={styles.pairEmptyText}>{emptyPairingHint(pairingGroups)}</Text>
+                </View>
+              ) : (
+                visibleGroups.map((group) => (
+                  <View key={group.category} style={styles.pairGroup}>
+                    <Text style={styles.pairGroupTitle}>{group.title}</Text>
+                    <View style={styles.pairRow}>
+                      {group.suggestions.map(({ item: piece, reason }) => (
+                        <TouchableOpacity
+                          key={piece.id}
+                          style={styles.pairCard}
+                          activeOpacity={0.8}
+                          disabled={!onSelectItem}
+                          onPress={() => onSelectItem?.(piece)}
+                        >
+                          <View style={styles.pairImageFrame}>
+                            <GarmentImage uri={piece.imageUrl} style={styles.pairImage} iconSize={18} />
+                          </View>
+                          <View style={styles.pairInfo}>
+                            <Text style={styles.pairName} numberOfLines={1}>
+                              {piece.name}
+                            </Text>
+                            <Text style={styles.pairReason} numberOfLines={2}>
+                              {reason}
+                            </Text>
+                          </View>
+                        </TouchableOpacity>
+                      ))}
+                      {/* Keep cards the same width when a group has fewer than three. */}
+                      {Array.from({ length: 3 - group.suggestions.length }, (_, i) => (
+                        <View key={`spacer-${i}`} style={styles.pairSpacer} />
+                      ))}
+                    </View>
+                  </View>
+                ))
+              )}
+            </View>
 
             {/* Delete / Remove Action */}
             <TouchableOpacity
@@ -262,6 +347,84 @@ const styles = StyleSheet.create({
     fontSize: 12.5,
     color: COLORS.textPrimary,
     lineHeight: 17
+  },
+  pairSection: {
+    marginBottom: 20
+  },
+  pairTitle: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: COLORS.primary
+  },
+  pairSubtitle: {
+    fontSize: 12,
+    color: COLORS.textSecondary,
+    marginBottom: 12
+  },
+  pairEmpty: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    padding: 14,
+    borderRadius: RADIUS.md,
+    backgroundColor: COLORS.surfaceSubtle,
+    borderWidth: 1,
+    borderColor: COLORS.border
+  },
+  pairEmptyText: {
+    flex: 1,
+    fontSize: 12.5,
+    lineHeight: 17,
+    color: COLORS.textSecondary
+  },
+  pairGroup: {
+    marginBottom: 14
+  },
+  pairGroupTitle: {
+    fontSize: 12.5,
+    fontWeight: '700',
+    color: COLORS.textPrimary,
+    marginBottom: 8
+  },
+  pairRow: {
+    flexDirection: 'row',
+    gap: 10
+  },
+  pairCard: {
+    flex: 1,
+    borderRadius: RADIUS.md,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    backgroundColor: COLORS.surfaceElevated,
+    overflow: 'hidden'
+  },
+  pairSpacer: {
+    flex: 1
+  },
+  pairImageFrame: {
+    width: '100%',
+    aspectRatio: 1 / 1.1,
+    backgroundColor: COLORS.surfaceSubtle
+  },
+  pairImage: {
+    width: '100%',
+    height: '100%'
+  },
+  pairInfo: {
+    paddingHorizontal: 8,
+    paddingTop: 7,
+    paddingBottom: 9
+  },
+  pairName: {
+    fontSize: 11.5,
+    fontWeight: '700',
+    color: COLORS.textPrimary
+  },
+  pairReason: {
+    fontSize: 10.5,
+    lineHeight: 14,
+    color: COLORS.textSecondary,
+    marginTop: 2
   },
   deleteBtn: {
     flexDirection: 'row',

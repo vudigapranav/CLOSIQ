@@ -71,6 +71,14 @@ This document tracks the live implementation status of **CLOSIQ**. It is updated
 * Web parity: same cloud rows; `OutfitRatingBar`; Today/Stylist rate + Later + Wear; shown looks recorded to outfit_history; Profile tabs + learning DNA. Fixed an old bug: Profile counted `'footwear'` instead of `'shoes'`.
 * Tests 92/92 (+6 `outfitBrain.test.ts`). Web build + lint clean; web sources type-check (only Vite `import.meta.env` noise outside Vite).
 
+## Pairs well with (2026-10-16)
+* User request: opening a garment in the Wardrobe should show, at the bottom of its detail sheet, which of the user's OWN clothes go with it — bottoms for a T-shirt/shirt, tops for pants, and so on.
+* Shared `src/services/pairingSuggestions.ts` (web + mobile, on-device, no AI call): tops → bottoms + footwear; bottoms → tops + footwear; outerwear → tops + bottoms; shoes → bottoms + tops; accessories → tops + bottoms; one-pieces (dress/saree/jumpsuit) → footwear + a layer and never a bottom. Ranked by formality gap, colour harmony (neutrals, light/dark contrast, hue clash), season overlap, Indian-ethnic pairing (churidar/salwar/dhoti only under ethnic tops), layering preference (no tank under a jacket when "avoid"), and the outfit brain (pairs the user loved together first, disliked pairs sink). Up to 3 per group, clashing picks (score < 0) dropped; an empty wardrobe category shows an honest "Add bottoms or footwear…" hint.
+* Web `ClothingDetailModal`: new "Pairs well with" section above the actions; tapping a suggestion opens that piece in the same sheet (scrolls to top). The old canned fallback text ("Combines gracefully with tailored neutral bottoms…") was removed — the "Styling notes" box now only shows the scan's own `pairingNotes`.
+* Mobile `GarmentDetailModal`: same section above "Remove from Wardrobe"; reads outfit feedback once per open; `CollectionScreen` passes wardrobe, layering preference and `onSelectItem`.
+* Tests 99/99 (+7 `pairingSuggestions.test.ts`). Web build + oxlint clean; mobile `tsc` clean. NOT TESTED on a device or in a browser (standing preference).
+* Still invented, untouched: web detail image badge "Used in N outfits" (`Math.max(3, …)` from wearCount).
+
 ## Latest APK (2026-10-14)
 * Build `4c16caf6-2562-4b00-949a-df8ee6f44310` from `aa8fe9a` (everything built in: Spark-hanger icon, outfit brain, AI fixes): https://expo.dev/artifacts/eas/Q02RnM5v733bWMY1pkbvl4YSL4wOabdJSe0JON8GD6E.apk — supersedes b35879a8 (Oct 13, old icon) and b4539959 (pre-brain). The user had reinstalled an older APK; on a fresh install an OTA update only applies on the second launch, so the rating bar never appeared.
 
