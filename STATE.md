@@ -77,6 +77,7 @@ This document tracks the live implementation status of **CLOSIQ**. It is updated
 * Web `ClothingDetailModal`: new "Pairs well with" section above the actions; tapping a suggestion opens that piece in the same sheet (scrolls to top). The old canned fallback text ("Combines gracefully with tailored neutral bottoms…") was removed — the "Styling notes" box now only shows the scan's own `pairingNotes`.
 * Mobile `GarmentDetailModal`: same section above "Remove from Wardrobe"; reads outfit feedback once per open; `CollectionScreen` passes wardrobe, layering preference and `onSelectItem`.
 * Tests 99/99 (+7 `pairingSuggestions.test.ts`). Web build + oxlint clean; mobile `tsc` clean. NOT TESTED on a device or in a browser (standing preference).
+* OTA "v1.1 Pairs well with": update group `eb85c800-2a28-4cb2-9359-36ff42976f86` (channel/branch `preview`, runtime 1.0.0, Android, commit `3903e39`). app.json `version` deliberately left at 1.0.0 — the runtime policy is `appVersion`, so bumping it would stop the installed APK from receiving the update. Verified in the exported bundle: new section present, Vercel API host, no LAN host, no Gemini key. Website NOT redeployed to Vercel in this change.
 * Still invented, untouched: web detail image badge "Used in N outfits" (`Math.max(3, …)` from wearCount).
 
 ## Latest APK (2026-10-14)
