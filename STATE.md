@@ -6,8 +6,23 @@ This document tracks the live implementation status of **CLOSIQ**. It is updated
 
 ## Current Phase
 
+* **Latest (2026-10-24)**: Wardrobe smart search + stylist filters on web and mobile — see "WARDROBE SEARCH + FILTERS" below.
 * **Phase**: Live deployment + new wardrobe features (2026-10-13) — **WEBSITE LIVE ON VERCEL; ANDROID APK BUILT; NOT DEVICE-VERIFIED**
 * **Status**: Website + AI backend deployed to Vercel at **https://closiq-liard.vercel.app** (login, cloud wardrobe shared with the phone app, responsive desktop/mobile web). Added garment **size** and **"where is it kept"** (Indian household places + custom) on web and mobile, and a free **studio photo** (white background, open-source U²-Net cut-out, no Gemini). Mobile linked to EAS (`@vudigapranav/closiq`) with over-the-air updates; first Android `preview` APK build started. Supabase was paused again and was restored; a daily Vercel Cron keeps it from pausing. **Workflow change at the user's request: commit and push straight to `main` (no PRs), then `git pull` into the local CLOSIQ folder.** Details in "DEPLOYMENT + FEATURES" below.
+
+---
+
+# WARDROBE SEARCH + FILTERS (2026-10-24)
+
+User request after 2–3 weeks of use: a search in the Wardrobe where "my blue jacket" shows every blue jacket whatever its type, and a filter section when a section (Tops, Bottoms, Footwear…) is opened — place, colour, size "and many more, think as a stylist". Commits are named "Addition of feature after using for 2 weeks: feature N – …" (features 1–10) at the user's request, each pushed straight to `main`.
+
+* **Shared engine** (web + mobile, on-device, no AI call):
+  * `src/services/wardrobeSearch.ts` — every query word must match (AND). A word matches by colour family (13 families: "blue" = navy, indigo, denim, cobalt… plus any piece whose swatch hex is blue), garment type ("jacket" = bomber, denim, biker, blazer, puffer…, "pants" = jeans, chinos, cargos…, "shirt" excludes T-shirts/sweatshirts), occasion/season/light-dark/favourite/never-worn words, or plain text on any field (name, type, colour, fabric, brand, fit, style, tags, size, place). Name matches rank first. `describeSearch()` feeds the "Looking for: Blue shades · Jackets (any type)" line.
+  * `src/services/wardrobeFilters.ts` — facets built from the pieces of the open section with counts: Colour, Type, Occasion, Where it's kept, Size (preset order), Season & weather, Fit, Style vibe, Fabric family, Layering, Wear history (never / 1–2 / 5+ / not worn 30+ days), Favourites. OR within a facet, AND across facets. Facets that can't narrow anything are hidden; `pruneFilters` ignores selections the current section doesn't offer. Sort: best match, recent, oldest, most/least worn, colour, name.
+* **Web** `CollectionScreen`: search bar always visible (the old toggle button is gone) + Filters button with count badge → `src/components/modals/WardrobeFilterSheet.tsx`; removable active-filter chips, "N of M pieces", Sort select. The single place dropdown was folded into the filters.
+* **Mobile** `CollectionScreen` (had no search before): same search bar + Filters button → `mobile/src/components/WardrobeFilterSheet.tsx` (safe-area aware); active chips, result count. The place chip row was folded into the filters.
+* Tests 107/107 (+8 `mobile/tests/wardrobeSearchFilters.test.ts`). Web build + oxlint clean; web `CollectionScreen` type-checks; mobile `tsc` clean except the pre-existing `expo-file-system` "module not found", which happens only because the local `mobile/node_modules` lacks that package (it is in package.json).
+* NOT TESTED in a browser or on a device (standing preference). Not yet deployed: website needs `vercel deploy --prod`; phone needs an OTA (`eas update --channel preview`).
 
 ---
 
