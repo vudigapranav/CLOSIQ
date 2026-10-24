@@ -22,7 +22,8 @@ User request after 2–3 weeks of use: a search in the Wardrobe where "my blue j
 * **Web** `CollectionScreen`: search bar always visible (the old toggle button is gone) + Filters button with count badge → `src/components/modals/WardrobeFilterSheet.tsx`; removable active-filter chips, "N of M pieces", Sort select. The single place dropdown was folded into the filters.
 * **Mobile** `CollectionScreen` (had no search before): same search bar + Filters button → `mobile/src/components/WardrobeFilterSheet.tsx` (safe-area aware); active chips, result count. The place chip row was folded into the filters.
 * Tests 107/107 (+8 `mobile/tests/wardrobeSearchFilters.test.ts`). Web build + oxlint clean; web `CollectionScreen` type-checks; mobile `tsc` clean except the pre-existing `expo-file-system` "module not found", which happens only because the local `mobile/node_modules` lacks that package (it is in package.json).
-* NOT TESTED in a browser or on a device (standing preference). Not yet deployed: website needs `vercel deploy --prod`; phone needs an OTA (`eas update --channel preview`).
+* NOT TESTED in a browser or on a device (standing preference).
+* **Deployed 2026-10-24**: website `vercel deploy --prod` from the main checkout — LIVE VERIFIED by curl: `/` 200, `/healthz` commit `3dfbcb5`, `geminiConfigured: true`; live bundle contains the new search/filter strings, no Gemini key. OTA "v1.2 Wardrobe smart search + filters": update group `beba481f-7f29-46de-ba39-b3c815206bda` (channel/branch `preview`, runtime 1.0.0, Android, commit `3dfbcb5`, `--environment preview`). Verified in the exported bundle: new strings present, Vercel API host, no LAN host, no Gemini key (the only `service_role` string is supabaseConfig's own guard). The main checkout's `mobile/node_modules` was missing `expo-file-system` and needed `npm install` (Node 22) first; npm's lockfile rewrite (dropped `libc` fields only) was reverted.
 
 ---
 
