@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Search, Plus, X, Shirt, MapPin } from 'lucide-react';
 import { CategoryChip } from '../ui/CategoryChip';
 import { ClothingCard } from '../ui/ClothingCard';
@@ -6,6 +6,7 @@ import { EmptyState } from '../ui/EmptyState';
 import { PrimaryButton } from '../ui/PrimaryButton';
 import { GarmentItem } from '../../types/wardrobe';
 import { usedStorageLocations } from '../../data/storageLocations';
+import { describeSearch, searchWardrobe } from '../../services/wardrobeSearch';
 
 interface CollectionScreenProps {
   wardrobe: GarmentItem[];
@@ -19,7 +20,6 @@ export const CollectionScreen: React.FC<CollectionScreenProps> = ({
   onSelectItem
 }) => {
   const [activeCategory, setActiveCategory] = useState<string>('All');
-  const [showSearch, setShowSearch] = useState<boolean>(false);
   const [searchQuery, setSearchQuery] = useState<string>('');
   // '' = every place. Only offered once at least one item has a place set.
   const [activePlace, setActivePlace] = useState<string>('');
@@ -36,24 +36,21 @@ export const CollectionScreen: React.FC<CollectionScreenProps> = ({
     { label: 'Accessories', key: 'accessories' }
   ];
 
-  const filteredWardrobe = wardrobe.filter((item) => {
-    if (activeCategory !== 'All' && item.category !== activeCategory) {
-      return false;
-    }
-    if (placeFilter && item.storageLocation !== placeFilter) {
-      return false;
-    }
-    if (searchQuery.trim() !== '') {
-      const q = searchQuery.toLowerCase();
-      const matchName = item.name.toLowerCase().includes(q);
-      const matchBrand = (item.brand || '').toLowerCase().includes(q);
-      const matchColor = item.color.toLowerCase().includes(q);
-      const matchFabric = item.fabric.toLowerCase().includes(q);
-      const matchPlace = (item.storageLocation || '').toLowerCase().includes(q);
-      return matchName || matchBrand || matchColor || matchFabric || matchPlace;
-    }
-    return true;
-  });
+  // Smart search: "blue jacket" = any blue-family piece that is any kind of
+  // jacket (see services/wardrobeSearch.ts). Category + place narrow first.
+  const filteredWardrobe = useMemo(
+    () =>
+      searchWardrobe(
+        wardrobe.filter(
+          (item) =>
+            (activeCategory === 'All' || item.category === activeCategory) &&
+            (!placeFilter || item.storageLocation === placeFilter)
+        ),
+        searchQuery
+      ),
+    [wardrobe, activeCategory, placeFilter, searchQuery]
+  );
+  const understood = useMemo(() => describeSearch(searchQuery), [searchQuery]);
 
   return (
     <div style={{ padding: '20px 20px 32px' }}>
@@ -65,25 +62,6 @@ export const CollectionScreen: React.FC<CollectionScreenProps> = ({
         </div>
 
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-          <button
-            onClick={() => setShowSearch(!showSearch)}
-            style={{
-              background: showSearch ? 'var(--color-primary-alpha)' : 'var(--color-surface-subtle)',
-              border: '1px solid var(--color-border)',
-              borderRadius: '50%',
-              width: 38,
-              height: 38,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              cursor: 'pointer',
-              color: showSearch ? 'var(--color-primary)' : 'var(--color-text-secondary)'
-            }}
-            title="Search Collection"
-          >
-            <Search size={18} />
-          </button>
-
           <button
             onClick={onOpenAddItem}
             style={{
@@ -107,13 +85,14 @@ export const CollectionScreen: React.FC<CollectionScreenProps> = ({
         </div>
       </div>
 
-      {/* Inline Search Bar */}
-      {showSearch && (
-        <div style={{ position: 'relative', marginBottom: 16 }}>
+      {/* Smart Search Bar — always visible */}
+      <div style={{ marginBottom: 16 }}>
+        <div style={{ position: 'relative' }}>
           <Search size={18} style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', color: 'var(--color-text-muted)' }} />
           <input
-            type="text"
-            placeholder="Search by name, color, fabric, or place..."
+            type="search"
+            aria-label="Search your wardrobe"
+            placeholder='Try "blue jacket", "white sneakers", "office"'
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             style={{
@@ -130,13 +109,38 @@ export const CollectionScreen: React.FC<CollectionScreenProps> = ({
           {searchQuery && (
             <button
               onClick={() => setSearchQuery('')}
-              style={{ position: 'absolute', right: 14, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-text-muted)' }}
+              aria-label="Clear search"
+              title="Clear search"
+              style={{ position: 'absolute', right: 14, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-text-muted)', display: 'flex' }}
             >
               <X size={16} />
             </button>
           )}
         </div>
-      )}
+        {understood.length > 0 && (
+          <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 6, marginTop: 10 }}>
+            <span className="text-caption">Looking for</span>
+            {understood.map((label, i) => (
+              <span
+                key={`${label}-${i}`}
+                style={{
+                  fontSize: '0.72rem',
+                  fontWeight: 600,
+                  color: 'var(--color-primary)',
+                  backgroundColor: 'var(--color-primary-alpha)',
+                  padding: '3px 10px',
+                  borderRadius: 'var(--radius-pill)'
+                }}
+              >
+                {label}
+              </span>
+            ))}
+            <span className="text-caption">
+              · {filteredWardrobe.length} piece{filteredWardrobe.length === 1 ? '' : 's'}
+            </span>
+          </div>
+        )}
+      </div>
 
       {/* Category Chips Bar */}
       <div className="hide-scrollbar" style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 4, marginBottom: 20 }}>
@@ -201,7 +205,11 @@ export const CollectionScreen: React.FC<CollectionScreenProps> = ({
         <EmptyState
           icon={<Search size={26} color="var(--color-primary)" />}
           title="No items match."
-          description="Try a different category, place, or search term."
+          description={
+            searchQuery.trim()
+              ? `Nothing you own matches "${searchQuery.trim()}"${activeCategory === 'All' ? '' : ' in this section'}. Try fewer words, or a colour family like "blue".`
+              : 'Try a different category or place.'
+          }
         />
       ) : (
         <div className="garment-grid">
