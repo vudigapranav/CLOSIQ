@@ -6,15 +6,17 @@ import {
   ScrollView,
   TouchableOpacity,
   Dimensions,
-  FlatList
+  FlatList,
+  TextInput
 } from 'react-native';
-import { Shirt, Plus, MapPin } from 'lucide-react-native';
+import { Shirt, Plus, MapPin, Search, X } from 'lucide-react-native';
 import { COLORS, RADIUS } from '../theme';
 import { GarmentItem, GarmentDetailsPatch, LayeringPreference, WardrobeProfile } from '../../../src/types/wardrobe';
 import { AddItemModal } from '../components/AddItemModal';
 import { GarmentDetailModal } from '../components/GarmentDetailModal';
 import { GarmentImage } from '../components/GarmentImage';
 import { customStorageLocations, usedStorageLocations } from '../../../src/data/storageLocations';
+import { describeSearch, searchWardrobe } from '../../../src/services/wardrobeSearch';
 
 const { width } = Dimensions.get('window');
 
@@ -82,6 +84,7 @@ export const CollectionScreen: React.FC<CollectionScreenProps> = ({
   const [selectedCategory, setSelectedCategory] = useState<string>('All');
   // '' = every place. The place row only appears once some item has a place.
   const [selectedPlace, setSelectedPlace] = useState<string>('');
+  const [searchQuery, setSearchQuery] = useState('');
   const [showAddModal, setShowAddModal] = useState(false);
   // Held by id and looked up in `wardrobe`, so the open detail sheet shows a
   // place change as soon as App's wardrobe state updates.
@@ -96,17 +99,22 @@ export const CollectionScreen: React.FC<CollectionScreenProps> = ({
   // A place disappears once its last item moves; drop the filter with it.
   const placeFilter = usedPlaces.includes(selectedPlace) ? selectedPlace : '';
 
-  // Filter items by category and place. `wardrobe` is lifted to App.tsx
-  // (Sprint M16) — this screen no longer loads its own copy from AsyncStorage.
+  // Filter items by category and place, then the smart search ("blue
+  // jacket" = every blue-family jacket of any type). `wardrobe` is lifted to
+  // App.tsx (Sprint M16) — this screen no longer loads its own copy.
   const filteredGarments = useMemo(
     () =>
-      wardrobe.filter(
-        (g) =>
-          (selectedCategory === 'All' || g.category === selectedCategory) &&
-          (!placeFilter || g.storageLocation === placeFilter)
+      searchWardrobe(
+        wardrobe.filter(
+          (g) =>
+            (selectedCategory === 'All' || g.category === selectedCategory) &&
+            (!placeFilter || g.storageLocation === placeFilter)
+        ),
+        searchQuery
       ),
-    [wardrobe, selectedCategory, placeFilter]
+    [wardrobe, selectedCategory, placeFilter, searchQuery]
   );
+  const understood = useMemo(() => describeSearch(searchQuery), [searchQuery]);
 
   const handleSelectGarment = useCallback((item: GarmentItem) => setSelectedGarmentId(item.id), []);
 
@@ -134,6 +142,42 @@ export const CollectionScreen: React.FC<CollectionScreenProps> = ({
           <Plus size={16} color="#FFFFFF" />
           <Text style={styles.addButtonText}>Add Item</Text>
         </TouchableOpacity>
+      </View>
+
+      {/* Smart search */}
+      <View style={styles.searchSection}>
+        <View style={styles.searchBox}>
+          <Search size={16} color={COLORS.textMuted} />
+          <TextInput
+            style={styles.searchInput}
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            placeholder='Try "blue jacket" or "office"'
+            placeholderTextColor={COLORS.textMuted}
+            returnKeyType="search"
+            autoCorrect={false}
+            autoCapitalize="none"
+            accessibilityLabel="Search your wardrobe"
+          />
+          {searchQuery.length > 0 && (
+            <TouchableOpacity onPress={() => setSearchQuery('')} hitSlop={10} accessibilityLabel="Clear search">
+              <X size={16} color={COLORS.textMuted} />
+            </TouchableOpacity>
+          )}
+        </View>
+        {understood.length > 0 && (
+          <View style={styles.understoodRow}>
+            <Text style={styles.understoodLabel}>Looking for</Text>
+            {understood.map((label, i) => (
+              <View key={`${label}-${i}`} style={styles.understoodChip}>
+                <Text style={styles.understoodChipText}>{label}</Text>
+              </View>
+            ))}
+            <Text style={styles.understoodLabel}>
+              · {filteredGarments.length} piece{filteredGarments.length === 1 ? '' : 's'}
+            </Text>
+          </View>
+        )}
       </View>
 
       {/* Category Filter Chips */}
@@ -192,9 +236,11 @@ export const CollectionScreen: React.FC<CollectionScreenProps> = ({
             <Shirt size={28} color={COLORS.primary} />
           </View>
 
-          <Text style={styles.emptyTitle}>No Garments Cataloged</Text>
+          <Text style={styles.emptyTitle}>{searchQuery.trim() ? 'No Matches' : 'No Garments Cataloged'}</Text>
           <Text style={styles.emptySubtitle}>
-            {placeFilter
+            {searchQuery.trim()
+              ? `Nothing you own matches "${searchQuery.trim()}". Try fewer words, or a colour family like "blue".`
+              : placeFilter
               ? `Nothing here is kept in ${placeFilter}${selectedCategory === 'All' ? '' : ` under ${selectedCategory.toUpperCase()}`}.`
               : selectedCategory === 'All'
               ? 'Your digital closet is empty. Tap "+ Add Item" to capture or upload real clothing photos.'
@@ -284,6 +330,49 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 12.5,
     fontWeight: '700'
+  },
+  searchSection: {
+    paddingHorizontal: 20,
+    paddingBottom: 12
+  },
+  searchBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 14,
+    height: 42,
+    borderRadius: RADIUS.pill,
+    backgroundColor: COLORS.surface,
+    borderWidth: 1,
+    borderColor: COLORS.borderMedium
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 14,
+    color: COLORS.textPrimary,
+    paddingVertical: 0
+  },
+  understoodRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 8
+  },
+  understoodLabel: {
+    fontSize: 11.5,
+    color: COLORS.textMuted
+  },
+  understoodChip: {
+    backgroundColor: COLORS.primaryAlpha,
+    paddingHorizontal: 9,
+    paddingVertical: 3,
+    borderRadius: RADIUS.pill
+  },
+  understoodChipText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: COLORS.primary
   },
   filterContainer: {
     borderBottomWidth: 1,
