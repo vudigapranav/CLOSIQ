@@ -13,6 +13,7 @@ import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import type { Session } from '@supabase/supabase-js';
 import { COLORS } from './src/theme';
 import { IntroSplash } from './src/components/IntroSplash';
+import { applyUpdateOnLaunch } from './src/services/appUpdates';
 import { BottomNavigation, NavTab } from './src/components/BottomNavigation';
 import { TodayScreen } from './src/screens/TodayScreen';
 import { CollectionScreen } from './src/screens/CollectionScreen';
@@ -82,6 +83,11 @@ function AppContent() {
   // reads builds its AsyncStorage key from whatever that module-level
   // value currently is — getting the order right here is what makes user
   // data isolation actually hold.
+  // Run a freshly published OTA update on this launch, not the next one.
+  useEffect(() => {
+    applyUpdateOnLaunch();
+  }, []);
+
   useEffect(() => {
     let mounted = true;
 
