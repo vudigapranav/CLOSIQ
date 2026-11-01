@@ -24,8 +24,16 @@ User request (2026-11-01): (1) remove the Stylist tab — keep the AI Stylist re
 | 3 | Mobile: new nav (Today · Wardrobe · camera · Planner · Profile) + Stylist entry in Today | DONE — `BottomNavigation`, Today "AI Stylist" card, Stylist back button + Android back |
 | 4 | Mobile: Shop Check screen (camera/gallery → AI scan → verdict, pairings, outfits, "I bought it") | DONE — `ShopCheckModal.tsx`; describe-by-hand fallback; Android bundle exports (4.7 MB) |
 | 5 | Web parity: same nav + Shop Check | DONE — web `BottomNavigation` (raised camera; sidebar row on desktop), Home "AI Stylist" card, Stylist back link, `ShopCheckModal.tsx`; build + lint + tsc clean |
-| 6 | Verify (tests, tsc, build, export), CLAUDE.md/STATE.md, push | in progress — CLAUDE.md §3/§4 updated |
-| 7 | Deploy web + OTA + new APK build (ask the user first) | todo |
+| 6 | Verify (tests, tsc, build, export), CLAUDE.md/STATE.md, push | DONE — tests 114/114, web lint + build + tsc clean, Android + iOS bundles export, all pushed to `main` (`e9022d1`…`77b0987`) |
+| 7 | Deploy web + OTA + new APK build (ask the user first) | WAITING FOR THE USER — the icon needs a new APK; everything else can go by OTA + Vercel |
+
+### What was built (details)
+* **Icon**: `scripts/generate-app-icons.mjs` now crops the brain-Q out of `public/brand/closiq-logo.png` with sharp (coverage mask → lanczos upscale → smoothstep edge), writing every icon size. Visually checked: app icon, adaptive foreground, white monochrome, favicon. The installed APK keeps the Spark hanger until a new build is installed.
+* **Shop Check engine** (`src/services/shopCheck.ts`): `runShopCheck(candidate, wardrobe, {brain, layeringPreference, stylePreferences, taste})` → verdict (`great` / `good` / `think_twice` / `unknown`) with reasons; `wearWith` per pairing category, diversified by colour family; up to 3 outfits (cartesian of top-4 per slot, pairwise clash filter, a different lead piece each, reused pieces penalised, occasion labels by average formality); Style DNA fit (shared axes with the user's top DNA axes / onboarding preferences → strong, neutral or casual-match → partial, else "new direction"); near-twins (same coarse type + colour family: 1 caps the verdict at "Could work", 2+ = "Think twice"); gap-filling; colour/fit tips; a "Future idea" line only when the closet can't complete a look. `pairingSuggestions.ts` now exports `pairCompatibility`, `pairingCategories` and `rankPairings` (`suggestPairings` unchanged).
+* **Scanner**: with no category hint the server prompt lets the AI choose the category (Add Item always sends one, so it's unchanged). Web `analyzeGarmentImageWithGemini` hint is optional.
+* **Phone**: `BottomNavigation` = Today · Wardrobe · raised 58 px camera circle "Shop Check" · Planner · Profile; Today is lit while the Stylist is open. Today has an "AI STYLIST" card; the Stylist has a "‹ Today" back link and Android back returns to Today. `ShopCheckModal` is a full-screen, edge-to-edge modal: pick → scanning → result, with a describe-by-hand fallback (type, 13 colour swatches, dressiness) when the AI scan fails. "I bought it" goes through `handleGarmentAdded` (cloud save + photo upload); the added piece is left out of the open result.
+* **Web**: same nav (the camera is a highlighted row in the ≥1024 px sidebar; CSS `.app-nav__camera*`), Home "AI STYLIST" card, Stylist "‹ Home" link, `src/components/modals/ShopCheckModal.tsx` (uses `<input capture="environment">` for the camera).
+* NOT TESTED in a browser or on a device (standing preference). Untested on real data: the AI scan with a real shop photo through the live server (needs the server deploy for the no-hint prompt).
 
 ---
 
