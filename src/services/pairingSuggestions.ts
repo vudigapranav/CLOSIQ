@@ -177,6 +177,12 @@ function pairScore(
   return { score, reason: reasons[0]?.text ?? 'Works with this piece' };
 }
 
+/** How well two garments go together (higher = better; below 0 = clash), with
+ *  the main reason. Also used by Shop Check to build whole outfits. */
+export function pairCompatibility(a: GarmentItem, b: GarmentItem, brain?: OutfitBrain): { score: number; reason: string } {
+  return pairScore(a, b, brain);
+}
+
 function candidatePool(
   item: GarmentItem,
   category: GarmentCategory,
@@ -206,18 +212,32 @@ function candidatePool(
  * uses that to nudge the user to add one instead of inventing a suggestion.
  */
 export function suggestPairings(item: GarmentItem, wardrobe: GarmentItem[], options: PairingOptions = {}): PairingGroup[] {
-  const { brain, layeringPreference = 'sometimes', limit = 3 } = options;
-  const categories: GarmentCategory[] = isOnePiece(item) ? ['shoes', 'outerwear'] : PAIRS_WITH[item.category];
+  const { limit = 3 } = options;
+  return pairingCategories(item).map((category) => ({
+    category,
+    title: GROUP_TITLE[category],
+    suggestions: rankPairings(item, category, wardrobe, options).slice(0, limit)
+  }));
+}
 
-  return categories.map((category) => {
-    const suggestions = candidatePool(item, category, wardrobe, layeringPreference)
-      .map((candidate) => ({ item: candidate, ...pairScore(item, candidate, brain) }))
-      // Below zero = clashing formality or colours; better to show fewer than a bad match.
-      .filter((s) => s.score >= 0)
-      .sort((a, b) => b.score - a.score || a.item.name.localeCompare(b.item.name) || a.item.id.localeCompare(b.item.id))
-      .slice(0, limit);
-    return { category, title: GROUP_TITLE[category], suggestions };
-  });
+/** The categories worth pairing with a piece, most important first. */
+export function pairingCategories(item: GarmentItem): GarmentCategory[] {
+  return isOnePiece(item) ? ['shoes', 'outerwear'] : PAIRS_WITH[item.category];
+}
+
+/** Every owned piece in `category` that suits `item`, best first (no limit). */
+export function rankPairings(
+  item: GarmentItem,
+  category: GarmentCategory,
+  wardrobe: GarmentItem[],
+  options: Omit<PairingOptions, 'limit'> = {}
+): PairingSuggestion[] {
+  const { brain, layeringPreference = 'sometimes' } = options;
+  return candidatePool(item, category, wardrobe, layeringPreference)
+    .map((candidate) => ({ item: candidate, ...pairScore(item, candidate, brain) }))
+    // Below zero = clashing formality or colours; better to show fewer than a bad match.
+    .filter((s) => s.score >= 0)
+    .sort((a, b) => b.score - a.score || a.item.name.localeCompare(b.item.name) || a.item.id.localeCompare(b.item.id));
 }
 
 const EMPTY_LABEL: Record<GarmentCategory, string> = {
