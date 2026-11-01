@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Sparkles, RefreshCw, Clock, Eye, AlertTriangle, Plus, X, Check, ArrowRight } from 'lucide-react';
+import { Sparkles, RefreshCw, Clock, Eye, AlertTriangle, Plus, X, Check, ArrowRight, ChevronLeft } from 'lucide-react';
 import { PrimaryButton } from '../ui/PrimaryButton';
 import { SecondaryButton } from '../ui/SecondaryButton';
 import { EmptyState } from '../ui/EmptyState';
@@ -31,6 +31,8 @@ interface StylistScreenProps {
   ratingFor?: (outfit: Outfit) => OutfitRating | null;
   onRateOutfit?: (outfit: Outfit, rating: OutfitRating) => void;
   onOutfitShown?: (outfit: Outfit) => void;
+  /** Back to Home — the Stylist opens from there, not from a tab (2026-11-01). */
+  onBack?: () => void;
 }
 
 const GENERATION_CAPTIONS = ['Checking your wardrobe…', 'Curating your look…', 'Finding the right combination…'];
@@ -49,8 +51,30 @@ export const StylistScreen: React.FC<StylistScreenProps> = ({
   brain,
   ratingFor,
   onRateOutfit,
-  onOutfitShown
+  onOutfitShown,
+  onBack
 }) => {
+  const backLink = onBack ? (
+    <button
+      onClick={onBack}
+      style={{
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: 2,
+        background: 'none',
+        border: 'none',
+        padding: 0,
+        marginBottom: 10,
+        cursor: 'pointer',
+        color: 'var(--color-primary)',
+        fontSize: '0.82rem',
+        fontWeight: 600
+      }}
+    >
+      <ChevronLeft size={16} />
+      Home
+    </button>
+  ) : null;
   const [prompt, setPrompt] = useState('I have a college presentation tomorrow');
   const [selectedChip, setSelectedChip] = useState('College');
   const [selectedStyle, setSelectedStyle] = useState<string | null>(null);
@@ -229,6 +253,7 @@ export const StylistScreen: React.FC<StylistScreenProps> = ({
   if (wardrobe.length === 0) {
     return (
       <div style={{ padding: '20px 20px 32px' }}>
+        {backLink}
         <div style={{ marginBottom: 20 }}>
           <h1 className="text-screen-heading">Your AI Stylist</h1>
           <p className="text-body" style={{ marginTop: 2 }}>Tell me where you're going.</p>
@@ -253,6 +278,7 @@ export const StylistScreen: React.FC<StylistScreenProps> = ({
   return (
     <div style={{ padding: '20px 20px 32px' }}>
       {/* 1. Header */}
+      {backLink}
       <div style={{ marginBottom: 20 }}>
         <h1 className="text-screen-heading">Your AI Stylist</h1>
         <p className="text-body" style={{ marginTop: 2 }}>Tell me where you're going.</p>

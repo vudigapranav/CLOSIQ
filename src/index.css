@@ -325,9 +325,43 @@ html, body {
   transition: color 0.2s ease, background-color 0.2s ease;
 }
 
-.app-nav__tab.is-stylist {
-  background: var(--color-primary-alpha);
+/* Raised centre camera button (Shop Check, 2026-11-01). */
+.app-nav__camera {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 3px;
+  flex: 1;
+  background: transparent;
+  border: none;
+  padding: 0 4px 6px;
+  cursor: pointer;
   color: var(--color-primary);
+}
+
+.app-nav__camera-circle {
+  width: 56px;
+  height: 56px;
+  margin-top: -34px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--color-primary);
+  color: var(--color-text-on-primary);
+  border: 4px solid var(--color-bg);
+  box-shadow: 0 8px 18px rgba(107, 90, 61, 0.35);
+  transition: transform 0.15s ease;
+}
+
+.app-nav__camera:hover .app-nav__camera-circle,
+.app-nav__camera:focus-visible .app-nav__camera-circle {
+  transform: translateY(-2px);
+}
+
+.app-nav__camera-label {
+  font-weight: 700;
 }
 
 .app-nav__tab.is-active {
@@ -414,6 +448,27 @@ html, body {
 
   .app-nav__label {
     font-size: 0.86rem;
+  }
+
+  /* In the sidebar the camera is a highlighted row, not a floating circle. */
+  .app-nav__camera {
+    flex: 0 0 auto;
+    flex-direction: row;
+    justify-content: flex-start;
+    gap: 12px;
+    padding: 11px 14px;
+    border-radius: var(--radius-lg);
+    background: var(--color-primary-alpha);
+  }
+
+  .app-nav__camera-circle {
+    width: auto;
+    height: auto;
+    margin-top: 0;
+    border: none;
+    box-shadow: none;
+    background: transparent;
+    color: var(--color-primary);
   }
 
   /* Bottom sheets become centred dialogs. */

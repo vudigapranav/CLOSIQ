@@ -9,7 +9,8 @@ import { GarmentCategory, FormalityLevel, LayeringRole } from '../../types/wardr
  */
 export async function analyzeGarmentImageWithGemini(
   imageUrl: string,
-  categoryHint: GarmentCategory = 'tops'
+  /** Omit to let the AI decide the category from the photo (Shop Check). */
+  categoryHint?: GarmentCategory
 ): Promise<VisionAnalysisResult> {
   const mimeType = imageUrl.startsWith('data:image/jpeg')
     ? 'image/jpeg'
@@ -34,7 +35,7 @@ export async function analyzeGarmentImageWithGemini(
   if (!res.ok || !res.data) {
     // Honest fallback: keep the pixel-colour guess as a pre-fill, but never
     // label it as AI (no "AI Analyzed" tag, no invented confidence).
-    const guess = await demoAnalyzePhoto(imageUrl, categoryHint);
+    const guess = await demoAnalyzePhoto(imageUrl, categoryHint ?? 'tops');
     return {
       ...guess,
       aiAnalyzed: false,
@@ -48,7 +49,7 @@ export async function analyzeGarmentImageWithGemini(
   // Sanitize and format
   const category: GarmentCategory = ['tops', 'bottoms', 'outerwear', 'shoes', 'accessories'].includes(json.category)
     ? json.category
-    : categoryHint;
+    : categoryHint ?? 'tops';
 
   const formality: FormalityLevel = ['casual', 'smart_casual', 'formal', 'evening'].includes(json.formality)
     ? json.formality

@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Sparkles, RefreshCw, Clock, Eye, Plus, AlertTriangle, ArrowRight, Check, Sun, ChevronRight } from 'lucide-react';
+import { Sparkles, RefreshCw, Clock, Eye, Plus, AlertTriangle, ArrowRight, Check, Sun, ChevronRight, Wand2 } from 'lucide-react';
 import { PrimaryButton } from '../ui/PrimaryButton';
 import { SecondaryButton } from '../ui/SecondaryButton';
 import { EmptyState } from '../ui/EmptyState';
@@ -29,7 +29,55 @@ interface TodayScreenProps {
   ratingFor?: (outfit: Outfit) => OutfitRating | null;
   onRateOutfit?: (outfit: Outfit, rating: OutfitRating) => void;
   onOutfitShown?: (outfit: Outfit) => void;
+  /** Opens the AI Stylist (no longer a tab — it lives on Home since 2026-11-01). */
+  onOpenStylist?: () => void;
 }
+
+/** A small "AI Stylist" entry on Home — the Stylist moved here from the nav bar. */
+const StylistEntry: React.FC<{ onOpen: () => void }> = ({ onOpen }) => (
+  <button
+    onClick={onOpen}
+    style={{
+      width: '100%',
+      display: 'flex',
+      alignItems: 'center',
+      gap: 12,
+      textAlign: 'left',
+      padding: '12px 14px',
+      marginTop: 16,
+      borderRadius: 'var(--radius-md)',
+      border: '1px solid var(--color-primary-alpha)',
+      backgroundColor: 'var(--color-primary-alpha)',
+      color: 'var(--color-text-primary)',
+      cursor: 'pointer'
+    }}
+  >
+    <span
+      style={{
+        width: 36,
+        height: 36,
+        borderRadius: '50%',
+        backgroundColor: 'var(--color-surface-elevated)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        color: 'var(--color-primary)',
+        flexShrink: 0
+      }}
+    >
+      <Wand2 size={18} />
+    </span>
+    <span style={{ flex: 1 }}>
+      <span style={{ display: 'block', fontSize: '0.68rem', fontWeight: 700, letterSpacing: '0.08em', color: 'var(--color-primary)' }}>
+        AI STYLIST
+      </span>
+      <span style={{ display: 'block', fontSize: '0.8rem', lineHeight: 1.4, marginTop: 2 }}>
+        Describe your plan — “date night”, “office party” — and the AI Stylist builds a look from your wardrobe.
+      </span>
+    </span>
+    <ChevronRight size={18} color="var(--color-primary)" />
+  </button>
+);
 
 const OCCASIONS = ['College', 'Work', 'Date', 'Party', 'Casual', 'Travel'];
 
@@ -55,7 +103,8 @@ export const TodayScreen: React.FC<TodayScreenProps> = ({
   brain,
   ratingFor,
   onRateOutfit,
-  onOutfitShown
+  onOutfitShown,
+  onOpenStylist
 }) => {
   const firstName = (userName || '').trim().split(/\s+/)[0];
   const greeting = firstName ? `${getGreeting()}, ${firstName}.` : `${getGreeting()}.`;
@@ -230,6 +279,7 @@ export const TodayScreen: React.FC<TodayScreenProps> = ({
             </div>
           )}
         </div>
+        {onOpenStylist && <StylistEntry onOpen={onOpenStylist} />}
         <p
           className="text-section-heading"
           style={{ fontSize: '1.1rem', marginTop: 18 }}

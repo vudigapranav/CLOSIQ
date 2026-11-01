@@ -21,10 +21,10 @@ User request (2026-11-01): (1) remove the Stylist tab — keep the AI Stylist re
 |---|------|--------|
 | 1 | Phone/web icon → brain-Q cropped from the official logo (`scripts/generate-app-icons.mjs`), CLAUDE.md §5 updated | DONE — needs a new APK build to reach the phone (OTA can't change icons) |
 | 2 | Shared Shop Check engine (`src/services/shopCheck.ts`) + tests | DONE — 6 tests, suite 114/114 |
-| 3 | Mobile: new nav (Today · Wardrobe · camera · Planner · Profile) + Stylist entry in Today | in progress |
-| 4 | Mobile: Shop Check screen (camera/gallery → AI scan → verdict, pairings, outfits, "I bought it") | todo |
-| 5 | Web parity: same nav + Shop Check | todo |
-| 6 | Verify (tests, tsc, build, export), CLAUDE.md/STATE.md, push | todo |
+| 3 | Mobile: new nav (Today · Wardrobe · camera · Planner · Profile) + Stylist entry in Today | DONE — `BottomNavigation`, Today "AI Stylist" card, Stylist back button + Android back |
+| 4 | Mobile: Shop Check screen (camera/gallery → AI scan → verdict, pairings, outfits, "I bought it") | DONE — `ShopCheckModal.tsx`; describe-by-hand fallback; Android bundle exports (4.7 MB) |
+| 5 | Web parity: same nav + Shop Check | DONE — web `BottomNavigation` (raised camera; sidebar row on desktop), Home "AI Stylist" card, Stylist back link, `ShopCheckModal.tsx`; build + lint + tsc clean |
+| 6 | Verify (tests, tsc, build, export), CLAUDE.md/STATE.md, push | in progress — CLAUDE.md §3/§4 updated |
 | 7 | Deploy web + OTA + new APK build (ask the user first) | todo |
 
 ---

@@ -11,6 +11,7 @@ import { PlannerScreen } from './components/screens/PlannerScreen';
 import { LoginScreen } from './components/screens/LoginScreen';
 import { ClothingDetailModal } from './components/modals/ClothingDetailModal';
 import { AddItemModal } from './components/modals/AddItemModal';
+import { ShopCheckModal } from './components/modals/ShopCheckModal';
 import { SplashScreen } from './components/ui/SplashScreen';
 import { ClosiqLogo } from './components/ui/ClosiqLogo';
 import { PrimaryButton } from './components/ui/PrimaryButton';
@@ -193,6 +194,8 @@ interface SignedInAppProps {
 const SignedInApp: React.FC<SignedInAppProps> = ({ user, isDarkMode, onToggleTheme }) => {
   const userId = user.id;
   const [activeTab, setActiveTab] = useState<NavTab>('today');
+  // The raised camera button in the middle of the nav (2026-11-01).
+  const [isShopCheckOpen, setIsShopCheckOpen] = useState(false);
 
   // 'loading' until preferences are read; a null profile means onboarding.
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading');
@@ -545,6 +548,7 @@ const SignedInApp: React.FC<SignedInAppProps> = ({ user, isDarkMode, onToggleThe
             onNavigateToCollection={() => setActiveTab('collection')}
             onSelectItemDetail={(item) => setSelectedDetailItem(item)}
             onNavigateToProfile={() => setActiveTab('profile')}
+            onOpenStylist={() => setActiveTab('stylist')}
             userName={basics.name}
             brain={brain}
             ratingFor={ratingFor}
@@ -573,6 +577,7 @@ const SignedInApp: React.FC<SignedInAppProps> = ({ user, isDarkMode, onToggleThe
             ratingFor={ratingFor}
             onRateOutfit={handleRateOutfit}
             onOutfitShown={handleOutfitShown}
+            onBack={() => setActiveTab('today')}
           />
         )}
         {activeTab === 'planner' && (
@@ -609,7 +614,19 @@ const SignedInApp: React.FC<SignedInAppProps> = ({ user, isDarkMode, onToggleThe
       </main>
 
       {/* Native-style Premium Bottom Navigation */}
-      <BottomNavigation activeTab={activeTab} onTabChange={setActiveTab} />
+      <BottomNavigation activeTab={activeTab} onTabChange={setActiveTab} onShopCheck={() => setIsShopCheckOpen(true)} />
+
+      {/* Shop Check — will a piece I'm about to buy work with my wardrobe? */}
+      {isShopCheckOpen && (
+        <ShopCheckModal
+          onClose={() => setIsShopCheckOpen(false)}
+          wardrobe={visibleWardrobe}
+          brain={brain}
+          layeringPreference={layeringPreference}
+          stylePreferences={basics.stylePreferences}
+          onAddGarment={handleAddGarment}
+        />
+      )}
 
       {/* Clothing Detail Modal */}
       {selectedDetailItem && (
