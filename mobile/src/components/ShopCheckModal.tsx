@@ -134,6 +134,9 @@ export const ShopCheckModal: React.FC<ShopCheckModalProps> = ({
   const [scanNotice, setScanNotice] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [added, setAdded] = useState(false);
+  // The garment created by "I bought it": left out of the check so the open
+  // result doesn't suddenly compare the piece with itself.
+  const [addedId, setAddedId] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<OutfitFeedback[]>([]);
   // A newer photo (or closing) makes any in-flight scan result stale.
   const runRef = useRef(0);
@@ -164,6 +167,7 @@ export const ShopCheckModal: React.FC<ShopCheckModalProps> = ({
     setScanNotice(null);
     setBusy(false);
     setAdded(false);
+    setAddedId(null);
     setFormType('');
     setFormFamily(null);
     setFormColorName('');
@@ -180,13 +184,14 @@ export const ShopCheckModal: React.FC<ShopCheckModalProps> = ({
     if (!described) return null;
     const brain = buildOutfitBrain(feedback, [], savedOutfits);
     const candidate = shopCandidate({ ...described, imageUrl: photoUri ?? '' });
-    return runShopCheck(candidate, wardrobe, {
+    const owned = addedId ? wardrobe.filter((g) => g.id !== addedId) : wardrobe;
+    return runShopCheck(candidate, owned, {
       brain,
       layeringPreference,
       stylePreferences,
-      taste: tasteGarments(brain, wardrobe)
+      taste: tasteGarments(brain, owned)
     });
-  }, [described, feedback, savedOutfits, wardrobe, layeringPreference, stylePreferences, photoUri]);
+  }, [described, feedback, savedOutfits, wardrobe, layeringPreference, stylePreferences, photoUri, addedId]);
 
   const handlePick = async (useCamera: boolean) => {
     if (busy) return;
@@ -211,6 +216,7 @@ export const ShopCheckModal: React.FC<ShopCheckModalProps> = ({
       const optimized = await optimizeGarmentImage(picked.assets[0].uri);
       setPhotoUri(optimized.uri);
       setAdded(false);
+      setAddedId(null);
       setStep('scanning');
       const run = ++runRef.current;
       const scan = optimized.base64
@@ -294,6 +300,7 @@ export const ShopCheckModal: React.FC<ShopCheckModalProps> = ({
       tags: described.tags ?? [],
       pairingNotes: described.pairingNotes
     };
+    setAddedId(garment.id);
     onGarmentAdded(garment);
     setAdded(true);
   };

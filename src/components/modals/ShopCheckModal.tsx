@@ -101,6 +101,9 @@ export const ShopCheckModal: React.FC<ShopCheckModalProps> = ({
   const [described, setDescribed] = useState<Described | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [added, setAdded] = useState(false);
+  // The garment created by "I bought it": left out of the check so the open
+  // result doesn't suddenly compare the piece with itself.
+  const [addedId, setAddedId] = useState<string | null>(null);
   const runRef = useRef(0);
 
   const [formCategory, setFormCategory] = useState<GarmentCategory>('tops');
@@ -112,13 +115,14 @@ export const ShopCheckModal: React.FC<ShopCheckModalProps> = ({
   const result: ShopCheckResult | null = useMemo(() => {
     if (!described) return null;
     const candidate = shopCandidate({ ...described, imageUrl: photo ?? '' });
-    return runShopCheck(candidate, wardrobe, {
+    const owned = addedId ? wardrobe.filter((g) => g.id !== addedId) : wardrobe;
+    return runShopCheck(candidate, owned, {
       brain,
       layeringPreference,
       stylePreferences,
-      taste: brain ? tasteGarments(brain, wardrobe) : []
+      taste: brain ? tasteGarments(brain, owned) : []
     });
-  }, [described, photo, wardrobe, brain, layeringPreference, stylePreferences]);
+  }, [described, photo, wardrobe, brain, layeringPreference, stylePreferences, addedId]);
 
   const reset = () => {
     runRef.current += 1;
@@ -127,6 +131,7 @@ export const ShopCheckModal: React.FC<ShopCheckModalProps> = ({
     setDescribed(null);
     setNotice(null);
     setAdded(false);
+    setAddedId(null);
     setFormType('');
     setFormFamily(null);
     setFormColorName('');
@@ -144,6 +149,7 @@ export const ShopCheckModal: React.FC<ShopCheckModalProps> = ({
       if (runRef.current !== run) return;
       setPhoto(dataUrl);
       setAdded(false);
+      setAddedId(null);
       setStep('scanning');
       const scan = await analyzeGarmentImageWithGemini(dataUrl);
       if (runRef.current !== run) return;
@@ -216,8 +222,10 @@ export const ShopCheckModal: React.FC<ShopCheckModalProps> = ({
 
   const handleBought = () => {
     if (!described || added) return;
+    const id = `user-upload-${Date.now()}`;
+    setAddedId(id);
     onAddGarment({
-      id: `user-upload-${Date.now()}`,
+      id,
       name: described.name,
       category: described.category,
       subcategory: described.subcategory,
