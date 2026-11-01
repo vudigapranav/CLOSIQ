@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { Search, Plus, X, Shirt, SlidersHorizontal } from 'lucide-react';
+import { Search, Plus, X, Shirt, SlidersHorizontal, ChevronDown, ArrowUpDown } from 'lucide-react';
 import { CategoryChip } from '../ui/CategoryChip';
 import { ClothingCard } from '../ui/ClothingCard';
 import { EmptyState } from '../ui/EmptyState';
@@ -7,16 +7,16 @@ import { PrimaryButton } from '../ui/PrimaryButton';
 import { GarmentItem } from '../../types/wardrobe';
 import { describeSearch, searchWardrobe } from '../../services/wardrobeSearch';
 import {
+  FacetKey,
   SORT_OPTIONS,
   WardrobeFilterState,
   WardrobeSort,
-  activeFilterChips,
   activeFilterCount,
   applyFilters,
   buildFacets,
+  facetButtonLabel,
   pruneFilters,
-  sortWardrobe,
-  toggleFilter
+  sortWardrobe
 } from '../../services/wardrobeFilters';
 import { WardrobeFilterSheet } from '../modals/WardrobeFilterSheet';
 
@@ -35,7 +35,9 @@ export const CollectionScreen: React.FC<CollectionScreenProps> = ({
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [filters, setFilters] = useState<WardrobeFilterState>({});
   const [sort, setSort] = useState<WardrobeSort>('relevance');
-  const [showFilters, setShowFilters] = useState(false);
+  // Which filter sheet is open: 'all' = every filter, a facet = just that one
+  // (from the inline filter bar), 'sort' = sorting; null = closed.
+  const [sheet, setSheet] = useState<'all' | 'sort' | FacetKey | null>(null);
 
   const categoryOptions = [
     { label: 'All', key: 'All' },
@@ -56,7 +58,6 @@ export const CollectionScreen: React.FC<CollectionScreenProps> = ({
   // Selections the section doesn't offer (a top type while on Bottoms) are ignored, not lost.
   const activeFilters = useMemo(() => pruneFilters(filters, facets), [filters, facets]);
   const filterCount = activeFilterCount(activeFilters);
-  const chips = activeFilterChips(activeFilters, facets);
 
   // Smart search: "blue jacket" = any blue-family piece that is any kind of
   // jacket (see services/wardrobeSearch.ts), then the section's filters, then sort.
@@ -134,48 +135,6 @@ export const CollectionScreen: React.FC<CollectionScreenProps> = ({
               </button>
             )}
           </div>
-          <button
-            onClick={() => setShowFilters(true)}
-            aria-label={filterCount > 0 ? `Filters, ${filterCount} on` : 'Filters'}
-            title={`Filter ${sectionLabel === 'All' ? 'your wardrobe' : sectionLabel}`}
-            style={{
-              position: 'relative',
-              flexShrink: 0,
-              height: 44,
-              padding: '0 14px',
-              display: 'flex',
-              alignItems: 'center',
-              gap: 6,
-              borderRadius: 'var(--radius-pill)',
-              border: `1px solid ${filterCount > 0 ? 'var(--color-primary)' : 'var(--color-border-medium)'}`,
-              backgroundColor: filterCount > 0 ? 'var(--color-primary-alpha)' : 'var(--color-surface)',
-              color: filterCount > 0 ? 'var(--color-primary)' : 'var(--color-text-primary)',
-              fontSize: '0.8rem',
-              fontWeight: 600,
-              cursor: 'pointer'
-            }}
-          >
-            <SlidersHorizontal size={16} />
-            <span>Filters</span>
-            {filterCount > 0 && (
-              <span
-                style={{
-                  minWidth: 18,
-                  height: 18,
-                  padding: '0 5px',
-                  borderRadius: 'var(--radius-pill)',
-                  backgroundColor: 'var(--color-primary)',
-                  color: 'var(--color-text-on-primary)',
-                  fontSize: '0.68rem',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  justifyContent: 'center'
-                }}
-              >
-                {filterCount}
-              </span>
-            )}
-          </button>
         </div>
         {understood.length > 0 && (
           <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 6, marginTop: 10 }}>
@@ -200,7 +159,7 @@ export const CollectionScreen: React.FC<CollectionScreenProps> = ({
       </div>
 
       {/* Category Chips Bar */}
-      <div className="hide-scrollbar" style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 4, marginBottom: 20 }}>
+      <div className="hide-scrollbar" style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 4, marginBottom: 12 }}>
         {categoryOptions.map((cat) => {
           const count = cat.key === 'All'
             ? wardrobe.length
@@ -218,69 +177,45 @@ export const CollectionScreen: React.FC<CollectionScreenProps> = ({
         })}
       </div>
 
-      {/* Active filters + sort */}
-      {wardrobe.length > 0 && (
-        <div style={{ marginTop: -8, marginBottom: 16 }}>
-          {chips.length > 0 && (
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 10 }}>
-              {chips.map((chip) => (
-                <button
-                  key={`${chip.facet}:${chip.value}`}
-                  onClick={() => setFilters(toggleFilter(activeFilters, chip.facet, chip.value))}
-                  aria-label={`Remove filter ${chip.label}`}
-                  style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: 5,
-                    padding: '4px 8px 4px 10px',
-                    borderRadius: 'var(--radius-pill)',
-                    border: '1px solid var(--color-primary)',
-                    backgroundColor: 'var(--color-primary-alpha)',
-                    color: 'var(--color-primary)',
-                    fontSize: '0.74rem',
-                    fontWeight: 600,
-                    cursor: 'pointer'
-                  }}
-                >
-                  {chip.hex && (
-                    <span style={{ width: 10, height: 10, borderRadius: '50%', backgroundColor: chip.hex, border: '1px solid rgba(0,0,0,0.15)' }} />
-                  )}
-                  <span>{chip.label}</span>
-                  <X size={12} />
-                </button>
-              ))}
-              <button
-                onClick={() => setFilters({})}
-                style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-text-secondary)', fontSize: '0.74rem', fontWeight: 600, textDecoration: 'underline' }}
-              >
-                Clear all
-              </button>
-            </div>
-          )}
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
+      {/* Filter section — always visible for the open section */}
+      {sectionItems.length > 0 && (
+        <div style={{ marginBottom: 18 }}>
+          <div className="hide-scrollbar" style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 4 }}>
+            <FilterBarButton
+              icon={<SlidersHorizontal size={14} />}
+              label={filterCount > 0 ? `All filters · ${filterCount}` : 'All filters'}
+              active={filterCount > 0}
+              onClick={() => setSheet('all')}
+            />
+            {facets.map((facet) => (
+              <FilterBarButton
+                key={facet.key}
+                label={facetButtonLabel(facet, activeFilters)}
+                active={(activeFilters[facet.key] || []).length > 0}
+                chevron
+                onClick={() => setSheet(facet.key)}
+              />
+            ))}
+            <FilterBarButton
+              icon={<ArrowUpDown size={14} />}
+              label={SORT_OPTIONS.find((o) => o.value === sort)?.label ?? 'Sort'}
+              active={sort !== 'relevance'}
+              chevron
+              onClick={() => setSheet('sort')}
+            />
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, marginTop: 8 }}>
             <span className="text-caption">
               {filteredWardrobe.length} of {sectionItems.length} piece{sectionItems.length === 1 ? '' : 's'}
             </span>
-            <label style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              <span className="text-caption">Sort</span>
-              <select
-                aria-label="Sort wardrobe"
-                value={sort}
-                onChange={(e) => setSort(e.target.value as WardrobeSort)}
-                style={{
-                  padding: '6px 10px',
-                  borderRadius: 'var(--radius-pill)',
-                  border: '1px solid var(--color-border-medium)',
-                  backgroundColor: 'var(--color-surface)',
-                  color: 'var(--color-text-primary)',
-                  fontSize: '0.76rem'
-                }}
+            {filterCount > 0 && (
+              <button
+                onClick={() => setFilters({})}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-primary)', fontSize: '0.76rem', fontWeight: 600, padding: 0 }}
               >
-                {SORT_OPTIONS.map((o) => (
-                  <option key={o.value} value={o.value}>{o.label}</option>
-                ))}
-              </select>
-            </label>
+                Clear filters
+              </button>
+            )}
           </div>
         </div>
       )}
@@ -333,7 +268,9 @@ export const CollectionScreen: React.FC<CollectionScreenProps> = ({
       )}
 
       <WardrobeFilterSheet
-        open={showFilters}
+        open={sheet !== null}
+        focus={sheet === 'all' ? null : sheet}
+        onShowAll={() => setSheet('all')}
         sectionLabel={sectionLabel === 'All' ? 'your wardrobe' : sectionLabel}
         facets={facets}
         filters={activeFilters}
@@ -341,8 +278,39 @@ export const CollectionScreen: React.FC<CollectionScreenProps> = ({
         sort={sort}
         onSortChange={setSort}
         resultCount={filteredWardrobe.length}
-        onClose={() => setShowFilters(false)}
+        onClose={() => setSheet(null)}
       />
     </div>
   );
 };
+
+const FilterBarButton: React.FC<{
+  label: string;
+  active: boolean;
+  onClick: () => void;
+  icon?: React.ReactNode;
+  chevron?: boolean;
+}> = ({ label, active, onClick, icon, chevron }) => (
+  <button
+    onClick={onClick}
+    style={{
+      display: 'inline-flex',
+      alignItems: 'center',
+      gap: 5,
+      flexShrink: 0,
+      padding: '7px 12px',
+      borderRadius: 'var(--radius-pill)',
+      border: `1px solid ${active ? 'var(--color-primary)' : 'var(--color-border-medium)'}`,
+      backgroundColor: active ? 'var(--color-primary-alpha)' : 'var(--color-surface)',
+      color: active ? 'var(--color-primary)' : 'var(--color-text-primary)',
+      fontSize: '0.76rem',
+      fontWeight: 600,
+      whiteSpace: 'nowrap',
+      cursor: 'pointer'
+    }}
+  >
+    {icon}
+    <span>{label}</span>
+    {chevron && <ChevronDown size={13} style={{ opacity: 0.7 }} />}
+  </button>
+);

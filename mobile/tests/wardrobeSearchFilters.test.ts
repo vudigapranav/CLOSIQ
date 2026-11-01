@@ -11,6 +11,7 @@ import {
   activeFilterCount,
   applyFilters,
   buildFacets,
+  facetButtonLabel,
   pruneFilters,
   sortWardrobe,
   toggleFilter
@@ -119,4 +120,14 @@ test('sorting', () => {
   assert.equal(sortWardrobe(W, 'most_worn')[0].id, 'blue_tee');
   assert.equal(sortWardrobe(W, 'name')[0].id, 'chinos');
   assert.deepEqual(sortWardrobe(W, 'relevance'), W);
+});
+
+test('filter bar buttons show the facet, the chosen option, or how many are chosen', () => {
+  const facets = buildFacets(W, NOW);
+  const color = facets.find((f) => f.key === 'color')!;
+  assert.equal(facetButtonLabel(color, {}), 'Colour');
+  assert.equal(facetButtonLabel(color, { color: ['blue'] }), 'Blue & navy');
+  assert.equal(facetButtonLabel(color, { color: ['blue', 'white'] }), 'Colour · 2');
+  const season = buildFacets(W.filter((i) => i.category === 'tops'), NOW).find((f) => f.key === 'season');
+  assert.equal(season?.shortTitle, 'Season');
 });

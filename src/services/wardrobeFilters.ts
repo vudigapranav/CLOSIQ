@@ -36,6 +36,8 @@ export interface FacetOption {
 export interface Facet {
   key: FacetKey;
   title: string;
+  /** Short label for the inline filter bar, e.g. "Season". */
+  shortTitle: string;
   /** One-line stylist hint under the title. */
   hint?: string;
   options: FacetOption[];
@@ -123,19 +125,19 @@ function valuesOf(i: GarmentItem, facet: FacetKey, now: number): string[] {
 
 const titleCase = (s: string) => s.replace(/\b([a-z])/g, (m) => m.toUpperCase());
 
-const FACETS: { key: FacetKey; title: string; hint?: string }[] = [
-  { key: 'color', title: 'Colour', hint: 'Whole colour families — Blue includes navy, indigo and denim.' },
-  { key: 'type', title: 'Type' },
-  { key: 'occasion', title: 'Occasion', hint: 'How dressed-up the piece is.' },
-  { key: 'place', title: "Where it's kept" },
-  { key: 'size', title: 'Size' },
-  { key: 'season', title: 'Season & weather' },
-  { key: 'fit', title: 'Fit & silhouette' },
-  { key: 'style', title: 'Style vibe' },
-  { key: 'fabric', title: 'Fabric' },
-  { key: 'layer', title: 'Layering', hint: 'Where it sits in a layered outfit.' },
-  { key: 'wear', title: 'Wear history', hint: 'Rediscover pieces you have been forgetting.' },
-  { key: 'favorite', title: 'Favourites' }
+const FACETS: { key: FacetKey; title: string; shortTitle: string; hint?: string }[] = [
+  { key: 'color', title: 'Colour', shortTitle: 'Colour', hint: 'Whole colour families — Blue includes navy, indigo and denim.' },
+  { key: 'type', title: 'Type', shortTitle: 'Type' },
+  { key: 'place', title: "Where it's kept", shortTitle: "Where it's kept" },
+  { key: 'size', title: 'Size', shortTitle: 'Size' },
+  { key: 'occasion', title: 'Occasion', shortTitle: 'Occasion', hint: 'How dressed-up the piece is.' },
+  { key: 'season', title: 'Season & weather', shortTitle: 'Season' },
+  { key: 'fit', title: 'Fit & silhouette', shortTitle: 'Fit' },
+  { key: 'style', title: 'Style vibe', shortTitle: 'Style' },
+  { key: 'fabric', title: 'Fabric', shortTitle: 'Fabric' },
+  { key: 'layer', title: 'Layering', shortTitle: 'Layering', hint: 'Where it sits in a layered outfit.' },
+  { key: 'wear', title: 'Wear history', shortTitle: 'Wear history', hint: 'Rediscover pieces you have been forgetting.' },
+  { key: 'favorite', title: 'Favourites', shortTitle: 'Favourites' }
 ];
 
 function optionOrder(facet: FacetKey, items: GarmentItem[]): { value: string; label: string; hex?: string }[] | null {
@@ -191,6 +193,15 @@ export function buildFacets(items: GarmentItem[], now: number = Date.now()): Fac
     facets.push({ ...def, options });
   }
   return facets;
+}
+
+/** Label for a facet's button in the inline filter bar: its short title,
+ *  the chosen option when one is picked, or "Colour · 2" for several. */
+export function facetButtonLabel(facet: Facet, state: WardrobeFilterState): string {
+  const selected = state[facet.key] || [];
+  if (selected.length === 0) return facet.shortTitle;
+  if (selected.length === 1) return facet.options.find((o) => o.value === selected[0])?.label ?? facet.shortTitle;
+  return `${facet.shortTitle} · ${selected.length}`;
 }
 
 // ---------- applying ----------
