@@ -6,9 +6,26 @@ This document tracks the live implementation status of **CLOSIQ**. It is updated
 
 ## Current Phase
 
+* **Now (2026-11-01)**: Shop Check + new nav sprint in progress — see the LIVE PROGRESS table below.
 * **Latest (2026-10-24)**: Wardrobe smart search + stylist filters on web and mobile — see "WARDROBE SEARCH + FILTERS" below.
 * **Phase**: Live deployment + new wardrobe features (2026-10-13) — **WEBSITE LIVE ON VERCEL; ANDROID APK BUILT; NOT DEVICE-VERIFIED**
 * **Status**: Website + AI backend deployed to Vercel at **https://closiq-liard.vercel.app** (login, cloud wardrobe shared with the phone app, responsive desktop/mobile web). Added garment **size** and **"where is it kept"** (Indian household places + custom) on web and mobile, and a free **studio photo** (white background, open-source U²-Net cut-out, no Gemini). Mobile linked to EAS (`@vudigapranav/closiq`) with over-the-air updates; first Android `preview` APK build started. Supabase was paused again and was restored; a daily Vercel Cron keeps it from pausing. **Workflow change at the user's request: commit and push straight to `main` (no PRs), then `git pull` into the local CLOSIQ folder.** Details in "DEPLOYMENT + FEATURES" below.
+
+---
+
+# SPRINT: SHOP CHECK + NEW NAV (started 2026-11-01) — LIVE PROGRESS
+
+User request (2026-11-01): (1) remove the Stylist tab — keep the AI Stylist reachable as a small entry inside Today; (2) move Planner into the Stylist slot; (3) a raised camera button in the middle of the nav that scans a garment in a shop and says whether it suits the user's Style DNA, what it pairs with from their OWN wardrobe ("brown pants, black pants, blue jeans…") and which full outfits it makes — before buying; (4) the original CLOSIQ logo (brain-Q) as the phone icon. "Don't hurry, make it an MVP."
+
+| # | Step | Status |
+|---|------|--------|
+| 1 | Phone/web icon → brain-Q cropped from the official logo (`scripts/generate-app-icons.mjs`), CLAUDE.md §5 updated | DONE — needs a new APK build to reach the phone (OTA can't change icons) |
+| 2 | Shared Shop Check engine (`src/services/shopCheck.ts`) + tests | in progress |
+| 3 | Mobile: new nav (Today · Wardrobe · camera · Planner · Profile) + Stylist entry in Today | todo |
+| 4 | Mobile: Shop Check screen (camera/gallery → AI scan → verdict, pairings, outfits, "I bought it") | todo |
+| 5 | Web parity: same nav + Shop Check | todo |
+| 6 | Verify (tests, tsc, build, export), CLAUDE.md/STATE.md, push | todo |
+| 7 | Deploy web + OTA + new APK build (ask the user first) | todo |
 
 ---
 
