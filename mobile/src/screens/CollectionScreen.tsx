@@ -9,7 +9,7 @@ import {
   FlatList,
   TextInput
 } from 'react-native';
-import { Shirt, Plus, Search, X, SlidersHorizontal } from 'lucide-react-native';
+import { Shirt, Plus, Search, X, SlidersHorizontal, ChevronDown, ArrowUpDown } from 'lucide-react-native';
 import { COLORS, RADIUS } from '../theme';
 import { GarmentItem, GarmentDetailsPatch, LayeringPreference, WardrobeProfile } from '../../../src/types/wardrobe';
 import { AddItemModal } from '../components/AddItemModal';
@@ -18,16 +18,16 @@ import { GarmentImage } from '../components/GarmentImage';
 import { customStorageLocations } from '../../../src/data/storageLocations';
 import { describeSearch, searchWardrobe } from '../../../src/services/wardrobeSearch';
 import {
+  FacetKey,
   SORT_OPTIONS,
   WardrobeFilterState,
   WardrobeSort,
-  activeFilterChips,
   activeFilterCount,
   applyFilters,
   buildFacets,
+  facetButtonLabel,
   pruneFilters,
-  sortWardrobe,
-  toggleFilter
+  sortWardrobe
 } from '../../../src/services/wardrobeFilters';
 import { WardrobeFilterSheet } from '../components/WardrobeFilterSheet';
 
@@ -86,6 +86,25 @@ const GarmentCard = React.memo<GarmentCardProps>(({ item, onPress }) => (
   </TouchableOpacity>
 ));
 
+const FilterBarButton: React.FC<{
+  label: string;
+  active: boolean;
+  onPress: () => void;
+  icon?: React.ReactNode;
+  chevron?: boolean;
+}> = ({ label, active, onPress, icon, chevron }) => (
+  <TouchableOpacity
+    style={[styles.filterBarButton, active && styles.filterBarButtonActive]}
+    activeOpacity={0.75}
+    onPress={onPress}
+    accessibilityRole="button"
+  >
+    {icon}
+    <Text style={[styles.filterBarText, active && styles.filterBarTextActive]}>{label}</Text>
+    {chevron && <ChevronDown size={13} color={active ? COLORS.primary : COLORS.textSecondary} />}
+  </TouchableOpacity>
+);
+
 export const CollectionScreen: React.FC<CollectionScreenProps> = ({
   profile,
   wardrobe,
@@ -98,7 +117,9 @@ export const CollectionScreen: React.FC<CollectionScreenProps> = ({
   const [searchQuery, setSearchQuery] = useState('');
   const [filters, setFilters] = useState<WardrobeFilterState>({});
   const [sort, setSort] = useState<WardrobeSort>('relevance');
-  const [showFilters, setShowFilters] = useState(false);
+  // Which filter sheet is open: 'all' = every filter, a facet = just that one
+  // (from the inline filter bar), 'sort' = sorting; null = closed.
+  const [sheet, setSheet] = useState<'all' | 'sort' | FacetKey | null>(null);
   const [showAddModal, setShowAddModal] = useState(false);
   // Held by id and looked up in `wardrobe`, so the open detail sheet shows a
   // place change as soon as App's wardrobe state updates.
@@ -120,7 +141,6 @@ export const CollectionScreen: React.FC<CollectionScreenProps> = ({
   const facets = useMemo(() => buildFacets(sectionItems), [sectionItems]);
   const activeFilters = useMemo(() => pruneFilters(filters, facets), [filters, facets]);
   const filterCount = activeFilterCount(activeFilters);
-  const chips = activeFilterChips(activeFilters, facets);
 
   // Section → smart search ("blue jacket" = every blue-family jacket of any
   // type) → filters → sort. `wardrobe` is lifted to App.tsx (Sprint M16).
@@ -180,20 +200,6 @@ export const CollectionScreen: React.FC<CollectionScreenProps> = ({
               </TouchableOpacity>
             )}
           </View>
-          <TouchableOpacity
-            style={[styles.filterButton, filterCount > 0 && styles.filterButtonActive]}
-            activeOpacity={0.8}
-            onPress={() => setShowFilters(true)}
-            accessibilityLabel={filterCount > 0 ? `Filters, ${filterCount} on` : 'Filters'}
-          >
-            <SlidersHorizontal size={16} color={COLORS.primary} />
-            <Text style={styles.filterButtonText}>Filters</Text>
-            {filterCount > 0 && (
-              <View style={styles.filterBadge}>
-                <Text style={styles.filterBadgeText}>{filterCount}</Text>
-              </View>
-            )}
-          </TouchableOpacity>
         </View>
         {understood.length > 0 && (
           <View style={styles.understoodRow}>
@@ -232,33 +238,43 @@ export const CollectionScreen: React.FC<CollectionScreenProps> = ({
         </ScrollView>
       </View>
 
-      {/* Active filters + result count */}
-      {wardrobe.length > 0 && (
-        <View style={styles.activeFiltersContainer}>
-          {chips.length > 0 && (
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterRail}>
-              {chips.map((chip) => (
-                <TouchableOpacity
-                  key={`${chip.facet}:${chip.value}`}
-                  style={styles.activeChip}
-                  activeOpacity={0.75}
-                  onPress={() => setFilters(toggleFilter(activeFilters, chip.facet, chip.value))}
-                  accessibilityLabel={`Remove filter ${chip.label}`}
-                >
-                  {chip.hex && <View style={[styles.colorDot, { backgroundColor: chip.hex }]} />}
-                  <Text style={styles.activeChipText}>{chip.label}</Text>
-                  <X size={12} color={COLORS.primary} />
-                </TouchableOpacity>
-              ))}
-              <TouchableOpacity style={styles.clearChip} onPress={() => setFilters({})}>
-                <Text style={styles.clearChipText}>Clear all</Text>
+      {/* Filter section — always visible for the open section */}
+      {sectionItems.length > 0 && (
+        <View style={styles.filterBarContainer}>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterRail}>
+            <FilterBarButton
+              icon={<SlidersHorizontal size={13} color={COLORS.primary} />}
+              label={filterCount > 0 ? `All filters · ${filterCount}` : 'All filters'}
+              active={filterCount > 0}
+              onPress={() => setSheet('all')}
+            />
+            {facets.map((facet) => (
+              <FilterBarButton
+                key={facet.key}
+                label={facetButtonLabel(facet, activeFilters)}
+                active={(activeFilters[facet.key] || []).length > 0}
+                chevron
+                onPress={() => setSheet(facet.key)}
+              />
+            ))}
+            <FilterBarButton
+              icon={<ArrowUpDown size={13} color={COLORS.primary} />}
+              label={SORT_OPTIONS.find((o) => o.value === sort)?.label ?? 'Sort'}
+              active={sort !== 'relevance'}
+              chevron
+              onPress={() => setSheet('sort')}
+            />
+          </ScrollView>
+          <View style={styles.resultRow}>
+            <Text style={styles.resultCount}>
+              {filteredGarments.length} of {sectionItems.length} piece{sectionItems.length === 1 ? '' : 's'}
+            </Text>
+            {filterCount > 0 && (
+              <TouchableOpacity onPress={() => setFilters({})} hitSlop={8}>
+                <Text style={styles.clearLinkText}>Clear filters</Text>
               </TouchableOpacity>
-            </ScrollView>
-          )}
-          <Text style={styles.resultCount}>
-            {filteredGarments.length} of {sectionItems.length} piece{sectionItems.length === 1 ? '' : 's'}
-            {sort !== 'relevance' ? ` · ${SORT_OPTIONS.find((o) => o.value === sort)?.label}` : ''}
-          </Text>
+            )}
+          </View>
         </View>
       )}
 
@@ -309,7 +325,9 @@ export const CollectionScreen: React.FC<CollectionScreenProps> = ({
       )}
 
       <WardrobeFilterSheet
-        visible={showFilters}
+        visible={sheet !== null}
+        focus={sheet === 'all' ? null : sheet}
+        onShowAll={() => setSheet('all')}
         sectionLabel={sectionLabel === 'All' ? 'your wardrobe' : sectionLabel}
         facets={facets}
         filters={activeFilters}
@@ -317,7 +335,7 @@ export const CollectionScreen: React.FC<CollectionScreenProps> = ({
         sort={sort}
         onSortChange={setSort}
         resultCount={filteredGarments.length}
-        onClose={() => setShowFilters(false)}
+        onClose={() => setSheet(null)}
       />
 
       {/* Add Item Modal */}
@@ -391,40 +409,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 8
   },
-  filterButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    height: 42,
-    paddingHorizontal: 12,
-    borderRadius: RADIUS.pill,
-    backgroundColor: COLORS.surface,
-    borderWidth: 1,
-    borderColor: COLORS.borderMedium
-  },
-  filterButtonActive: {
-    backgroundColor: COLORS.primaryAlpha,
-    borderColor: COLORS.primary
-  },
-  filterButtonText: {
-    fontSize: 12.5,
-    fontWeight: '700',
-    color: COLORS.primary
-  },
-  filterBadge: {
-    minWidth: 18,
-    height: 18,
-    paddingHorizontal: 5,
-    borderRadius: 9,
-    backgroundColor: COLORS.primary,
-    alignItems: 'center',
-    justifyContent: 'center'
-  },
-  filterBadgeText: {
-    color: '#FFFFFF',
-    fontSize: 10.5,
-    fontWeight: '800'
-  },
   searchBox: {
     flex: 1,
     flexDirection: 'row',
@@ -474,40 +458,49 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     gap: 8
   },
-  activeFiltersContainer: {
+  filterBarContainer: {
     paddingTop: 10,
+    paddingBottom: 2,
     gap: 8
   },
-  activeChip: {
+  filterBarButton: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 5,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
+    paddingHorizontal: 11,
+    paddingVertical: 6,
     borderRadius: RADIUS.pill,
-    backgroundColor: COLORS.primaryAlpha,
+    backgroundColor: COLORS.surfaceElevated,
     borderWidth: 1,
+    borderColor: COLORS.borderMedium
+  },
+  filterBarButtonActive: {
+    backgroundColor: COLORS.primaryAlpha,
     borderColor: COLORS.primary
   },
-  activeChipText: {
+  filterBarText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: COLORS.textPrimary
+  },
+  filterBarTextActive: {
+    color: COLORS.primary,
+    fontWeight: '700'
+  },
+  resultRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 20
+  },
+  clearLinkText: {
     fontSize: 12,
     fontWeight: '700',
     color: COLORS.primary
   },
-  clearChip: {
-    justifyContent: 'center',
-    paddingHorizontal: 6
-  },
-  clearChipText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: COLORS.textSecondary,
-    textDecorationLine: 'underline'
-  },
   resultCount: {
     fontSize: 11.5,
-    color: COLORS.textMuted,
-    paddingHorizontal: 20
+    color: COLORS.textMuted
   },
   clearFiltersButton: {
     paddingHorizontal: 20,

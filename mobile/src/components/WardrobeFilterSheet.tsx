@@ -24,6 +24,10 @@ interface WardrobeFilterSheetProps {
   sort: WardrobeSort;
   onSortChange: (sort: WardrobeSort) => void;
   resultCount: number;
+  /** Open on one filter (from the inline filter bar) or on sorting; null/undefined = every filter. */
+  focus?: FacetKey | 'sort' | null;
+  /** "All filters" link inside a focused sheet. */
+  onShowAll?: () => void;
   onClose: () => void;
 }
 
@@ -37,10 +41,15 @@ export const WardrobeFilterSheet: React.FC<WardrobeFilterSheetProps> = ({
   sort,
   onSortChange,
   resultCount,
+  focus,
+  onShowAll,
   onClose
 }) => {
   const insets = useSafeAreaInsets();
   const active = activeFilterCount(filters);
+  const focusedFacet = focus && focus !== 'sort' ? facets.find((f) => f.key === focus) : undefined;
+  const isFocused = focus === 'sort' || Boolean(focusedFacet);
+  const shownFacets = focus === 'sort' ? [] : focusedFacet ? [focusedFacet] : facets;
   const toggle = (facet: FacetKey, value: string) => onChange(toggleFilter(filters, facet, value));
 
   return (
@@ -50,7 +59,9 @@ export const WardrobeFilterSheet: React.FC<WardrobeFilterSheetProps> = ({
         <View style={[styles.sheet, { paddingBottom: Math.max(insets.bottom, 16) }]}>
           <View style={styles.headerRow}>
             <View style={{ flex: 1 }}>
-              <Text style={styles.title}>Filter {sectionLabel}</Text>
+              <Text style={styles.title}>
+                {focus === 'sort' ? `Sort ${sectionLabel}` : focusedFacet ? `${focusedFacet.title} · ${sectionLabel}` : `Filter ${sectionLabel}`}
+              </Text>
               <Text style={styles.subtitle}>
                 {active > 0 ? `${active} filter${active === 1 ? '' : 's'} on` : 'Narrow down what you own'}
               </Text>
@@ -61,19 +72,21 @@ export const WardrobeFilterSheet: React.FC<WardrobeFilterSheetProps> = ({
           </View>
 
           <ScrollView style={styles.body} showsVerticalScrollIndicator={false}>
-            <Section title="Sort by">
-              {SORT_OPTIONS.map((o) => (
-                <OptionChip key={o.value} label={o.label} selected={sort === o.value} onPress={() => onSortChange(o.value)} />
-              ))}
-            </Section>
+            {(!isFocused || focus === 'sort') && (
+              <Section title="Sort by">
+                {SORT_OPTIONS.map((o) => (
+                  <OptionChip key={o.value} label={o.label} selected={sort === o.value} onPress={() => onSortChange(o.value)} />
+                ))}
+              </Section>
+            )}
 
-            {facets.length === 0 && (
+            {!isFocused && facets.length === 0 && (
               <Text style={styles.emptyText}>
                 Add a few more pieces (with sizes and places) and filters will appear here.
               </Text>
             )}
 
-            {facets.map((facet) => {
+            {shownFacets.map((facet) => {
               const selected = filters[facet.key] || [];
               return (
                 <Section
@@ -95,6 +108,12 @@ export const WardrobeFilterSheet: React.FC<WardrobeFilterSheetProps> = ({
                 </Section>
               );
             })}
+
+            {isFocused && onShowAll && (
+              <TouchableOpacity onPress={onShowAll} style={styles.showAllLink} hitSlop={8}>
+                <Text style={styles.showAllText}>All filters →</Text>
+              </TouchableOpacity>
+            )}
           </ScrollView>
 
           <View style={styles.footer}>
@@ -202,6 +221,14 @@ const styles = StyleSheet.create({
     color: COLORS.textSecondary,
     marginTop: 12,
     lineHeight: 19
+  },
+  showAllLink: {
+    paddingVertical: 14
+  },
+  showAllText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: COLORS.primary
   },
   section: {
     paddingVertical: 14,
