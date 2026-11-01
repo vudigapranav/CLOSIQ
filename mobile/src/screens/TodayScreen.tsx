@@ -12,7 +12,7 @@ import {
   Dimensions,
   Alert
 } from 'react-native';
-import { Sparkles, Calendar, Thermometer, Shirt, ArrowRight, AlertCircle, RefreshCw } from 'lucide-react-native';
+import { Sparkles, Calendar, Thermometer, Shirt, ArrowRight, AlertCircle, RefreshCw, Wand2, ChevronRight } from 'lucide-react-native';
 import { COLORS, RADIUS } from '../theme';
 import { GarmentItem, WardrobeProfile, LayeringPreference, Outfit, OutfitRating, SavedLookStatus } from '../../../src/types/wardrobe';
 import { useOutfitFeedback } from '../hooks/useOutfitFeedback';
@@ -66,6 +66,8 @@ interface TodayScreenProps {
   savedOutfits: Outfit[];
   onSaveOutfit: (outfit: Outfit) => Promise<Outfit[]>;
   onNavigateToCollection?: () => void;
+  /** Opens the AI Stylist (no longer a tab — it lives here on Today since 2026-11-01). */
+  onOpenStylist?: () => void;
 }
 
 export const TodayScreen: React.FC<TodayScreenProps> = ({
@@ -78,7 +80,8 @@ export const TodayScreen: React.FC<TodayScreenProps> = ({
   wardrobe,
   savedOutfits,
   onSaveOutfit,
-  onNavigateToCollection
+  onNavigateToCollection,
+  onOpenStylist
 }) => {
   const [selectedOccasion, setSelectedOccasion] = useState('College');
   const [customPrompt, setCustomPrompt] = useState('');
@@ -442,6 +445,28 @@ export const TodayScreen: React.FC<TodayScreenProps> = ({
         </View>
       </View>
 
+      {/* AI Stylist — a small entry, not a tab */}
+      {onOpenStylist && (
+        <TouchableOpacity
+          style={styles.stylistEntry}
+          activeOpacity={0.8}
+          onPress={onOpenStylist}
+          accessibilityRole="button"
+          accessibilityLabel="Open AI Stylist"
+        >
+          <View style={styles.stylistEntryIcon}>
+            <Wand2 size={18} color={COLORS.primary} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.stylistEntryLabel}>AI STYLIST</Text>
+            <Text style={styles.stylistEntryText}>
+              Describe your plan — “date night”, “office party” — and the AI Stylist builds a look from your wardrobe.
+            </Text>
+          </View>
+          <ChevronRight size={18} color={COLORS.primary} />
+        </TouchableOpacity>
+      )}
+
       {/* Empty Wardrobe Block */}
       {wardrobe.length === 0 ? (
         <View style={styles.emptyCard}>
@@ -664,6 +689,38 @@ const styles = StyleSheet.create({
     fontSize: 13.5,
     color: COLORS.textSecondary,
     lineHeight: 19
+  },
+  stylistEntry: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    backgroundColor: COLORS.primaryAlpha,
+    borderRadius: RADIUS.md,
+    padding: 12,
+    marginTop: -12,
+    marginBottom: 24,
+    borderWidth: 1,
+    borderColor: COLORS.primaryAlphaDark
+  },
+  stylistEntryIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: COLORS.surfaceElevated,
+    alignItems: 'center',
+    justifyContent: 'center'
+  },
+  stylistEntryLabel: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: COLORS.primary,
+    letterSpacing: 1
+  },
+  stylistEntryText: {
+    fontSize: 12.5,
+    color: COLORS.textPrimary,
+    lineHeight: 17,
+    marginTop: 2
   },
   weatherStrip: {
     flexDirection: 'row',

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import {
   Alert,
+  BackHandler,
   StyleSheet,
   View,
   StatusBar
@@ -15,6 +16,7 @@ import { COLORS } from './src/theme';
 import { IntroSplash } from './src/components/IntroSplash';
 import { applyUpdateOnLaunch } from './src/services/appUpdates';
 import { BottomNavigation, NavTab } from './src/components/BottomNavigation';
+import { ShopCheckModal } from './src/components/ShopCheckModal';
 import { TodayScreen } from './src/screens/TodayScreen';
 import { CollectionScreen } from './src/screens/CollectionScreen';
 import { StylistScreen } from './src/screens/StylistScreen';
@@ -41,6 +43,8 @@ import { UserProfileData } from './src/types/onboarding';
 function AppContent() {
   const [showSplash, setShowSplash] = useState(true);
   const [activeTab, setActiveTab] = useState<NavTab>('today');
+  // The raised camera button in the middle of the nav (2026-11-01).
+  const [shopCheckOpen, setShopCheckOpen] = useState(false);
   const [profile, setProfile] = useState<WardrobeProfile>('men');
   const [layeringPreference, setLayeringPreference] = useState<LayeringPreference>('avoid');
   const [wearAgainOutfit, setWearAgainOutfit] = useState<Outfit | null>(null);
@@ -87,6 +91,17 @@ function AppContent() {
   useEffect(() => {
     applyUpdateOnLaunch();
   }, []);
+
+  // The AI Stylist is opened from Today (it has no tab), so Android's back
+  // gesture returns there instead of leaving the app.
+  useEffect(() => {
+    if (activeTab !== 'stylist') return;
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      setActiveTab('today');
+      return true;
+    });
+    return () => sub.remove();
+  }, [activeTab]);
 
   useEffect(() => {
     let mounted = true;
@@ -350,6 +365,7 @@ function AppContent() {
             savedOutfits={savedOutfits}
             onSaveOutfit={handleSaveOutfit}
             onNavigateToCollection={() => setActiveTab('collection')}
+            onOpenStylist={() => setActiveTab('stylist')}
           />
         )}
         {activeTab === 'collection' && (
@@ -381,6 +397,7 @@ function AppContent() {
             savedOutfits={savedOutfits}
             onSaveOutfit={handleSaveOutfit}
             onNavigateToCollection={() => setActiveTab('collection')}
+            onBack={() => setActiveTab('today')}
           />
         )}
         {activeTab === 'profile' && (
@@ -406,8 +423,18 @@ function AppContent() {
         )}
       </View>
 
-      {/* Polished Floating Bottom Navigation */}
-      <BottomNavigation activeTab={activeTab} onSelectTab={setActiveTab} />
+      {/* Today · Wardrobe · (Shop Check camera) · Planner · Profile */}
+      <BottomNavigation activeTab={activeTab} onSelectTab={setActiveTab} onPressShopCheck={() => setShopCheckOpen(true)} />
+
+      <ShopCheckModal
+        visible={shopCheckOpen}
+        onClose={() => setShopCheckOpen(false)}
+        wardrobe={wardrobe}
+        savedOutfits={savedOutfits}
+        layeringPreference={layeringPreference}
+        stylePreferences={userProfile.stylePreferences}
+        onGarmentAdded={handleGarmentAdded}
+      />
     </SafeAreaView>
   );
 }

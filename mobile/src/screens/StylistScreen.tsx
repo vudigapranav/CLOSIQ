@@ -10,7 +10,7 @@ import {
   Modal,
   Alert
 } from 'react-native';
-import { Wand2, Sparkles, RefreshCw, Shirt, ArrowRight, AlertCircle } from 'lucide-react-native';
+import { Wand2, Sparkles, RefreshCw, Shirt, ArrowRight, AlertCircle, ChevronLeft } from 'lucide-react-native';
 import { COLORS, RADIUS } from '../theme';
 import { GarmentItem, WardrobeProfile, LayeringPreference, Outfit, OutfitRating, SavedLookStatus } from '../../../src/types/wardrobe';
 import { useOutfitFeedback } from '../hooks/useOutfitFeedback';
@@ -40,6 +40,8 @@ interface StylistScreenProps {
   savedOutfits: Outfit[];
   onSaveOutfit: (outfit: Outfit) => Promise<Outfit[]>;
   onNavigateToCollection?: () => void;
+  /** Back to Today — the Stylist is opened from there, not from a tab. */
+  onBack?: () => void;
 }
 
 export const StylistScreen: React.FC<StylistScreenProps> = ({
@@ -49,7 +51,8 @@ export const StylistScreen: React.FC<StylistScreenProps> = ({
   wardrobe,
   savedOutfits,
   onSaveOutfit,
-  onNavigateToCollection
+  onNavigateToCollection,
+  onBack
 }) => {
   const [promptText, setPromptText] = useState('');
   const [loading, setLoading] = useState(false);
@@ -293,6 +296,13 @@ export const StylistScreen: React.FC<StylistScreenProps> = ({
       contentContainerStyle={styles.scrollContent}
       showsVerticalScrollIndicator={false}
     >
+      {onBack && (
+        <TouchableOpacity style={styles.backRow} onPress={onBack} hitSlop={10} accessibilityRole="button" accessibilityLabel="Back to Today">
+          <ChevronLeft size={18} color={COLORS.primary} />
+          <Text style={styles.backText}>Today</Text>
+        </TouchableOpacity>
+      )}
+
       {/* Header */}
       <View style={styles.header}>
         <View style={styles.iconCircle}>
@@ -461,6 +471,18 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingTop: 16,
     paddingBottom: 24
+  },
+  backRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    gap: 2,
+    marginBottom: 12
+  },
+  backText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: COLORS.primary
   },
   header: {
     flexDirection: 'row',
