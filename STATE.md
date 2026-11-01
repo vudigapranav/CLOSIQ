@@ -6,7 +6,7 @@ This document tracks the live implementation status of **CLOSIQ**. It is updated
 
 ## Current Phase
 
-* **Now (2026-11-01)**: Shop Check + new nav sprint in progress — see the LIVE PROGRESS table below.
+* **Now (2026-11-01)**: Shop Check + new nav + brain-Q icon — deployed (Vercel), OTA v1.3 published, new APK `47bad076` built. See the LIVE PROGRESS table below.
 * **Latest (2026-10-24)**: Wardrobe smart search + stylist filters on web and mobile — see "WARDROBE SEARCH + FILTERS" below.
 * **Phase**: Live deployment + new wardrobe features (2026-10-13) — **WEBSITE LIVE ON VERCEL; ANDROID APK BUILT; NOT DEVICE-VERIFIED**
 * **Status**: Website + AI backend deployed to Vercel at **https://closiq-liard.vercel.app** (login, cloud wardrobe shared with the phone app, responsive desktop/mobile web). Added garment **size** and **"where is it kept"** (Indian household places + custom) on web and mobile, and a free **studio photo** (white background, open-source U²-Net cut-out, no Gemini). Mobile linked to EAS (`@vudigapranav/closiq`) with over-the-air updates; first Android `preview` APK build started. Supabase was paused again and was restored; a daily Vercel Cron keeps it from pausing. **Workflow change at the user's request: commit and push straight to `main` (no PRs), then `git pull` into the local CLOSIQ folder.** Details in "DEPLOYMENT + FEATURES" below.
@@ -25,7 +25,7 @@ User request (2026-11-01): (1) remove the Stylist tab — keep the AI Stylist re
 | 4 | Mobile: Shop Check screen (camera/gallery → AI scan → verdict, pairings, outfits, "I bought it") | DONE — `ShopCheckModal.tsx`; describe-by-hand fallback; Android bundle exports (4.7 MB) |
 | 5 | Web parity: same nav + Shop Check | DONE — web `BottomNavigation` (raised camera; sidebar row on desktop), Home "AI Stylist" card, Stylist back link, `ShopCheckModal.tsx`; build + lint + tsc clean |
 | 6 | Verify (tests, tsc, build, export), CLAUDE.md/STATE.md, push | DONE — tests 114/114, web lint + build + tsc clean, Android + iOS bundles export, all pushed to `main` (`e9022d1`…`77b0987`) |
-| 7 | Deploy web + OTA + new APK build | Web DEPLOYED (LIVE VERIFIED: `/healthz` commit `0b39763`, live bundle has Shop Check / AI STYLIST / All filters, no Gemini key, new favicon 200). OTA "v1.3" PUBLISHED: group `fc5c60b1-7fec-4c6c-9602-89a0f2bf8908` (preview, runtime 1.0.0, Android, commit `0b39763`; bundle has Shop Check, Vercel host, no LAN host, no key). APK: building on EAS |
+| 7 | Deploy web + OTA + new APK build | Web DEPLOYED (LIVE VERIFIED: `/healthz` commit `0b39763`, live bundle has Shop Check / AI STYLIST / All filters, no Gemini key, new favicon 200). OTA "v1.3" PUBLISHED: group `fc5c60b1-7fec-4c6c-9602-89a0f2bf8908` (preview, runtime 1.0.0, Android, commit `0b39763`; bundle has Shop Check, Vercel host, no LAN host, no key). APK BUILT: `47bad076-c1f6-4956-b2bc-0d93d5487fe5` (preview, runtime 1.0.0, commit `b179877`, brain-Q icon) — https://expo.dev/artifacts/eas/B3PFF5wF2QsymhmZxYMRZPZDq_5HAwjaOEt2Qtr_HD0.apk; supersedes `4c16caf6`. Not yet installed/tested on a device |
 
 ### What was built (details)
 * **Icon**: `scripts/generate-app-icons.mjs` now crops the brain-Q out of `public/brand/closiq-logo.png` with sharp (coverage mask → lanczos upscale → smoothstep edge), writing every icon size. Visually checked: app icon, adaptive foreground, white monochrome, favicon. The installed APK keeps the Spark hanger until a new build is installed.
