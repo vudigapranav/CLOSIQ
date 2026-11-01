@@ -25,7 +25,7 @@ User request (2026-11-01): (1) remove the Stylist tab — keep the AI Stylist re
 | 4 | Mobile: Shop Check screen (camera/gallery → AI scan → verdict, pairings, outfits, "I bought it") | DONE — `ShopCheckModal.tsx`; describe-by-hand fallback; Android bundle exports (4.7 MB) |
 | 5 | Web parity: same nav + Shop Check | DONE — web `BottomNavigation` (raised camera; sidebar row on desktop), Home "AI Stylist" card, Stylist back link, `ShopCheckModal.tsx`; build + lint + tsc clean |
 | 6 | Verify (tests, tsc, build, export), CLAUDE.md/STATE.md, push | DONE — tests 114/114, web lint + build + tsc clean, Android + iOS bundles export, all pushed to `main` (`e9022d1`…`77b0987`) |
-| 7 | Deploy web + OTA + new APK build (ask the user first) | WAITING FOR THE USER — the icon needs a new APK; everything else can go by OTA + Vercel |
+| 7 | Deploy web + OTA + new APK build | Web DEPLOYED (LIVE VERIFIED: `/healthz` commit `0b39763`, live bundle has Shop Check / AI STYLIST / All filters, no Gemini key, new favicon 200). OTA "v1.3" PUBLISHED: group `fc5c60b1-7fec-4c6c-9602-89a0f2bf8908` (preview, runtime 1.0.0, Android, commit `0b39763`; bundle has Shop Check, Vercel host, no LAN host, no key). APK: building on EAS |
 
 ### What was built (details)
 * **Icon**: `scripts/generate-app-icons.mjs` now crops the brain-Q out of `public/brand/closiq-logo.png` with sharp (coverage mask → lanczos upscale → smoothstep edge), writing every icon size. Visually checked: app icon, adaptive foreground, white monochrome, favicon. The installed APK keeps the Spark hanger until a new build is installed.
