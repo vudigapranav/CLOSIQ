@@ -162,7 +162,7 @@ Return structured JSON output matching this schema:
   "aiConfidence": 0.95,
   "pairingNotes": "Concise 1-sentence styling advice for this garment."
 }
-Category hint: ${body.categoryHint || 'tops'}.`;
+${body.categoryHint ? `Category hint: ${body.categoryHint}.` : 'No category hint: decide the category from the photo (it may be a top, bottom, layer, footwear or an accessory).'}`;
 
     const response = await generateWithFallback(apiKey, {
       contents: [
