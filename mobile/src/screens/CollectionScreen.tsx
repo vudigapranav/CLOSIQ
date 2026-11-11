@@ -67,6 +67,11 @@ const GarmentCard = React.memo<GarmentCardProps>(({ item, onPress }) => (
       <View style={styles.catBadge}>
         <Text style={styles.catBadgeText}>{item.category.slice(0, 4)}</Text>
       </View>
+      {item.availability && item.availability !== 'available' && (
+        <View style={styles.availBadge}>
+          <Text style={styles.availBadgeText}>{item.availability === 'laundry' ? 'In laundry' : 'Unavailable'}</Text>
+        </View>
+      )}
     </View>
 
     <View style={styles.cardInfo}>
@@ -596,6 +601,18 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: COLORS.border
   },
+  availBadge: {
+    position: 'absolute',
+    bottom: 6,
+    left: 6,
+    backgroundColor: COLORS.surfaceElevated,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    borderRadius: RADIUS.pill,
+    paddingHorizontal: 8,
+    paddingVertical: 2
+  },
+  availBadgeText: { fontSize: 10, fontWeight: '700', color: COLORS.textPrimary },
   cardImageFrame: {
     width: '100%',
     height: 140,

@@ -14,6 +14,7 @@ import { COLORS, RADIUS } from '../theme';
 import { WardrobeProfile, LayeringPreference, Outfit, GarmentItem, SavedLookStatus } from '../../../src/types/wardrobe';
 import { OutfitFeedback, buildOutfitBrain, tasteGarments } from '../../../src/services/outfitBrain';
 import { loadOutfitFeedback } from '../services/outfitFeedbackStorage';
+import { AccountPrivacySection } from '../components/AccountPrivacySection';
 import { SavedLookDetailModal } from '../components/SavedLookDetailModal';
 import { BodyTypeOptionCard } from '../components/BodyTypeOptionCard';
 import { GarmentImage } from '../components/GarmentImage';
@@ -407,6 +408,8 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
           <Text style={styles.logoutBtnText}>Log Out</Text>
         </TouchableOpacity>
       </View>
+
+      <AccountPrivacySection />
 
       {/* Saved Look Detail Sheet Modal */}
       <SavedLookDetailModal

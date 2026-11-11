@@ -32,6 +32,7 @@ import { FormalityLevel, GarmentCategory, GarmentItem, LayeringPreference, Outfi
 import { runShopCheck, shopCandidate, ShopCheckResult, ShopVerdict } from '../../../src/services/shopCheck';
 import { COLOR_FAMILIES, ColorFamily } from '../../../src/services/wardrobeSearch';
 import { buildOutfitBrain, OutfitFeedback, tasteGarments } from '../../../src/services/outfitBrain';
+import { getAiPhotoConsent } from '../services/accountService';
 import { analyzeGarmentImageMobile, VisionAnalysisResult } from '../services/visionAnalysis';
 import { optimizeGarmentImage } from '../services/imageOptimizer';
 import { loadOutfitFeedback } from '../services/outfitFeedbackStorage';
@@ -217,6 +218,12 @@ export const ShopCheckModal: React.FC<ShopCheckModalProps> = ({
       setPhotoUri(optimized.uri);
       setAdded(false);
       setAddedId(null);
+      // Consent gate: AI photo analysis off -> no vision call, describe by hand.
+      if (!(await getAiPhotoConsent())) {
+        setScanNotice('AI photo analysis is turned off in Profile. Describe the piece in a few taps and CLOSIQ will still check it against your wardrobe.');
+        setStep('describe');
+        return;
+      }
       setStep('scanning');
       const run = ++runRef.current;
       const scan = optimized.base64

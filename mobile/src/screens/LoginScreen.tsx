@@ -13,10 +13,10 @@ import {
 } from 'react-native';
 import { Eye, EyeOff, AlertCircle, CheckCircle2 } from 'lucide-react-native';
 import { COLORS, RADIUS } from '../theme';
-import { signIn, signUp } from '../services/authService';
+import { signIn, signUp, requestPasswordReset } from '../services/authService';
 import { isSupabaseConfigured, supabaseConfigCheck } from '../services/supabaseClient';
 
-type Mode = 'login' | 'signup';
+type Mode = 'login' | 'signup' | 'forgot';
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -58,11 +58,26 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ sessionNotice }) => {
     setShowPassword(false);
   };
 
+  const handleReset = async (trimmedEmail: string) => {
+    if (!EMAIL_RE.test(trimmedEmail)) {
+      setErrorMessage('Enter a valid email address.');
+      return;
+    }
+    inFlightRef.current = true;
+    setLoading(true);
+    const res = await requestPasswordReset(trimmedEmail).catch(() => null);
+    inFlightRef.current = false;
+    setLoading(false);
+    if (res?.ok) setInfoMessage(res.message ?? null);
+    else setErrorMessage(res?.message || 'Something went wrong. Please try again.');
+  };
+
   const handleSubmit = async () => {
     if (inFlightRef.current) return;
     resetMessages();
 
     const trimmedEmail = email.trim();
+    if (mode === 'forgot') return handleReset(trimmedEmail);
     if (!trimmedEmail || !password) {
       setErrorMessage('Enter your email and password.');
       return;
@@ -128,10 +143,12 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ sessionNotice }) => {
           <Text style={styles.tagline}>AI Personal Wardrobe & Stylist</Text>
         </View>
 
-        <Text style={styles.heading}>{mode === 'login' ? 'Welcome back' : 'Create your account'}</Text>
+        <Text style={styles.heading}>{mode === 'login' ? 'Welcome back' : mode === 'forgot' ? 'Reset your password' : 'Create your account'}</Text>
         <Text style={styles.subheading}>
           {mode === 'login'
             ? 'Log in to your closet.'
+            : mode === 'forgot'
+            ? "Enter your email and we'll send you a link to set a new password."
             : 'Just an email and password — the rest is a quick setup after this.'}
         </Text>
 
@@ -165,6 +182,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ sessionNotice }) => {
           textContentType="emailAddress"
         />
 
+        {mode !== 'forgot' && (<>
         <Text style={styles.label}>Password</Text>
         <View style={styles.passwordRow}>
           <TextInput
@@ -189,6 +207,19 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ sessionNotice }) => {
             )}
           </TouchableOpacity>
         </View>
+        </>)}
+
+        {mode === 'login' && (
+          <TouchableOpacity
+            style={styles.forgotBtn}
+            onPress={() => switchMode('forgot')}
+            disabled={loading}
+            accessibilityRole="button"
+            accessibilityLabel="Forgot password"
+          >
+            <Text style={styles.switchModeLink}>Forgot password?</Text>
+          </TouchableOpacity>
+        )}
 
         {mode === 'signup' && (
           <>
@@ -228,7 +259,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ sessionNotice }) => {
           {loading ? (
             <ActivityIndicator size="small" color="#FFFFFF" />
           ) : (
-            <Text style={styles.primaryBtnText}>{mode === 'login' ? 'Log In' : 'Create Account'}</Text>
+            <Text style={styles.primaryBtnText}>{mode === 'login' ? 'Log In' : mode === 'forgot' ? 'Send reset link' : 'Create Account'}</Text>
           )}
         </TouchableOpacity>
 
@@ -238,7 +269,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ sessionNotice }) => {
           disabled={loading}
         >
           <Text style={styles.switchModeText}>
-            {mode === 'login' ? "Don't have an account? " : 'Already have an account? '}
+            {mode === 'login' ? "Don't have an account? " : mode === 'forgot' ? 'Back to ' : 'Already have an account? '}
             <Text style={styles.switchModeLink}>{mode === 'login' ? 'Sign Up' : 'Log In'}</Text>
           </Text>
         </TouchableOpacity>
@@ -355,6 +386,10 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 14.5,
     fontWeight: '700'
+  },
+  forgotBtn: {
+    alignSelf: 'flex-end',
+    paddingVertical: 10
   },
   switchModeBtn: {
     marginTop: 16,

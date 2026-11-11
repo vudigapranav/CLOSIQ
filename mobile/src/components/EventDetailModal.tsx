@@ -1,8 +1,11 @@
 import React from 'react';
-import { StyleSheet, View, Text, Modal, TouchableOpacity, ScrollView, Alert } from 'react-native';
-import { X, Trash2, Pencil, CalendarDays, Clock, Tag, Sparkles, Sun } from 'lucide-react-native';
+import { StyleSheet, View, Text, Modal, TouchableOpacity, ScrollView, Alert, Share, Platform } from 'react-native';
+import { File, Paths } from 'expo-file-system';
+import { X, Trash2, Pencil, CalendarDays, CalendarPlus, Clock, Tag, Sparkles, Sun } from 'lucide-react-native';
 import { COLORS, RADIUS } from '../theme';
 import { PlannerEvent } from '../types/planner';
+import { buildIcs, hasRealTime, icsFileName } from '../../../src/services/calendarExport';
+import { matchLabel } from '../../../src/types/wardrobe';
 import { formatEventDateLabel, formatEventTimeLabel } from '../services/plannerStorage';
 import { GarmentImage } from './GarmentImage';
 
@@ -24,6 +27,39 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
   onUseForToday
 }) => {
   if (!event) return null;
+
+  const handleAddToCalendar = async () => {
+    const ics = buildIcs([
+      {
+        id: event.id,
+        title: event.title,
+        date: event.date,
+        time: hasRealTime(event.time) ? event.time : null,
+        occasion: event.occasion,
+        notes: event.notes,
+        outfit: event.outfit ? { title: event.outfit.title, items: event.outfit.items.map((i) => ({ name: i.name })) } : null
+      }
+    ]);
+    try {
+      // iOS shares the .ics file (Calendar picks it up); Android's share sheet
+      // only carries text, so the file is also written and the ics is the message.
+      let uri: string | undefined;
+      try {
+        const file = new File(Paths.cache, icsFileName(event.title));
+        file.write(ics);
+        uri = file.uri;
+      } catch (err) {
+        console.warn('Could not write .ics file, sharing as text:', err);
+      }
+      await Share.share(
+        Platform.OS === 'ios' && uri
+          ? { url: uri, title: event.title }
+          : { message: ics, title: event.title }
+      );
+    } catch (err) {
+      Alert.alert("Couldn't share this event", err instanceof Error ? err.message : 'Please try again.');
+    }
+  };
 
   const handleDelete = () => {
     Alert.alert('Delete Event', `Remove "${event.title}" from your planner?`, [
@@ -85,7 +121,7 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
                   ))}
                 </View>
                 <Text style={styles.outfitTitle} numberOfLines={1}>{event.outfit.title}</Text>
-                <Text style={styles.outfitMeta}>{event.outfit.items.length} pieces • {event.outfit.styleScore}% Match</Text>
+                <Text style={styles.outfitMeta}>{event.outfit.items.length} pieces • {matchLabel(event.outfit)}</Text>
 
                 <View style={styles.outfitActionRow}>
                   <TouchableOpacity style={styles.secondaryBtn} activeOpacity={0.8} onPress={() => onPlanOutfit(event)}>
@@ -103,6 +139,11 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
                 <Text style={styles.planOutfitBtnText}>Plan an Outfit</Text>
               </TouchableOpacity>
             )}
+
+            <TouchableOpacity style={[styles.editBtn, { marginBottom: 10 }]} activeOpacity={0.8} onPress={handleAddToCalendar}>
+              <CalendarPlus size={14} color={COLORS.textPrimary} style={{ marginRight: 6 }} />
+              <Text style={styles.editBtnText}>Add to calendar</Text>
+            </TouchableOpacity>
 
             <View style={styles.actionRow}>
               <TouchableOpacity style={styles.editBtn} activeOpacity={0.8} onPress={() => onEdit(event)}>

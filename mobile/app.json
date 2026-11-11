@@ -21,9 +21,6 @@
         "backgroundColor": "#F7F2E9",
         "foregroundImage": "./assets/adaptive-icon-foreground.png",
         "monochromeImage": "./assets/adaptive-icon-monochrome.png"
-      },
-      "runtimeVersion": {
-        "policy": "appVersion"
       }
     },
     "web": {
@@ -53,8 +50,7 @@
         }
       ],
       "@react-native-community/datetimepicker",
-      "expo-status-bar",
-      "expo-splash-screen"
+      "expo-status-bar"
     ],
     "extra": {
       "eas": {
@@ -64,6 +60,9 @@
     "owner": "vudigapranav",
     "updates": {
       "url": "https://u.expo.dev/859d629b-60ac-4860-b325-16eee1c362d7"
+    },
+    "runtimeVersion": {
+      "policy": "appVersion"
     }
   }
 }

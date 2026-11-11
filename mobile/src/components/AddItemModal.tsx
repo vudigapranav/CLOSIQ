@@ -16,6 +16,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { Camera, Image as ImageIcon, Sparkles, X, Check, RefreshCw, AlertCircle } from 'lucide-react-native';
 import { COLORS, RADIUS } from '../theme';
 import { GarmentItem, GarmentCategory, WardrobeProfile, FormalityLevel } from '../../../src/types/wardrobe';
+import { getAiPhotoConsent } from '../services/accountService';
 import { analyzeGarmentImageMobile, VisionAnalysisResult } from '../services/visionAnalysis';
 import { optimizeGarmentImage } from '../services/imageOptimizer';
 import { StorageLocationPicker } from './StorageLocationPicker';
@@ -172,6 +173,17 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({
   const handleStartAnalysis = async () => {
     if (!base64Data) {
       Alert.alert('Analysis Error', 'No image data found to analyze.');
+      return;
+    }
+
+    // Consent gate: with AI photo analysis off, skip the scan entirely and
+    // go straight to manual entry.
+    const consented = await getAiPhotoConsent();
+    if (!consented) {
+      setAnalysisResult(null);
+      setAnalysisFailure('AI photo analysis is turned off in Profile.');
+      setEditedCategory(selectedCategory);
+      setStep('manual');
       return;
     }
 

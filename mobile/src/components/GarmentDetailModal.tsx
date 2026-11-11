@@ -9,13 +9,15 @@ import {
 } from 'react-native';
 import { X, Trash2, Sparkles, Shirt } from 'lucide-react-native';
 import { COLORS, RADIUS } from '../theme';
-import { GarmentItem, GarmentDetailsPatch, LayeringPreference } from '../../../src/types/wardrobe';
+import { AVAILABILITY_OPTIONS, GarmentItem, GarmentDetailsPatch, LayeringPreference } from '../../../src/types/wardrobe';
+import { describeWear } from '../../../src/services/garmentEdit';
 import { OutfitFeedback, buildOutfitBrain } from '../../../src/services/outfitBrain';
 import { emptyPairingHint, suggestPairings } from '../../../src/services/pairingSuggestions';
 import { loadOutfitFeedback } from '../services/outfitFeedbackStorage';
 import { GarmentImage } from './GarmentImage';
 import { StorageLocationPicker } from './StorageLocationPicker';
 import { SizePicker } from './SizePicker';
+import { GarmentEditForm } from './GarmentEditForm';
 
 interface GarmentDetailModalProps {
   item: GarmentItem | null;
@@ -58,6 +60,15 @@ export const GarmentDetailModal: React.FC<GarmentDetailModalProps> = ({
     };
   }, [isOpen]);
 
+  const [editing, setEditing] = useState(false);
+  const itemId = item?.id;
+  useEffect(() => {
+    setEditing(false);
+  }, [itemId]);
+  const collectionNames = useMemo(
+    () => [...new Set(wardrobe.flatMap((g) => g.collections || []))].sort((a, b) => a.localeCompare(b)),
+    [wardrobe]
+  );
   const pairingGroups = useMemo(
     () => (item ? suggestPairings(item, wardrobe, { brain: buildOutfitBrain(feedback), layeringPreference }) : []),
     [item, wardrobe, feedback, layeringPreference]
@@ -91,6 +102,28 @@ export const GarmentDetailModal: React.FC<GarmentDetailModalProps> = ({
             {/* Garment Image */}
             <View style={styles.imageFrame}>
               <GarmentImage uri={item.imageUrl} style={styles.garmentImg} iconSize={28} />
+              {item.availability && item.availability !== 'available' && (
+                <View style={styles.availBadge}>
+                  <Text style={styles.availBadgeText}>{item.availability === 'laundry' ? 'In laundry' : 'Unavailable'}</Text>
+                </View>
+              )}
+            </View>
+
+            {/* Quick availability toggle — works without edit mode */}
+            <View style={styles.availRow}>
+              {AVAILABILITY_OPTIONS.map((o) => {
+                const active = (item.availability ?? 'available') === o.value;
+                return (
+                  <TouchableOpacity
+                    key={o.value}
+                    style={[styles.availBtn, active && styles.availBtnActive]}
+                    activeOpacity={0.8}
+                    onPress={() => onUpdateItem(item.id, { availability: o.value })}
+                  >
+                    <Text style={[styles.availBtnText, active && styles.availBtnTextActive]} numberOfLines={1}>{o.label}</Text>
+                  </TouchableOpacity>
+                );
+              })}
             </View>
 
             {/* Title & Style Archetype */}
@@ -99,7 +132,28 @@ export const GarmentDetailModal: React.FC<GarmentDetailModalProps> = ({
               <Text style={styles.garmentStyle}>
                 {item.style || 'Casual Essential'} • {item.subcategory}
               </Text>
+              <Text style={styles.wearLine}>{describeWear(item.wearCount, item.lastWornDate)}</Text>
+              {item.collections && item.collections.length > 0 && (
+                <Text style={styles.wearLine}>{item.collections.join(' · ')}</Text>
+              )}
+              {!editing && (
+                <TouchableOpacity style={styles.editBtn} activeOpacity={0.8} onPress={() => setEditing(true)}>
+                  <Text style={styles.editBtnText}>Edit details</Text>
+                </TouchableOpacity>
+              )}
             </View>
+
+            {editing && (
+              <GarmentEditForm
+                item={item}
+                collectionSuggestions={collectionNames}
+                onCancel={() => setEditing(false)}
+                onSave={(patch) => {
+                  onUpdateItem(item.id, patch);
+                  setEditing(false);
+                }}
+              />
+            )}
 
             {/* Color & Attributes Grid */}
             <View style={styles.attrGrid}>
@@ -219,6 +273,44 @@ export const GarmentDetailModal: React.FC<GarmentDetailModalProps> = ({
 };
 
 const styles = StyleSheet.create({
+  availBadge: {
+    position: 'absolute',
+    top: 10,
+    left: 10,
+    backgroundColor: COLORS.surfaceElevated,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    borderRadius: RADIUS.pill,
+    paddingHorizontal: 10,
+    paddingVertical: 3
+  },
+  availBadgeText: { fontSize: 11, fontWeight: '700', color: COLORS.textPrimary },
+  availRow: {
+    flexDirection: 'row',
+    gap: 4,
+    padding: 4,
+    marginBottom: 16,
+    backgroundColor: COLORS.surfaceSubtle,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    borderRadius: RADIUS.pill
+  },
+  availBtn: { flex: 1, alignItems: 'center', paddingVertical: 9, borderRadius: RADIUS.pill },
+  availBtnActive: { backgroundColor: COLORS.primary },
+  availBtnText: { fontSize: 12, fontWeight: '600', color: COLORS.textSecondary },
+  availBtnTextActive: { color: COLORS.surfaceElevated },
+  wearLine: { fontSize: 12, color: COLORS.textSecondary, marginTop: 4 },
+  editBtn: {
+    alignSelf: 'flex-start',
+    marginTop: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: RADIUS.pill,
+    backgroundColor: COLORS.surfaceSubtle,
+    borderWidth: 1,
+    borderColor: COLORS.border
+  },
+  editBtnText: { fontSize: 12, fontWeight: '700', color: COLORS.textPrimary },
   backdrop: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.55)',

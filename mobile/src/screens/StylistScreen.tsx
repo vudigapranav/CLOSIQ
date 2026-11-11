@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import { Wand2, Sparkles, RefreshCw, Shirt, ArrowRight, AlertCircle, ChevronLeft } from 'lucide-react-native';
 import { COLORS, RADIUS } from '../theme';
+import { FORMALITY_LABEL, resolveTargetFormality } from '../../../src/services/intelligence/garmentTraits';
 import { GarmentItem, WardrobeProfile, LayeringPreference, Outfit, OutfitRating, SavedLookStatus } from '../../../src/types/wardrobe';
 import { useOutfitFeedback } from '../hooks/useOutfitFeedback';
 import { generateOutfitMobile, swapGarmentMobile, MobileOutfitResult } from '../services/outfitStylist';
@@ -253,19 +254,23 @@ export const StylistScreen: React.FC<StylistScreenProps> = ({
         title: outfitResult.data.title,
         occasion: promptText.trim() || 'AI Stylist Look',
         vibe: outfitResult.data.vibe,
-        formalityLabel: 'Smart Casual',
-        temperature: 72,
+        formalityLabel: FORMALITY_LABEL[resolveTargetFormality(promptText)],
+        // °C, only when a real reading exists — never an invented number.
+        ...(weatherRef.current ? { temperature: Math.round(weatherRef.current.temperatureCelsius) } : {}),
         items: resolvedGarments,
         styleScore: outfitResult.data.styleScore,
         explanation: {
           summary: outfitResult.data.explanation.summary,
           colorHarmony: outfitResult.data.explanation.colorHarmony || 'Balanced tones',
-          silhouette: 'Proportional fit',
-          weatherSuitability: 'Suitable for current climate',
-          versatilityNote: 'High styling versatility'
+          silhouette: '',
+          weatherSuitability: weatherRef.current
+            ? `${weatherRef.current.condition}, ${Math.round(weatherRef.current.temperatureCelsius)}°C`
+            : '',
+          versatilityNote: ''
         },
         saved: true,
         dateCreated: new Date().toISOString(),
+        source: outfitResult.mode === 'gemini' ? 'ai' : 'local',
         status
       };
 

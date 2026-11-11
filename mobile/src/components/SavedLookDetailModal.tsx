@@ -10,7 +10,7 @@ import {
 } from 'react-native';
 import { X, Sparkles, Trash2, ArrowRight } from 'lucide-react-native';
 import { COLORS, RADIUS } from '../theme';
-import { Outfit } from '../../../src/types/wardrobe';
+import { Outfit, matchLabel } from '../../../src/types/wardrobe';
 import { GarmentImage } from './GarmentImage';
 
 interface SavedLookDetailModalProps {
@@ -77,7 +77,7 @@ export const SavedLookDetailModal: React.FC<SavedLookDetailModalProps> = ({
               <Text style={styles.vibeText}>{outfit.vibe}</Text>
 
               <View style={styles.scoreBadge}>
-                <Text style={styles.scoreText}>{outfit.styleScore}% Match</Text>
+                <Text style={styles.scoreText}>{matchLabel(outfit)}</Text>
               </View>
             </View>
 
