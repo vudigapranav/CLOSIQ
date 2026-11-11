@@ -261,6 +261,7 @@ export const CollectionScreen: React.FC<CollectionScreenProps> = ({
               imageUrl={item.imageUrl}
               brand={item.brand}
               wearCount={item.wearCount}
+              availability={item.availability}
               onClick={() => onSelectItem(item)}
             />
           ))}

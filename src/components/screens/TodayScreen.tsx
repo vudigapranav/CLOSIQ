@@ -9,6 +9,8 @@ import { OutfitBrain } from '../../services/outfitBrain';
 import { OutfitRatingBar } from '../ui/OutfitRatingBar';
 import { isSameOutfit, formatCategoryList } from '../../services/aiStylist';
 import { generateAIOutfitWithGemini } from '../../services/ai';
+import { WeatherCard } from '../ui/WeatherCard';
+import { WebWeatherState } from '../../services/weather/webWeather';
 
 interface TodayScreenProps {
   wardrobe: GarmentItem[];
@@ -31,6 +33,10 @@ interface TodayScreenProps {
   onOutfitShown?: (outfit: Outfit) => void;
   /** Opens the AI Stylist (no longer a tab — it lives on Home since 2026-11-01). */
   onOpenStylist?: () => void;
+  /** Weather state held once in App (useWebWeather). */
+  weather?: WebWeatherState;
+  /** Style options chosen at onboarding. */
+  stylePreferences?: string[];
 }
 
 /** A small "AI Stylist" entry on Home — the Stylist moved here from the nav bar. */
@@ -104,7 +110,9 @@ export const TodayScreen: React.FC<TodayScreenProps> = ({
   ratingFor,
   onRateOutfit,
   onOutfitShown,
-  onOpenStylist
+  onOpenStylist,
+  weather,
+  stylePreferences
 }) => {
   const firstName = (userName || '').trim().split(/\s+/)[0];
   const greeting = firstName ? `${getGreeting()}, ${firstName}.` : `${getGreeting()}.`;
@@ -141,7 +149,7 @@ export const TodayScreen: React.FC<TodayScreenProps> = ({
     setErrorMessage(null);
     setShowBreakdown(false);
     try {
-      const generated = await generateAIOutfitWithGemini(wardrobe, { prompt: promptText, layeringPreference, excludeGarmentIds, brain }, seed);
+      const generated = await generateAIOutfitWithGemini(wardrobe, { prompt: promptText, layeringPreference, excludeGarmentIds, brain, weather: weather?.current ?? null, stylePreferences }, seed);
       if (token !== generationToken.current) return;
       setOutfit(generated);
       onOutfitShown?.(generated);
@@ -163,6 +171,22 @@ export const TodayScreen: React.FC<TodayScreenProps> = ({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [wardrobe.length]);
+
+  // Weather arrives asynchronously: if the first look was made without it,
+  // regenerate ONCE when it first shows up (never again, so no repeated calls).
+  const generatedWithoutWeather = useRef(false);
+  const weatherRegenerated = useRef(false);
+  useEffect(() => {
+    if (outfit && !weather?.current && !isGenerating) generatedWithoutWeather.current = true;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [outfit]);
+  useEffect(() => {
+    if (weather?.current && generatedWithoutWeather.current && !weatherRegenerated.current && !externalOutfit && wardrobe.length > 0 && !isGenerating) {
+      weatherRegenerated.current = true;
+      runGeneration(activePrompt, variationSeed);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [weather?.current]);
 
   const handleSelectOccasion = (occ: string) => {
     setSelectedOccasion(occ);
@@ -260,7 +284,7 @@ export const TodayScreen: React.FC<TodayScreenProps> = ({
             <h1 className="text-screen-heading">{greeting}</h1>
             <p className="text-body" style={{ marginTop: 2 }}>Let's find your look.</p>
           </div>
-          {outfit && (
+          {outfit && typeof outfit.temperature === 'number' && (
             <div
               style={{
                 display: 'flex',
@@ -279,6 +303,7 @@ export const TodayScreen: React.FC<TodayScreenProps> = ({
             </div>
           )}
         </div>
+        {weather && <WeatherCard weather={weather} />}
         {onOpenStylist && <StylistEntry onOpen={onOpenStylist} />}
         <p
           className="text-section-heading"

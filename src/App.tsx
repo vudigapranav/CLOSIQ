@@ -19,12 +19,15 @@ import { GarmentItem, GarmentDetailsPatch, Outfit, OutfitRating, WardrobeProfile
 import { isSameOutfit } from './services/aiStylist';
 import { customStorageLocations } from './data/storageLocations';
 import { supabase, isCloudConfigured } from './services/cloud/supabase';
+import { SchemaNotReadyError } from './services/cloud/schemaErrors';
+import { useWebWeather } from './services/weather/webWeather';
 import { signOut, updatePassword } from './services/cloud/auth';
 import {
   loadWardrobe,
   addGarment,
   deleteGarment,
   updateGarment,
+  recordGarmentsWorn,
   loadSavedOutfits,
   saveOutfit,
   removeOutfit,
@@ -209,6 +212,8 @@ const SignedInApp: React.FC<SignedInAppProps> = ({ user, isDarkMode, onToggleThe
   const [feedback, setFeedback] = useState<OutfitFeedback[]>([]);
   const [recentSignatures, setRecentSignatures] = useState<string[]>([]);
   const [notice, setNotice] = useState<string | null>(null);
+  // Weather is held once here and passed down (Today, Stylist, Planner).
+  const weather = useWebWeather(userId);
 
   // The weekly planner is browser-local (the mobile app's planner is a
   // different, event-based model), kept per account.
@@ -225,7 +230,9 @@ const SignedInApp: React.FC<SignedInAppProps> = ({ user, isDarkMode, onToggleThe
 
   const fail = useCallback((what: string, err: unknown) => {
     console.warn(`[CLOSIQ cloud] ${what}:`, err);
-    setNotice(`${what}. Check your connection and try again.`);
+    setNotice(
+      err instanceof SchemaNotReadyError ? `${what}. ${err.message}` : `${what}. Check your connection and try again.`
+    );
   }, []);
 
   const loadAll = useCallback(async () => {
@@ -399,9 +406,7 @@ const SignedInApp: React.FC<SignedInAppProps> = ({ user, isDarkMode, onToggleThe
     setWardrobe((prev) =>
       prev.map((item) => (wornIds.has(item.id) ? { ...item, wearCount: item.wearCount + 1, lastWornDate: today } : item))
     );
-    Promise.all(updates.map((u) => updateGarment(userId, profile, u.id, { wearCount: u.wearCount, lastWornDate: today }))).catch(
-      (err) => fail('Couldn’t record what you wore', err)
-    );
+    recordGarmentsWorn(userId, profile, updates, today).catch((err) => fail('Couldn’t record what you wore', err));
     // Wearing it counts: the look moves to "Worn" in Saved Looks (2026-10-14).
     handleSaveOutfit({ ...outfit, status: 'worn' });
   };
@@ -549,6 +554,8 @@ const SignedInApp: React.FC<SignedInAppProps> = ({ user, isDarkMode, onToggleThe
             onSelectItemDetail={(item) => setSelectedDetailItem(item)}
             onNavigateToProfile={() => setActiveTab('profile')}
             onOpenStylist={() => setActiveTab('stylist')}
+            weather={weather}
+            stylePreferences={basics.stylePreferences}
             userName={basics.name}
             brain={brain}
             ratingFor={ratingFor}
@@ -578,6 +585,8 @@ const SignedInApp: React.FC<SignedInAppProps> = ({ user, isDarkMode, onToggleThe
             onRateOutfit={handleRateOutfit}
             onOutfitShown={handleOutfitShown}
             onBack={() => setActiveTab('today')}
+            weather={weather}
+            stylePreferences={basics.stylePreferences}
           />
         )}
         {activeTab === 'planner' && (
@@ -588,6 +597,11 @@ const SignedInApp: React.FC<SignedInAppProps> = ({ user, isDarkMode, onToggleThe
             onAssignOutfit={handleAssignPlanOutfit}
             onClearOutfit={handleClearPlanOutfit}
             onNavigateToStylist={() => setActiveTab('stylist')}
+            userId={userId}
+            wardrobe={visibleWardrobe}
+            layeringPreference={layeringPreference}
+            brain={brain}
+            weather={weather}
           />
         )}
         {activeTab === 'profile' && (
@@ -605,6 +619,7 @@ const SignedInApp: React.FC<SignedInAppProps> = ({ user, isDarkMode, onToggleThe
             onNavigateToCollection={() => setActiveTab('collection')}
             onNavigateToPlanner={() => setActiveTab('planner')}
             userEmail={user.email}
+            userId={userId}
             userName={basics.name}
             stylePreferences={basics.stylePreferences}
             brain={brain}

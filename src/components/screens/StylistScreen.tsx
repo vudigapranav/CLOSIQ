@@ -16,6 +16,8 @@ import {
   formatCategoryList
 } from '../../services/aiStylist';
 import { generateAIOutfitWithGemini } from '../../services/ai';
+import { WebWeatherState } from '../../services/weather/webWeather';
+import { formatTemperature } from '../../services/weather/weatherCore';
 
 interface StylistScreenProps {
   wardrobe: GarmentItem[];
@@ -33,6 +35,9 @@ interface StylistScreenProps {
   onOutfitShown?: (outfit: Outfit) => void;
   /** Back to Home — the Stylist opens from there, not from a tab (2026-11-01). */
   onBack?: () => void;
+  /** Weather state held once in App (useWebWeather). */
+  weather?: WebWeatherState;
+  stylePreferences?: string[];
 }
 
 const GENERATION_CAPTIONS = ['Checking your wardrobe…', 'Curating your look…', 'Finding the right combination…'];
@@ -52,7 +57,9 @@ export const StylistScreen: React.FC<StylistScreenProps> = ({
   ratingFor,
   onRateOutfit,
   onOutfitShown,
-  onBack
+  onBack,
+  weather,
+  stylePreferences
 }) => {
   const backLink = onBack ? (
     <button
@@ -107,7 +114,7 @@ export const StylistScreen: React.FC<StylistScreenProps> = ({
       const effectivePrompt = selectedStyle ? `${basePrompt} — ${selectedStyle.toLowerCase()} style` : basePrompt;
       const next = await generateAIOutfitWithGemini(
         wardrobe,
-        { prompt: effectivePrompt, layeringPreference, excludeGarmentIds, brain },
+        { prompt: effectivePrompt, layeringPreference, excludeGarmentIds, brain, weather: weather?.current ?? null, stylePreferences },
         seed
       );
       if (token !== generationToken.current) return;
@@ -282,6 +289,12 @@ export const StylistScreen: React.FC<StylistScreenProps> = ({
       <div style={{ marginBottom: 20 }}>
         <h1 className="text-screen-heading">Your AI Stylist</h1>
         <p className="text-body" style={{ marginTop: 2 }}>Tell me where you're going.</p>
+        {weather?.current && (
+          <p style={{ marginTop: 6, fontSize: '0.78rem', color: 'var(--color-text-secondary)' }}>
+            Styling for {formatTemperature(weather.current.temperatureC, weather.unit)}, {weather.current.condition.toLowerCase()}
+            {weather.place ? ` in ${weather.place.name}` : ''}.
+          </p>
+        )}
       </div>
 
       {/* 2. Natural Language Input & Chips Box */}
