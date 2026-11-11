@@ -11,7 +11,10 @@
     "build": "vite build",
     "start": "node --env-file-if-exists=.env server/index.js",
     "lint": "oxlint",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "typecheck": "mobile/node_modules/.bin/tsc -p tsconfig.json",
+    "test": "cd mobile && npm test",
+    "test:server": "node --test --experimental-test-module-mocks server/tests/*.test.mjs"
   },
   "dependencies": {
     "@google/genai": "^2.17.0",
