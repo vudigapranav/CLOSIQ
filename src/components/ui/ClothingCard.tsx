@@ -9,6 +9,7 @@ export interface ClothingCardProps {
   imageUrl: string;
   brand?: string;
   wearCount?: number;
+  availability?: 'available' | 'laundry' | 'unavailable';
   onClick?: () => void;
 }
 
@@ -20,6 +21,7 @@ export const ClothingCard: React.FC<ClothingCardProps> = ({
   imageUrl,
   brand,
   wearCount,
+  availability,
   onClick
 }) => {
   return (
@@ -47,6 +49,24 @@ export const ClothingCard: React.FC<ClothingCardProps> = ({
     >
       <div style={{ position: 'relative', width: '100%', height: 228, backgroundColor: 'var(--color-surface-subtle)' }}>
         <GarmentImage src={imageUrl} alt={name} category={category} hexColor={hexColor} />
+        {availability && availability !== 'available' && (
+          <div
+            style={{
+              position: 'absolute',
+              top: 8,
+              left: 8,
+              backgroundColor: 'var(--color-surface-elevated)',
+              color: 'var(--color-text-primary)',
+              border: '1px solid var(--color-border)',
+              padding: '2px 8px',
+              borderRadius: 'var(--radius-pill)',
+              fontSize: '0.66rem',
+              fontWeight: 700
+            }}
+          >
+            {availability === 'laundry' ? 'In laundry' : 'Unavailable'}
+          </div>
+        )}
         <div
           style={{
             position: 'absolute',
