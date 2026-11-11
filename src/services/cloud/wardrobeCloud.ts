@@ -3,6 +3,8 @@ import { GarmentItem, GarmentDetailsPatch, LayeringPreference, Outfit, OutfitRat
 import { OutfitFeedback, comboSignature } from '../outfitBrain';
 import { normalizeStorageLocation } from '../../data/storageLocations';
 import { normalizeSize } from '../../data/garmentSizes';
+import { normalizeGarmentPatch } from '../garmentEdit';
+import { SchemaNotReadyError, isMissingColumnError, isMissingFunctionError } from './schemaErrors';
 
 /**
  * Web cloud data (2026-10-13): the same rows the mobile app reads and writes
@@ -40,7 +42,24 @@ type GarmentRow = {
   is_seed_item: boolean;
   storage_location: string | null;
   size: string | null;
+  // Wardrobe-intelligence columns (2026-11-11) — absent until that migration is applied.
+  availability?: string | null;
+  purchase_date?: string | null;
+  pattern?: string | null;
+  collections?: string[] | null;
 };
+
+/** Remembered for the session once PostgREST says the new columns don't exist. */
+let intelColumnsMissing = false;
+/** Same for the record_garments_worn RPC. */
+let wornRpcMissing = false;
+
+const INTEL_KEYS = ['availability', 'purchase_date', 'pattern', 'collections'] as const;
+function withoutIntel(row: Record<string, unknown>): Record<string, unknown> {
+  const out = { ...row };
+  for (const k of INTEL_KEYS) delete out[k];
+  return out;
+}
 
 // ---------- images ----------
 
@@ -120,7 +139,11 @@ function rowToGarment(row: GarmentRow): GarmentItem {
     profile: (row.source_profile as WardrobeProfile) || undefined,
     isSeedItem: row.is_seed_item,
     storageLocation: row.storage_location || undefined,
-    size: row.size || undefined
+    size: row.size || undefined,
+    availability: row.availability === 'laundry' || row.availability === 'unavailable' ? row.availability : undefined,
+    purchaseDate: row.purchase_date || undefined,
+    pattern: row.pattern || undefined,
+    collections: row.collections && row.collections.length > 0 ? row.collections : undefined
   };
 }
 
@@ -156,7 +179,7 @@ export async function addGarment(userId: string, profile: WardrobeProfile, item:
     imageUrl = signed?.signedUrl || `${SUPABASE_URL}${SIGNED_PATH_MARKER}${encodeURI(storagePath)}`;
   }
 
-  const { error } = await supabase.from('garments').insert({
+  const baseRow: Record<string, unknown> = {
     user_id: userId,
     garment_id: item.id,
     wardrobe_profile: profile,
@@ -186,7 +209,18 @@ export async function addGarment(userId: string, profile: WardrobeProfile, item:
     is_seed_item: item.isSeedItem || false,
     storage_location: normalizeStorageLocation(item.storageLocation) ?? null,
     size: normalizeSize(item.size) ?? null
-  });
+  };
+  const intelRow = {
+    availability: item.availability ?? 'available',
+    purchase_date: item.purchaseDate ?? null,
+    pattern: item.pattern ?? null,
+    collections: item.collections ?? []
+  };
+  let { error } = await supabase.from('garments').insert(intelColumnsMissing ? baseRow : { ...baseRow, ...intelRow });
+  if (error && !intelColumnsMissing && isMissingColumnError(error)) {
+    intelColumnsMissing = true;
+    ({ error } = await supabase.from('garments').insert(baseRow));
+  }
   if (error) {
     if (storagePath) await supabase.storage.from(GARMENT_IMAGES_BUCKET).remove([storagePath]);
     throw error;
@@ -207,25 +241,81 @@ export async function deleteGarment(userId: string, profile: WardrobeProfile, it
   if (path) await supabase.storage.from(GARMENT_IMAGES_BUCKET).remove([path]);
 }
 
+/** Maps a (normalised) details patch to snake_case columns. */
+function patchToRow(patch: GarmentDetailsPatch & { wearCount?: number; lastWornDate?: string }): Record<string, unknown> {
+  const { patch: p } = normalizeGarmentPatch(patch);
+  const row: Record<string, unknown> = {};
+  const has = (k: string) => Object.prototype.hasOwnProperty.call(patch, k);
+  if (has('storageLocation')) row.storage_location = p.storageLocation ?? null;
+  if (has('size')) row.size = p.size ?? null;
+  if (p.name !== undefined) row.name = p.name;
+  if (p.category !== undefined) row.category = p.category;
+  if (p.subcategory !== undefined) row.subcategory = p.subcategory;
+  if (p.color !== undefined) row.color = p.color;
+  if (p.hexColor !== undefined) row.hex_color = p.hexColor;
+  if (has('secondaryColors')) row.secondary_colors = p.secondaryColors?.length ? p.secondaryColors : null;
+  if (p.fabric !== undefined) row.fabric = p.fabric;
+  if (p.seasons !== undefined) row.seasons = p.seasons;
+  if (p.formality !== undefined) row.formality = p.formality;
+  if (has('brand')) row.brand = p.brand ?? null;
+  if (has('fit')) row.fit = p.fit ?? null;
+  if (has('style')) row.style = p.style ?? null;
+  if (p.tags !== undefined) row.tags = p.tags;
+  if (p.favorite !== undefined) row.favorite = p.favorite;
+  if (has('layeringRole')) row.layering_role = p.layeringRole ?? null;
+  if (p.availability !== undefined) row.availability = p.availability;
+  if (has('purchaseDate')) row.purchase_date = p.purchaseDate ?? null;
+  if (has('pattern')) row.pattern = p.pattern ?? null;
+  if (p.collections !== undefined) row.collections = p.collections;
+  if (patch.wearCount !== undefined) row.wear_count = patch.wearCount;
+  if (patch.lastWornDate !== undefined) row.last_worn_date = patch.lastWornDate;
+  return row;
+}
+
 export async function updateGarment(
   userId: string,
   profile: WardrobeProfile,
   id: string,
   patch: GarmentDetailsPatch & { wearCount?: number; lastWornDate?: string }
 ): Promise<void> {
-  const row: Record<string, unknown> = {};
-  if ('storageLocation' in patch) row.storage_location = normalizeStorageLocation(patch.storageLocation) ?? null;
-  if ('size' in patch) row.size = normalizeSize(patch.size) ?? null;
-  if (patch.wearCount !== undefined) row.wear_count = patch.wearCount;
-  if (patch.lastWornDate !== undefined) row.last_worn_date = patch.lastWornDate;
-  if (Object.keys(row).length === 0) return;
-  const { error } = await supabase
-    .from('garments')
-    .update(row)
-    .eq('user_id', userId)
-    .eq('garment_id', id)
-    .eq('wardrobe_profile', profile);
+  const fullRow = patchToRow(patch);
+  if (Object.keys(fullRow).length === 0) return;
+  let row = intelColumnsMissing ? withoutIntel(fullRow) : fullRow;
+  if (Object.keys(row).length === 0) throw new SchemaNotReadyError();
+  const run = (r: Record<string, unknown>) =>
+    supabase.from('garments').update(r).eq('user_id', userId).eq('garment_id', id).eq('wardrobe_profile', profile);
+  let { error } = await run(row);
+  if (error && isMissingColumnError(error)) {
+    intelColumnsMissing = true;
+    row = withoutIntel(row);
+    if (Object.keys(row).length === 0) throw new SchemaNotReadyError();
+    ({ error } = await run(row));
+  }
   if (error) throw error;
+}
+
+/**
+ * Wear tracking: +1 wear and today's date for every garment, atomically via
+ * the record_garments_worn RPC. When the RPC isn't deployed it falls back to
+ * per-row updates from the counts the caller already has.
+ */
+export async function recordGarmentsWorn(
+  userId: string,
+  profile: WardrobeProfile,
+  items: { id: string; wearCount: number }[],
+  wornOn: string
+): Promise<void> {
+  if (items.length === 0) return;
+  if (!wornRpcMissing) {
+    const { error } = await supabase.rpc('record_garments_worn', {
+      p_garment_ids: items.slice(0, 50).map((i) => i.id),
+      p_worn_on: wornOn
+    });
+    if (!error) return;
+    if (!isMissingFunctionError(error)) throw error;
+    wornRpcMissing = true;
+  }
+  await Promise.all(items.map((i) => updateGarment(userId, profile, i.id, { wearCount: i.wearCount, lastWornDate: wornOn })));
 }
 
 // ---------- saved looks ----------
@@ -407,17 +497,9 @@ export async function loadRecentSignatures(userId: string): Promise<string[]> {
 /** Notes that this combination was just shown (shared with mobile's outfit_history). */
 export async function recordShownOutfit(userId: string, garmentIds: string[]): Promise<void> {
   const signature = comboSignature(garmentIds);
-  const now = new Date().toISOString();
-  const { data, error } = await supabase
-    .from('outfit_history')
-    .select('id')
-    .eq('user_id', userId)
-    .eq('signature', signature)
-    .maybeSingle();
+  const { error } = await supabase.from('outfit_history').upsert(
+    { user_id: userId, signature, garment_ids: garmentIds, last_seen_at: new Date().toISOString() },
+    { onConflict: 'user_id,signature' }
+  );
   if (error) throw error;
-  const write = data
-    ? supabase.from('outfit_history').update({ last_seen_at: now, garment_ids: garmentIds }).eq('id', data.id)
-    : supabase.from('outfit_history').insert({ user_id: userId, signature, garment_ids: garmentIds, last_seen_at: now });
-  const { error: writeError } = await write;
-  if (writeError) throw writeError;
 }
