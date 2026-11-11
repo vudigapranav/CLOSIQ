@@ -51,10 +51,57 @@ export interface GarmentItem {
   /** Size as the user entered it — a preset from `src/data/garmentSizes.ts`
    *  (e.g. "M", "40", "UK 8", "Free size") or free text. */
   size?: string;
+  /** 'available' (default) | 'laundry' | 'unavailable' (lent out, needs repair…).
+   *  Every recommender skips pieces that aren't available. */
+  availability?: GarmentAvailability;
+  /** When the user bought it — 'YYYY-MM' or 'YYYY-MM-DD', user-entered only. */
+  purchaseDate?: string;
+  /** Visible pattern (Solid, Striped, Checked…) — suggested by the scan, confirmed by the user. */
+  pattern?: string;
+  /** User-named collections ("Office", "Goa trip"). */
+  collections?: string[];
+}
+
+export type GarmentAvailability = 'available' | 'laundry' | 'unavailable';
+
+export const AVAILABILITY_OPTIONS: { value: GarmentAvailability; label: string; description: string }[] = [
+  { value: 'available', label: 'Ready to wear', description: 'In the wardrobe' },
+  { value: 'laundry', label: 'In the laundry', description: 'Washing, ironing or with the dhobi' },
+  { value: 'unavailable', label: 'Unavailable', description: 'Lent out, being altered or repaired' }
+];
+
+/** Missing availability = available (rows saved before 2026-11-11). */
+export function isGarmentAvailable(item: Pick<GarmentItem, 'availability'>): boolean {
+  return !item.availability || item.availability === 'available';
 }
 
 /** The fields a user can edit on an item after it's saved. */
-export type GarmentDetailsPatch = Partial<Pick<GarmentItem, 'storageLocation' | 'size'>>;
+export type GarmentDetailsPatch = Partial<
+  Pick<
+    GarmentItem,
+    | 'storageLocation'
+    | 'size'
+    | 'name'
+    | 'category'
+    | 'subcategory'
+    | 'color'
+    | 'hexColor'
+    | 'secondaryColors'
+    | 'fabric'
+    | 'seasons'
+    | 'formality'
+    | 'brand'
+    | 'fit'
+    | 'style'
+    | 'tags'
+    | 'favorite'
+    | 'layeringRole'
+    | 'availability'
+    | 'purchaseDate'
+    | 'pattern'
+    | 'collections'
+  >
+>;
 
 export interface OutfitExplanation {
   summary: string;
@@ -71,7 +118,8 @@ export interface Outfit {
   vibe: string;
   /** Human-readable formality tier, e.g. "Smart Casual" — shown as the outfit's "Style" label. */
   formalityLabel: string;
-  temperature: number;
+  /** °C the outfit was planned for — only when real weather was known. */
+  temperature?: number;
   items: GarmentItem[];
   styleScore: number;
   explanation: OutfitExplanation;
@@ -86,6 +134,32 @@ export interface Outfit {
   /** Saved Looks only: 'try_later' = "I'll try this next time";
    *  'worn' = "I'm wearing / wore this". */
   status?: SavedLookStatus;
+  /** CLOSIQ's own explainable rule-based fit score (0–100) — computed by
+   *  src/services/intelligence/outfitEngine.ts for every outfit, AI or local. */
+  ruleScore?: number;
+  /** Per-factor breakdown behind `ruleScore` ("why this works"). */
+  scoreBreakdown?: OutfitScoreFactor[];
+}
+
+export type OutfitScoreFactorKey =
+  | 'formality'
+  | 'color'
+  | 'weather'
+  | 'season'
+  | 'style'
+  | 'feedback'
+  | 'rotation'
+  | 'completeness';
+
+export interface OutfitScoreFactor {
+  key: OutfitScoreFactorKey;
+  label: string;
+  /** 0–1: how well the outfit does on this factor. */
+  score: number;
+  /** Relative importance used in the total (0 = not considered, e.g. no weather data). */
+  weight: number;
+  /** One plain-English line on what drove the score. */
+  note: string;
 }
 
 export type SavedLookStatus = 'try_later' | 'worn';
@@ -93,9 +167,13 @@ export type SavedLookStatus = 'try_later' | 'worn';
 /** How the user rated a suggested outfit (stored per garment combination). */
 export type OutfitRating = 'dislike' | 'okay' | 'nice';
 
-/** "96% Match" only for an AI-scored outfit; never an invented number. */
-export function matchLabel(outfit: Pick<Outfit, 'source' | 'styleScore'>): string {
-  return outfit.source === 'local' || !outfit.styleScore ? 'Local pick' : `${outfit.styleScore}% Match`;
+/** "96% Match" only for an AI-scored outfit; a local pick says it is
+ *  rule-based and shows CLOSIQ's own explainable score — never an invented number. */
+export function matchLabel(outfit: Pick<Outfit, 'source' | 'styleScore' | 'ruleScore'>): string {
+  if (outfit.source === 'local' || !outfit.styleScore) {
+    return typeof outfit.ruleScore === 'number' ? `Rule-based · ${outfit.ruleScore}/100` : 'Rule-based pick';
+  }
+  return `AI · ${outfit.styleScore}% Match`;
 }
 
 export interface UserProfile {
