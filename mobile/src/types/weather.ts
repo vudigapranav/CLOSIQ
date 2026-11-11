@@ -1,3 +1,5 @@
+import type { DailyForecast } from '../../../src/services/weather/weatherCore';
+
 /**
  * Mobile-only weather model. Deliberately small (per M14 brief) and
  * deliberately NOT added to the shared web types file — the web app has no
@@ -17,6 +19,12 @@ export interface WeatherData {
   conditionCode?: number;
   humidity?: number;
   locationName?: string;
+  /** Today's high / low and rain chance (from the 7-day forecast). */
+  maxC?: number;
+  minC?: number;
+  precipitationProbability?: number;
+  /** 7-day forecast, when fetched (older caches won't have it). */
+  daily?: DailyForecast[];
   /** ISO timestamp of when this reading was fetched (not when it's displayed). */
   timestamp: string;
   source: WeatherSource;

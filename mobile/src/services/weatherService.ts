@@ -1,4 +1,5 @@
 import * as Location from 'expo-location';
+import { buildForecastUrl, parseForecast, DailyForecast, WeatherSnapshot } from '../../../src/services/weather/weatherCore';
 import { WeatherData, WeatherFetchResult, WeatherFetchStatus } from '../types/weather';
 import { loadCachedWeather, saveCachedWeather } from './weatherCacheStorage';
 
@@ -67,60 +68,45 @@ async function getCoords(): Promise<{ latitude: number; longitude: number }> {
   return { latitude: position.coords.latitude, longitude: position.coords.longitude };
 }
 
-/** WMO weather codes (used by Open-Meteo) collapsed into a small set of
- *  human-readable buckets — kept deliberately coarse per "keep the model
- *  small." The raw code is still stored on WeatherData.conditionCode for
- *  any future, more detailed mapping (e.g. icons) without a re-fetch. */
-function mapWeatherCode(code: number): string {
-  if (code === 0) return 'Clear';
-  if (code === 1) return 'Mostly Clear';
-  if (code === 2) return 'Partly Cloudy';
-  if (code === 3) return 'Overcast';
-  if (code === 45 || code === 48) return 'Fog';
-  if (code >= 51 && code <= 57) return 'Drizzle';
-  if (code >= 61 && code <= 67) return 'Rain';
-  if (code >= 71 && code <= 77) return 'Snow';
-  if (code >= 80 && code <= 82) return 'Rain Showers';
-  if (code === 85 || code === 86) return 'Snow Showers';
-  if (code >= 95) return 'Thunderstorm';
-  return 'Clear';
-}
-
-interface OpenMeteoCurrent {
-  temperature_2m: number;
-  apparent_temperature?: number;
-  relative_humidity_2m?: number;
-  weather_code: number;
-}
-
 async function fetchOpenMeteo(coords: { latitude: number; longitude: number }): Promise<{
   temperatureCelsius: number;
   feelsLikeCelsius?: number;
-  humidity?: number;
   condition: string;
   conditionCode: number;
+  maxC?: number;
+  minC?: number;
+  precipitationProbability?: number;
+  daily: DailyForecast[];
 }> {
-  const url =
-    `https://api.open-meteo.com/v1/forecast?latitude=${coords.latitude}&longitude=${coords.longitude}` +
-    `&current=temperature_2m,relative_humidity_2m,apparent_temperature,weather_code&timezone=auto`;
-
-  const response = await withTimeout(fetch(url), FETCH_TIMEOUT_MS);
+  const response = await withTimeout(fetch(buildForecastUrl(coords.latitude, coords.longitude)), FETCH_TIMEOUT_MS);
   if (!response.ok) {
     throw new Error(`Open-Meteo request failed: ${response.status}`);
   }
-
-  const json = await response.json();
-  const current: OpenMeteoCurrent | undefined = json?.current;
-  if (!current || typeof current.temperature_2m !== 'number' || typeof current.weather_code !== 'number') {
-    throw new Error('Malformed Open-Meteo response');
-  }
-
+  const bundle = parseForecast(await response.json());
+  const c = bundle.current;
   return {
-    temperatureCelsius: current.temperature_2m,
-    feelsLikeCelsius: typeof current.apparent_temperature === 'number' ? current.apparent_temperature : undefined,
-    humidity: typeof current.relative_humidity_2m === 'number' ? current.relative_humidity_2m : undefined,
-    condition: mapWeatherCode(current.weather_code),
-    conditionCode: current.weather_code
+    temperatureCelsius: c.temperatureC,
+    feelsLikeCelsius: c.feelsLikeC,
+    condition: c.condition,
+    conditionCode: c.conditionCode ?? -1,
+    maxC: c.maxC,
+    minC: c.minC,
+    precipitationProbability: c.precipitationProbability,
+    daily: bundle.daily
+  };
+}
+
+/** WeatherData -> the shared WeatherSnapshot the outfit engines take. */
+export function toWeatherSnapshot(data: WeatherData | null): WeatherSnapshot | null {
+  if (!data || !Number.isFinite(data.temperatureCelsius)) return null;
+  return {
+    temperatureC: data.temperatureCelsius,
+    feelsLikeC: data.feelsLikeCelsius,
+    precipitationProbability: data.precipitationProbability,
+    condition: data.condition,
+    conditionCode: data.conditionCode,
+    maxC: data.maxC,
+    minC: data.minC
   };
 }
 

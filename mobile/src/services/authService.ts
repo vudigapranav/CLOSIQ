@@ -138,6 +138,36 @@ export async function signUp(email: string, password: string): Promise<AuthResul
   });
 }
 
+/**
+ * Sends a password-reset email. The link opens the website, which handles
+ * the PASSWORD_RECOVERY event and shows a set-new-password screen. Success
+ * is generic: it never reveals whether the email has an account.
+ */
+export async function requestPasswordReset(email: string): Promise<AuthResult> {
+  const trimmedEmail = email.trim();
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
+    return { ok: false, session: null, kind: 'invalid_email', message: 'Enter a valid email address.' };
+  }
+  const configProblem = configFailure();
+  if (configProblem) return configProblem;
+
+  return attemptAuth(async () => {
+    const redirectTo = API_BASE_URL.startsWith('https://') ? `${API_BASE_URL}/` : undefined;
+    const { error } = await supabase.auth.resetPasswordForEmail(trimmedEmail, redirectTo ? { redirectTo } : undefined);
+    if (error) {
+      const { kind, message } = classifyAuthError(error);
+      // "User not found"-style errors must look like success.
+      if (kind === 'unknown' || kind === 'invalid_credentials') {
+        return { ok: true, session: null, message: RESET_SENT_MESSAGE };
+      }
+      return { ok: false, session: null, kind, message };
+    }
+    return { ok: true, session: null, message: RESET_SENT_MESSAGE };
+  });
+}
+
+const RESET_SENT_MESSAGE = 'If an account exists for that email, a reset link is on its way. Open it to set a new password.';
+
 export async function signOut(): Promise<{ ok: boolean; message?: string }> {
   try {
     const { error } = await supabase.auth.signOut();

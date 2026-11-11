@@ -48,6 +48,10 @@ export type Database = {
           secondary_colors: string[] | null
           source_profile: string | null
           storage_location: string | null
+          availability?: string
+          purchase_date?: string | null
+          pattern?: string | null
+          collections?: string[]
           storage_path: string | null
           style: string | null
           subcategory: string
@@ -82,6 +86,10 @@ export type Database = {
           secondary_colors?: string[] | null
           source_profile?: string | null
           storage_location?: string | null
+          availability?: string
+          purchase_date?: string | null
+          pattern?: string | null
+          collections?: string[]
           storage_path?: string | null
           style?: string | null
           subcategory?: string
@@ -116,6 +124,10 @@ export type Database = {
           secondary_colors?: string[] | null
           source_profile?: string | null
           storage_location?: string | null
+          availability?: string
+          purchase_date?: string | null
+          pattern?: string | null
+          collections?: string[]
           storage_path?: string | null
           style?: string | null
           subcategory?: string
@@ -360,7 +372,14 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      record_garments_worn: {
+        Args: { p_garment_ids: string[]; p_worn_on: string }
+        Returns: number
+      }
+      delete_my_account: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
+      }
     }
     Enums: {
       [_ in never]: never

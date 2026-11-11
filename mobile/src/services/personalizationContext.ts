@@ -49,6 +49,11 @@ export interface WeatherContext {
   unit: TemperatureUnit;
   condition: string;
   locationName?: string;
+  /** Real forecast details when the fetch had them (never filled in otherwise). */
+  feelsLikeCelsius?: number;
+  precipitationProbability?: number;
+  maxC?: number;
+  minC?: number;
 }
 
 /** Returns undefined — never a fabricated placeholder — when weather is
@@ -59,7 +64,11 @@ export function buildWeatherContext(weather: WeatherData | null, unit: Temperatu
     temperatureCelsius: weather.temperatureCelsius,
     unit,
     condition: weather.condition,
-    locationName: weather.locationName
+    locationName: weather.locationName,
+    feelsLikeCelsius: weather.feelsLikeCelsius,
+    precipitationProbability: weather.precipitationProbability,
+    maxC: weather.maxC,
+    minC: weather.minC
   };
 }
 

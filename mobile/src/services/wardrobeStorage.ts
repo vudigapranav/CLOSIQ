@@ -17,9 +17,21 @@ import {
   resolveStaticImageUrl,
   storageReferenceUrl
 } from './garmentImages';
-import type { Tables } from '../types/supabase';
+import type { Tables, TablesUpdate } from '../types/supabase';
 import { normalizeStorageLocation } from '../../../src/data/storageLocations';
 import { normalizeSize } from '../../../src/data/garmentSizes';
+import { normalizeGarmentPatch } from '../../../src/services/garmentEdit';
+import { isMissingColumnError, isMissingFunctionError } from '../../../src/services/cloud/schemaErrors';
+
+/** Remembered once PostgREST reports the 2026-11-11 columns/RPC don't exist yet. */
+let intelColumnsMissing = false;
+let wornRpcMissing = false;
+const INTEL_KEYS = ['availability', 'purchase_date', 'pattern', 'collections'];
+function withoutIntel(row: Record<string, unknown>): Record<string, unknown> {
+  const out = { ...row };
+  for (const k of INTEL_KEYS) delete out[k];
+  return out;
+}
 
 const BASE_STORAGE_KEYS: Record<WardrobeProfile, string> = {
   men: '@closiq_user_wardrobe_men',
@@ -86,7 +98,11 @@ function rowToGarment(row: Tables<'garments'>): GarmentItem {
     profile: (row.source_profile as WardrobeProfile) || undefined,
     isSeedItem: row.is_seed_item,
     storageLocation: row.storage_location || undefined,
-    size: row.size || undefined
+    size: row.size || undefined,
+    availability: row.availability === 'laundry' || row.availability === 'unavailable' ? row.availability : undefined,
+    purchaseDate: row.purchase_date || undefined,
+    pattern: row.pattern || undefined,
+    collections: row.collections && row.collections.length > 0 ? row.collections : undefined
   };
 }
 
@@ -252,7 +268,7 @@ export async function saveUserGarment(
     run: async (attempt) => {
       // A failed attempt may still have committed; never insert twice.
       if (attempt > 1 && (await garmentRowExists(userId, item.id, profile))) return;
-      const { error } = await supabase.from('garments').insert({
+      const baseRow = {
         user_id: userId,
         garment_id: item.id,
         wardrobe_profile: profile,
@@ -282,7 +298,18 @@ export async function saveUserGarment(
         is_seed_item: item.isSeedItem || false,
         storage_location: normalizeStorageLocation(item.storageLocation) ?? null,
         size: normalizeSize(item.size) ?? null
-      });
+      };
+      const intelRow = {
+        availability: item.availability ?? 'available',
+        purchase_date: item.purchaseDate ?? null,
+        pattern: item.pattern ?? null,
+        collections: item.collections ?? []
+      };
+      let { error } = await supabase.from('garments').insert(intelColumnsMissing ? baseRow : { ...baseRow, ...intelRow });
+      if (error && !intelColumnsMissing && isMissingColumnError(error)) {
+        intelColumnsMissing = true;
+        ({ error } = await supabase.from('garments').insert(baseRow));
+      }
       if (error) throw error;
     }
   });
@@ -370,8 +397,8 @@ export async function removeUserGarment(
 }
 
 /**
- * Edits the user-editable details of a saved garment (size, where it's
- * kept). Optimistic like the other mutations: the cache updates first; if
+ * Edits the user-editable details of a saved garment (name, colour,
+ * availability, collections, size, where it's kept…). Optimistic like the other mutations: the cache updates first; if
  * the cloud write fails the cache is rolled back, so the app never shows a
  * value the account doesn't have.
  */
@@ -382,16 +409,32 @@ export async function updateUserGarmentDetails(
 ): Promise<GarmentItem[]> {
   const scope = captureSession();
   const userId = scope.userId;
-  const clean: GarmentDetailsPatch = {};
-  const row: { storage_location?: string | null; size?: string | null } = {};
-  if ('storageLocation' in patch) {
-    clean.storageLocation = normalizeStorageLocation(patch.storageLocation);
-    row.storage_location = clean.storageLocation ?? null;
-  }
-  if ('size' in patch) {
-    clean.size = normalizeSize(patch.size);
-    row.size = clean.size ?? null;
-  }
+  const { patch: clean, errors } = normalizeGarmentPatch(patch);
+  if (Object.keys(errors).length > 0) console.warn('Ignoring invalid garment fields:', Object.keys(errors));
+  const has = (k: string) => Object.prototype.hasOwnProperty.call(clean, k);
+  const row: Record<string, unknown> = {};
+  if (has('storageLocation')) row.storage_location = clean.storageLocation ?? null;
+  if (has('size')) row.size = clean.size ?? null;
+  if (clean.name !== undefined) row.name = clean.name;
+  if (clean.category !== undefined) row.category = clean.category;
+  if (clean.subcategory !== undefined) row.subcategory = clean.subcategory;
+  if (clean.color !== undefined) row.color = clean.color;
+  if (clean.hexColor !== undefined) row.hex_color = clean.hexColor;
+  if (has('secondaryColors')) row.secondary_colors = clean.secondaryColors?.length ? clean.secondaryColors : null;
+  if (clean.fabric !== undefined) row.fabric = clean.fabric;
+  if (clean.seasons !== undefined) row.seasons = clean.seasons;
+  if (clean.formality !== undefined) row.formality = clean.formality;
+  if (has('brand')) row.brand = clean.brand ?? null;
+  if (has('fit')) row.fit = clean.fit ?? null;
+  if (has('style')) row.style = clean.style ?? null;
+  if (clean.tags !== undefined) row.tags = clean.tags;
+  if (clean.favorite !== undefined) row.favorite = clean.favorite;
+  if (has('layeringRole')) row.layering_role = clean.layeringRole ?? null;
+  if (clean.availability !== undefined) row.availability = clean.availability;
+  if (has('purchaseDate')) row.purchase_date = clean.purchaseDate ?? null;
+  if (has('pattern')) row.pattern = clean.pattern ?? null;
+  if (clean.collections !== undefined) row.collections = clean.collections;
+  if (Object.keys(row).length === 0) return loadCachedWardrobe(scope, profile);
 
   const existingCache = await loadCachedWardrobe(scope, profile);
   const updated = existingCache.map((item) => (item.id === id ? { ...item, ...clean } : item));
@@ -404,12 +447,21 @@ export async function updateUserGarmentDetails(
     title: 'Change not saved',
     message: "We couldn't save this change to your account. Try again in a moment.",
     run: async () => {
-      const { error } = await supabase
-        .from('garments')
-        .update(row)
-        .eq('user_id', userId)
-        .eq('garment_id', id)
-        .eq('wardrobe_profile', profile);
+      const write = (r: Record<string, unknown>) =>
+        supabase.from('garments').update(r as TablesUpdate<'garments'>).eq('user_id', userId).eq('garment_id', id).eq('wardrobe_profile', profile);
+      if (Object.keys(row).length === 0) return;
+      let payload = intelColumnsMissing ? withoutIntel(row) : row;
+      // Only not-yet-deployed fields changed: nothing can be saved, so fail
+      // (the change is rolled back and "Change not saved" is shown) rather
+      // than pretend it stuck.
+      if (Object.keys(payload).length === 0) throw new Error('schema_not_ready');
+      let { error } = await write(payload);
+      if (error && isMissingColumnError(error)) {
+        intelColumnsMissing = true;
+        payload = withoutIntel(row);
+        if (Object.keys(payload).length === 0) throw new Error('schema_not_ready');
+        ({ error } = await write(payload));
+      }
       if (error) throw error;
     }
   });
@@ -439,10 +491,22 @@ export async function recordGarmentsWorn(ids: string[], profile: WardrobeProfile
   await AsyncStorage.setItem(storageKey(scope, profile), JSON.stringify(updated));
   if (!userId || !isSessionCurrent(scope)) return updated;
 
-  await Promise.all(
-    updated
-      .filter((item) => worn.has(item.id))
-      .map(async (item) => {
+  const wornItems = updated.filter((item) => worn.has(item.id));
+  let viaRpc = false;
+  if (!wornRpcMissing && wornItems.length > 0) {
+    const { error } = await supabase.rpc('record_garments_worn', {
+      p_garment_ids: wornItems.slice(0, 50).map((i) => i.id),
+      p_worn_on: today
+    });
+    if (!error) viaRpc = true;
+    else if (isMissingFunctionError(error)) wornRpcMissing = true;
+    else console.warn('Wear count RPC failed; falling back to per-row updates:', error);
+  }
+  // Any RPC failure (not deployed, RLS, network blip) falls back to per-row
+  // updates so a wear is never silently lost.
+  if (!viaRpc && wornItems.length > 0) {
+    await Promise.all(
+      wornItems.map(async (item) => {
         const { error } = await supabase
           .from('garments')
           .update({ wear_count: item.wearCount, last_worn_date: today })
@@ -451,6 +515,7 @@ export async function recordGarmentsWorn(ids: string[], profile: WardrobeProfile
           .eq('wardrobe_profile', profile);
         if (error) console.warn('Wear count not saved to the cloud for', item.id, error);
       })
-  );
+    );
+  }
   return isSessionCurrent(scope) ? updated : [];
 }
