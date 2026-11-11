@@ -1,5 +1,5 @@
 import { GarmentItem, LayeringPreference, Outfit, OutfitRating } from '../types/wardrobe';
-import { generateAIOutfit } from './aiStylist';
+import { OutfitContext, buildEngineOutfit, rankOutfits } from './intelligence/outfitEngine';
 
 /**
  * The outfit "brain" (2026-10-14) — shared by the web app and the mobile app.
@@ -112,39 +112,28 @@ export function brainContextForAI(brain: OutfitBrain): BrainAIContext {
 }
 
 /**
- * The local (no-AI) stylist, made brain-aware: tries the occasion-ranked
- * combinations from generateAIOutfit, never returns a disliked one, prefers
- * one not shown recently or rated "okay", and leans toward pieces from liked
- * looks. Returns null only when every combination it can make is disliked.
+ * The local (no-AI) stylist, made brain-aware: ranks complete outfits with
+ * the explainable rule-based engine (src/services/intelligence/outfitEngine.ts),
+ * never returns a disliked combination, prefers one not shown recently or
+ * rated "okay", and leans toward pieces from liked looks. Laundry /
+ * unavailable pieces are never used. Returns null only when nothing can be
+ * built (every combination disliked, or no usable pieces).
  */
 export function pickLocalOutfit(
   wardrobe: GarmentItem[],
-  request: { prompt: string; layeringPreference?: LayeringPreference },
+  request: { prompt: string; layeringPreference?: LayeringPreference } & Pick<OutfitContext, 'weather' | 'stylePreferences' | 'excludeGarmentIds' | 'today'>,
   brain?: OutfitBrain,
   maxTries = 24
 ): Outfit | null {
-  const seen = new Set<string>();
-  let best: { outfit: Outfit; score: number } | null = null;
-
-  for (let seed = 0; seed < maxTries; seed += 1) {
-    const outfit = generateAIOutfit(wardrobe, { prompt: request.prompt, layeringPreference: request.layeringPreference }, seed);
-    const ids = outfit.items.map((i) => i.id);
-    if (ids.length === 0) continue;
-    const sig = comboSignature(ids);
-    if (seen.has(sig)) continue;
-    seen.add(sig);
-    if (brain?.disliked.has(sig)) continue;
-
-    let score = -seed * 0.01; // earlier seeds fit the occasion better
-    if (brain) {
-      const recentIndex = brain.recent.indexOf(sig);
-      if (recentIndex !== -1) score -= 10 - recentIndex;
-      if (brain.okay.has(sig)) score -= 3;
-      score += ids.filter((id) => brain.likedGarmentIds.has(id)).length * 0.5;
-    }
-    if (!best || score > best.score) best = { outfit, score };
-  }
-  return best?.outfit ?? null;
+  const ctx: OutfitContext = { ...request, brain };
+  const ranked = rankOutfits(wardrobe, ctx, maxTries);
+  if (ranked.length === 0) return null;
+  const sigOf = (items: GarmentItem[]) => comboSignature(items.map((i) => i.id));
+  const pick =
+    ranked.find((r) => isFreshCombination(r.items.map((i) => i.id), brain) && !brain?.okay.has(sigOf(r.items))) ??
+    ranked.find((r) => isFreshCombination(r.items.map((i) => i.id), brain)) ??
+    ranked[0];
+  return buildEngineOutfit(pick, ctx);
 }
 
 /** Garments from looks the user liked or wore — Style DNA's "taste" input. */

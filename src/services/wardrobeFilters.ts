@@ -18,7 +18,7 @@ import { COLOR_FAMILIES, ColorFamily, colorFamiliesOf, hexToHsl } from './wardro
 
 export type FacetKey =
   | 'color' | 'type' | 'occasion' | 'place' | 'size' | 'season' | 'fit'
-  | 'style' | 'fabric' | 'layer' | 'wear' | 'favorite';
+  | 'style' | 'fabric' | 'layer' | 'wear' | 'favorite' | 'status' | 'collection';
 
 /** Selected option values per facet; a missing/empty facet = no filter. */
 export type WardrobeFilterState = Partial<Record<FacetKey, string[]>>;
@@ -118,6 +118,8 @@ function valuesOf(i: GarmentItem, facet: FacetKey, now: number): string[] {
     case 'layer': return i.layeringRole ? [i.layeringRole] : [];
     case 'wear': return wearBuckets(i, now);
     case 'favorite': return i.favorite ? ['favorite'] : [];
+    case 'status': return [i.availability || 'available'];
+    case 'collection': return (i.collections || []).map((c) => c.trim()).filter(Boolean);
   }
 }
 
@@ -137,7 +139,9 @@ const FACETS: { key: FacetKey; title: string; shortTitle: string; hint?: string 
   { key: 'fabric', title: 'Fabric', shortTitle: 'Fabric' },
   { key: 'layer', title: 'Layering', shortTitle: 'Layering', hint: 'Where it sits in a layered outfit.' },
   { key: 'wear', title: 'Wear history', shortTitle: 'Wear history', hint: 'Rediscover pieces you have been forgetting.' },
-  { key: 'favorite', title: 'Favourites', shortTitle: 'Favourites' }
+  { key: 'favorite', title: 'Favourites', shortTitle: 'Favourites' },
+  { key: 'status', title: 'Availability', shortTitle: 'Availability', hint: 'Ready to wear, in the laundry, or unavailable.' },
+  { key: 'collection', title: 'Collections', shortTitle: 'Collection' }
 ];
 
 function optionOrder(facet: FacetKey, items: GarmentItem[]): { value: string; label: string; hex?: string }[] | null {
@@ -149,6 +153,11 @@ function optionOrder(facet: FacetKey, items: GarmentItem[]): { value: string; la
     case 'fabric': return FABRIC_FAMILIES;
     case 'wear': return WEAR;
     case 'favorite': return [{ value: 'favorite', label: 'Favourites only' }];
+    case 'status': return [
+      { value: 'available', label: 'Ready to wear' },
+      { value: 'laundry', label: 'In the laundry' },
+      { value: 'unavailable', label: 'Unavailable' }
+    ];
     case 'size': {
       // Size presets in their natural order (XS → 3XL, UK 3 → UK 12), then custom sizes.
       const cats = [...new Set(items.map((i) => i.category))];

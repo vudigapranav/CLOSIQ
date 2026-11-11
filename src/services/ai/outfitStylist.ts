@@ -1,8 +1,11 @@
 import { postJsonToApi } from './geminiClient';
 import { validateAIOutfitResponse, RawAIOutfitResponse } from './validator';
-import { GarmentItem, Outfit, LayeringPreference, GarmentCategory, FormalityLevel } from '../../types/wardrobe';
+import { GarmentItem, Outfit, LayeringPreference, GarmentCategory, FormalityLevel, isGarmentAvailable } from '../../types/wardrobe';
 import { generateAIOutfit as demoGenerateAIOutfit } from '../aiStylist';
 import { OutfitBrain, brainContextForAI, isFreshCombination, pickLocalOutfit } from '../outfitBrain';
+import { FORMALITY_LABEL, resolveTargetFormality } from '../intelligence/garmentTraits';
+import { OutfitContext, explainScore, isCoherentAIOutfit, rankSwapCandidates, scoreOutfit } from '../intelligence/outfitEngine';
+import { WeatherSnapshot } from '../weather/weatherCore';
 
 export interface OutfitRequestOptions {
   prompt: string;
@@ -11,7 +14,37 @@ export interface OutfitRequestOptions {
   excludeGarmentIds?: string[];
   /** The outfit brain (src/services/outfitBrain.ts): dislikes, recent looks, taste. */
   brain?: OutfitBrain;
+  /** Real weather only (src/services/weather/webWeather.ts) — omit when unknown. */
+  weather?: WeatherSnapshot | null;
+  /** Onboarding style ids (profiles.style_preferences). */
+  stylePreferences?: string[];
 }
+
+function engineContext(options: OutfitRequestOptions): OutfitContext {
+  return {
+    prompt: options.prompt,
+    layeringPreference: options.layeringPreference,
+    weather: options.weather ?? null,
+    stylePreferences: options.stylePreferences,
+    brain: options.brain,
+    excludeGarmentIds: options.excludeGarmentIds
+  };
+}
+
+/** What the server prompt gets for weather — honest "unknown" when absent. */
+function weatherContextFor(weather: WeatherSnapshot | null | undefined) {
+  if (!weather) return undefined;
+  return {
+    temperatureC: Math.round(weather.temperatureC),
+    feelsLikeC: weather.feelsLikeC !== undefined ? Math.round(weather.feelsLikeC) : undefined,
+    condition: weather.condition,
+    precipitationProbability: weather.precipitationProbability,
+    maxC: weather.maxC,
+    minC: weather.minC
+  };
+}
+
+export { isCoherentAIOutfit };
 
 /** Formats structured wardrobe context for AI styling */
 function formatWardrobeContext(wardrobe: GarmentItem[]) {
@@ -105,24 +138,35 @@ export async function generateAIOutfitWithGemini(
   // Brain-aware: never a disliked combination, avoids recently shown ones.
   // (Only when every possible combination is disliked does it fall back to
   // the plain occasion pick, so the screen is never left empty.)
-  const localPick = () => {
-    const pool = (options.excludeGarmentIds || []).length > 0
-      ? wardrobe.filter((item) => !options.excludeGarmentIds!.includes(item.id))
-      : wardrobe;
+  // Laundry / unavailable pieces are never offered to the AI or the engine.
+  const available = wardrobe.filter(isGarmentAvailable);
+  const ctx = engineContext(options);
+
+  // Rule-based picks are labelled as such: source 'local', styleScore 0, and
+  // the engine's own explainable ruleScore. Brain-aware: never a disliked
+  // combination, avoids recently shown ones. Only when every combination is
+  // disliked does it fall back to the plain ranked pick, so the screen is
+  // never left empty.
+  const localPick = (): Outfit => {
     const picked =
-      pickLocalOutfit(pool.length >= 2 ? pool : wardrobe, options, options.brain) ??
-      demoGenerateAIOutfit(wardrobe, options, seed);
+      pickLocalOutfit(available, ctx, options.brain) ??
+      demoGenerateAIOutfit(available, { prompt: options.prompt, layeringPreference: options.layeringPreference }, seed, {
+        weather: ctx.weather,
+        stylePreferences: ctx.stylePreferences
+      });
     return { ...picked, source: 'local' as const, styleScore: 0 };
   };
 
-  if (wardrobe.length === 0) {
+  if (available.length === 0) {
     return localPick();
   }
 
-  const wardrobeContext = formatWardrobeContext(wardrobe);
-  const wardrobeSummary = summarizeWardrobeCoverage(wardrobe);
+  const wardrobeContext = formatWardrobeContext(available);
+  const wardrobeSummary = summarizeWardrobeCoverage(available);
 
   const res = await postJsonToApi<RawAIOutfitResponse>('/api/ai/generate-outfit', {
+    weatherContext: weatherContextFor(options.weather),
+    stylePreferences: options.stylePreferences,
     prompt: options.prompt,
     layeringPreference: options.layeringPreference || 'avoid',
     excludeGarmentIds: options.excludeGarmentIds || [],
@@ -143,7 +187,14 @@ export async function generateAIOutfitWithGemini(
   }
 
   // Pass raw AI response through strict validation layer on client
-  const validated = validateAIOutfitResponse(res.data, wardrobe);
+  const validated = validateAIOutfitResponse(res.data, available);
+
+  if (validated.valid && (validated.droppedIds > 0 || !isCoherentAIOutfit(validated.items, options.excludeGarmentIds))) {
+    // The model invented a piece, used an excluded one, or built an
+    // unwearable look — don't show a silently "repaired" outfit as AI.
+    console.warn('[CLOSIQ Stylist] AI outfit rejected (invented/excluded/incoherent pieces); using the rule-based stylist.');
+    return localPick();
+  }
 
   if (validated.valid && !isFreshCombination(validated.items.map((i) => i.id), options.brain)) {
     // The AI repeated a disliked or just-shown look: the brain overrides it.
@@ -155,21 +206,25 @@ export async function generateAIOutfitWithGemini(
     return localPick();
   }
 
+  const score = scoreOutfit(validated.items, ctx);
+  const target = resolveTargetFormality(options.prompt);
   return {
     id: `outfit_gemini_${Date.now()}_${seed}`,
     title: validated.outfitName,
     occasion: options.prompt,
     vibe: validated.vibe,
-    formalityLabel: validated.vibe,
-    temperature: 20,
+    formalityLabel: FORMALITY_LABEL[target],
+    temperature: options.weather ? Math.round(options.weather.temperatureC) : undefined,
     items: validated.items,
     styleScore: validated.styleMatch,
+    ruleScore: score.total,
+    scoreBreakdown: score.factors,
     explanation: {
       summary: validated.whyItWorks.overall,
       colorHarmony: validated.whyItWorks.color,
       silhouette: validated.whyItWorks.fit,
-      weatherSuitability: validated.whyItWorks.occasion,
-      versatilityNote: 'Selected from your personal wardrobe.'
+      weatherSuitability: explainScore(score).weatherSuitability,
+      versatilityNote: validated.whyItWorks.occasion
     },
     saved: false,
     dateCreated: new Date().toISOString().split('T')[0],
@@ -188,53 +243,50 @@ export async function swapGarmentWithGemini(
   options: OutfitRequestOptions
 ): Promise<Outfit> {
   const targetItem = wardrobe.find((i) => i.id === targetGarmentId);
-  if (!targetItem || wardrobe.length <= 1) {
+  const available = wardrobe.filter(isGarmentAvailable);
+  if (!targetItem || available.length === 0) {
     return currentOutfit;
   }
-
-  const wardrobeContext = formatWardrobeContext(wardrobe);
+  const ctx = engineContext(options);
   const currentItemIds = currentOutfit.items.map((i) => i.id);
+
+  // Every swap — AI or rule-based — is re-scored; an AI match % described the
+  // original pieces, so it is dropped (styleScore 0) instead of kept stale.
+  const commit = (replacement: GarmentItem, summary?: string, title?: string, viaAI = false): Outfit => {
+    const items = currentOutfit.items.map((i) => (i.id === targetGarmentId ? replacement : i));
+    const score = scoreOutfit(items, ctx);
+    const explanation = explainScore(score);
+    return {
+      ...currentOutfit,
+      title: title || currentOutfit.title,
+      items,
+      styleScore: 0,
+      ruleScore: score.total,
+      scoreBreakdown: score.factors,
+      source: viaAI ? currentOutfit.source : 'local',
+      explanation: { ...currentOutfit.explanation, ...explanation, summary: summary || explanation.summary }
+    };
+  };
+  const ruleBased = (): Outfit => {
+    const best = rankSwapCandidates(currentOutfit, targetItem.category, available, ctx)[0];
+    return best ? commit(best) : currentOutfit;
+  };
 
   const res = await postJsonToApi<any>('/api/ai/swap-garment', {
     prompt: options.prompt,
     currentOutfitGarmentIds: currentItemIds,
     targetGarmentIdToSwap: targetGarmentId,
     targetCategory: targetItem.category,
-    wardrobe: wardrobeContext
+    wardrobe: formatWardrobeContext(available)
   });
 
-  if (!res.ok || !res.data || !res.data.replacementGarmentId) {
-    const candidates = wardrobe.filter(
-      (i) => i.category === targetItem.category && i.id !== targetGarmentId
-    );
-    if (candidates.length === 0) return currentOutfit;
-    const replacement = candidates[Math.floor(Math.random() * candidates.length)];
-    const newItems = currentOutfit.items.map((i) => (i.id === targetGarmentId ? replacement : i));
-    return { ...currentOutfit, items: newItems };
-  }
+  const replacementId = res.ok ? res.data?.replacementGarmentId : undefined;
+  const replacementItem = available.find(
+    (i) => i.id === replacementId && i.category === targetItem.category && !currentItemIds.includes(i.id)
+  );
+  if (!replacementItem) return ruleBased();
 
-  const replacementId = res.data.replacementGarmentId;
-  const replacementItem = wardrobe.find((i) => i.id === replacementId && i.id !== targetGarmentId);
-
-  if (!replacementItem) {
-    const candidates = wardrobe.filter(
-      (i) => i.category === targetItem.category && i.id !== targetGarmentId
-    );
-    if (candidates.length === 0) return currentOutfit;
-    const fallbackRep = candidates[Math.floor(Math.random() * candidates.length)];
-    const newItems = currentOutfit.items.map((i) => (i.id === targetGarmentId ? fallbackRep : i));
-    return { ...currentOutfit, items: newItems };
-  }
-
-  const newItems = currentOutfit.items.map((i) => (i.id === targetGarmentId ? replacementItem : i));
-
-  return {
-    ...currentOutfit,
-    title: res.data.outfitName || currentOutfit.title,
-    items: newItems,
-    explanation: {
-      ...currentOutfit.explanation,
-      summary: res.data.whyItWorks || currentOutfit.explanation.summary
-    }
-  };
+  const whyItWorks = typeof res.data.whyItWorks === 'string' ? res.data.whyItWorks.slice(0, 400) : undefined;
+  const outfitName = typeof res.data.outfitName === 'string' ? res.data.outfitName.slice(0, 80) : undefined;
+  return commit(replacementItem, whyItWorks, outfitName, true);
 }

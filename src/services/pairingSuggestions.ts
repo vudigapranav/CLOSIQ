@@ -1,4 +1,12 @@
-import { FormalityLevel, GarmentCategory, GarmentItem, LayeringPreference } from '../types/wardrobe';
+import { GarmentCategory, GarmentItem, LayeringPreference, isGarmentAvailable } from '../types/wardrobe';
+import {
+  ETHNIC_ONLY_BOTTOM,
+  colorHarmony,
+  formalityGap as formalityGapShared,
+  garmentText,
+  isEthnic,
+  isOnePiece
+} from './intelligence/garmentTraits';
 import { OutfitBrain } from './outfitBrain';
 
 /**
@@ -50,79 +58,10 @@ const PAIRS_WITH: Record<GarmentCategory, GarmentCategory[]> = {
   accessories: ['tops', 'bottoms']
 };
 
-const text = (i: GarmentItem) => `${i.name} ${i.subcategory} ${i.style ?? ''} ${i.tags.join(' ')}`.toLowerCase();
-
-/** Dresses, sarees, jumpsuits… worn on their own, so they never need (or get) a bottom. */
-const ONE_PIECE = /\b(dress|gown|jumpsuit|romper|playsuit|saree|sari)\b/;
-export const isOnePiece = (i: GarmentItem) => i.category === 'tops' && ONE_PIECE.test(text(i));
-
-const ETHNIC = /(kurta|kurti|saree|sari\b|lehenga|sherwani|dupatta|salwar|churidar|dhoti|anarkali|bandhgala|nehru|jutti|mojari|kolhapuri|pathani|ethnic|chikankari|patiala)/;
-/** Bottoms that only really work under ethnic tops. */
-const ETHNIC_ONLY_BOTTOM = /(salwar|churidar|dhoti|patiala|lehenga)/;
-const isEthnic = (i: GarmentItem) => ETHNIC.test(text(i));
-
-const FORMALITY_ORDER: FormalityLevel[] = ['casual', 'smart_casual', 'formal', 'evening'];
-const formalityGap = (a: FormalityLevel, b: FormalityLevel) =>
-  Math.abs(FORMALITY_ORDER.indexOf(a) - FORMALITY_ORDER.indexOf(b));
-
-// ---------- colour ----------
-
-const NEUTRAL_NAME = /(black|white|grey|gray|charcoal|navy|beige|cream|ivory|khaki|tan\b|camel|denim|indigo|olive|brown|taupe|stone|off[- ]?white|nude|chambray|sand|ecru)/;
-
-interface Hsl { h: number; s: number; l: number }
-
-function hexToHsl(hex: string | undefined): Hsl | null {
-  if (!hex) return null;
-  let h = hex.trim().replace('#', '');
-  if (h.length === 3) h = h.split('').map((c) => c + c).join('');
-  if (!/^[0-9a-f]{6}$/i.test(h)) return null;
-  const r = parseInt(h.slice(0, 2), 16) / 255;
-  const g = parseInt(h.slice(2, 4), 16) / 255;
-  const b = parseInt(h.slice(4, 6), 16) / 255;
-  const max = Math.max(r, g, b);
-  const min = Math.min(r, g, b);
-  const l = (max + min) / 2;
-  if (max === min) return { h: 0, s: 0, l };
-  const d = max - min;
-  const s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
-  let hue = max === r ? (g - b) / d + (g < b ? 6 : 0) : max === g ? (b - r) / d + 2 : (r - g) / d + 4;
-  hue *= 60;
-  return { h: hue, s, l };
-}
-
-function isNeutral(i: GarmentItem, hsl: Hsl | null): boolean {
-  if (NEUTRAL_NAME.test(i.color.toLowerCase())) return true;
-  if (!hsl) return false;
-  return hsl.s < 0.18 || hsl.l > 0.9 || hsl.l < 0.12;
-}
-
-const colorName = (i: GarmentItem) => i.color.trim().toLowerCase() || 'this';
-const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
-
-function colorScore(a: GarmentItem, b: GarmentItem): { score: number; reason?: string } {
-  const ha = hexToHsl(a.hexColor);
-  const hb = hexToHsl(b.hexColor);
-  const na = isNeutral(a, ha);
-  const nb = isNeutral(b, hb);
-  const sameName = colorName(a) === colorName(b);
-  const contrast = ha && hb ? Math.abs(ha.l - hb.l) : 0;
-
-  if (na && nb) {
-    if (contrast > 0.25) return { score: 2.5, reason: `${cap(colorName(b))} and ${colorName(a)} — clean contrast` };
-    return { score: 1.5, reason: sameName ? `Tonal ${colorName(a)} look` : 'Easy neutral pairing' };
-  }
-  if (na !== nb) {
-    const [neutral, colour] = na ? [a, b] : [b, a];
-    return { score: 2, reason: `${cap(colorName(neutral))} lets the ${colorName(colour)} stand out` };
-  }
-  // Two colours.
-  if (sameName) return { score: -0.5 };
-  if (!ha || !hb) return { score: 0 };
-  const diff = Math.min(Math.abs(ha.h - hb.h), 360 - Math.abs(ha.h - hb.h));
-  if (diff < 30) return { score: 0.5, reason: 'Same colour family' };
-  if (diff > 150) return { score: 0.5, reason: 'Bold complementary colours' };
-  return { score: -1.5 };
-}
+const text = garmentText;
+export { isOnePiece };
+const formalityGap = formalityGapShared;
+const colorScore = colorHarmony;
 
 // ---------- scoring ----------
 
@@ -189,7 +128,8 @@ function candidatePool(
   wardrobe: GarmentItem[],
   layeringPreference: LayeringPreference
 ): GarmentItem[] {
-  let pool = wardrobe.filter((g) => g.id !== item.id && g.category === category);
+  // Pieces in the laundry / lent out are never suggested.
+  let pool = wardrobe.filter((g) => g.id !== item.id && g.category === category && isGarmentAvailable(g));
   if (category === 'bottoms') pool = pool.filter((g) => !isOnePiece(g));
   if (category === 'tops') {
     // A one-piece already is the outfit; suggest it only for shoes/outerwear.

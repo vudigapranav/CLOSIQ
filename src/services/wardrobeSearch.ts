@@ -218,6 +218,8 @@ const OTHER_CONCEPTS: { words: string[]; label: string; test: (i: GarmentItem) =
   { words: ['light', 'pale', 'pastel'], label: 'Light shades', test: isLight },
   { words: ['dark', 'deep'], label: 'Dark shades', test: isDark },
   { words: ['favorite', 'favorites', 'favourite', 'favourites', 'fav', 'favs', 'loved'], label: 'Favourites', test: (i) => i.favorite },
+  { words: ['laundry', 'dhobi', 'washing', 'unironed'], label: 'In the laundry', test: (i) => i.availability === 'laundry' },
+  { words: ['unavailable', 'lent', 'repair', 'altered'], label: 'Unavailable', test: (i) => i.availability === 'unavailable' },
   { words: ['unworn', 'never_worn'], label: 'Never worn', test: (i) => (i.wearCount || 0) === 0 }
 ];
 
@@ -308,7 +310,7 @@ function haystack(i: GarmentItem): string {
   return [
     i.name, i.subcategory, i.color, ...(i.secondaryColors || []), i.fabric, i.brand, i.fit, i.style,
     ...(i.tags || []), i.storageLocation, i.size, FORMALITY_LABEL[i.formality], CATEGORY_LABEL[i.category],
-    ...(i.seasons || []), i.layeringRole?.replace('_', ' ')
+    ...(i.seasons || []), i.layeringRole?.replace('_', ' '), i.pattern, ...(i.collections || [])
   ].filter(Boolean).join(' ').toLowerCase();
 }
 
