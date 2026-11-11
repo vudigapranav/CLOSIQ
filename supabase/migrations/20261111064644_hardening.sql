@@ -1,12 +1,12 @@
 -- ============================================================
 -- CLOSIQ — Hardening (2026-11-11)
--- ADDITIVE and idempotent. Not applied automatically.
+-- ADDITIVE and idempotent.
 -- ============================================================
 
 -- outfit_feedback: enforce RLS even for the table owner.
 alter table public.outfit_feedback force row level security;
 
--- record_garments_worn: same as 20261111120000 plus a batch-size cap.
+-- record_garments_worn: same as 20261111054834_wardrobe_intelligence plus a batch-size cap.
 create or replace function public.record_garments_worn(p_garment_ids text[], p_worn_on text)
 returns integer
 language sql
