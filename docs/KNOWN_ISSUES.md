@@ -4,7 +4,7 @@ Last updated: 2026-11-11. Ordered by impact.
 
 ## Needs the project owner (cannot be done by code alone)
 
-1. **2026-11-11 migrations not applied to production Supabase** — `20261111120000_wardrobe_intelligence.sql` and `20261111130000_hardening.sql` are additive and idempotent. Until applied: laundry status, purchase date, pattern, collections, AI-photo-consent and weather-city are saved on the device only (cloud writes fall back to the old columns), wear counts use the old per-row update, and **account deletion shows "not enabled" and deletes nothing**. Apply with `supabase db push` or the SQL editor.
+1. **Migrations are applied to production (2026-11-11)** — `20261111054834_wardrobe_intelligence` and `20261111064644_hardening` are live on project `wibinjtekmadwtbxygrd`. Laundry status, purchase info, pattern, collections, AI-photo consent, weather city, atomic wear counts and account deletion now persist. Still to do in the Supabase dashboard: turn on **Auth → Leaked password protection** (security advisor warning).
 2. **Supabase Auth redirect URLs** — password-reset emails (web and the new mobile "Forgot password?") link to `https://closiq-liard.vercel.app/`; that URL must be in Auth → URL configuration (Site URL + redirect allow-list), and custom SMTP is needed for non-team recipients.
 3. **Not deployed** — none of the 2026-11-11 work is on Vercel or in an OTA update/APK yet. Web: `vercel deploy --prod`. Phone: `eas update --channel preview` (JS only) — no native change was made, runtime stays 1.0.0.
 4. **No device verification** — the Android APK has been built in the past but the 2026-11-11 changes have only been verified by type checks, unit tests and an Android JS bundle export. Install on a phone before release.

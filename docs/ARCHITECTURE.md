@@ -47,7 +47,7 @@ Platform-specific code stays thin: web `src/services/cloud/*`, `src/services/ai/
 
 Migrations: `supabase/migrations/` (timestamped, replayable). Tables, all with RLS enabled and owner-only policies scoped to `authenticated`:
 
-* `profiles` (1:1 auth user) — name, style_preferences[], temperature unit, onboarding flags, `ai_photo_consent`, `weather_city` (the last two are in `20261111120000_wardrobe_intelligence.sql`).
+* `profiles` (1:1 auth user) — name, style_preferences[], temperature unit, onboarding flags, `ai_photo_consent`, `weather_city` (the last two are in `20261111054834_wardrobe_intelligence.sql`).
 * `user_preferences` — wardrobe profile (men/women), layering preference.
 * `garments` — one row per piece; `garment_id` is the stable client id; image in Storage bucket `garment-images/<uid>/…` (private, 5 MB, mime allowlist, folder = `auth.uid()`).
 * `saved_outfits` — looks with `status` (`try_later` / `worn`), items as jsonb.
@@ -56,7 +56,7 @@ Migrations: `supabase/migrations/` (timestamped, replayable). Tables, all with R
 * `outfit_feedback` — per-combination rating.
 * RPCs: `record_garments_worn(ids, date)` (atomic wear counter, SECURITY INVOKER), `delete_my_account()` (SECURITY DEFINER, `auth.uid()` only).
 
-**Rollout rule:** the 2026-11-11 migrations are additive and NOT yet applied to production. Every client read/write of the new columns or RPCs degrades gracefully (`src/services/cloud/schemaErrors.ts`, mobile `wardrobeStorage.ts`): an unknown column is retried without the new fields, a missing RPC falls back to the old per-row update, and account deletion reports "not enabled" without deleting anything.
+**Rollout rule:** migrations are additive; the 2026-11-11 ones are applied to production. Every client read/write of the new columns or RPCs degrades gracefully (`src/services/cloud/schemaErrors.ts`, mobile `wardrobeStorage.ts`): an unknown column is retried without the new fields, a missing RPC falls back to the old per-row update, and account deletion reports "not enabled" without deleting anything — so a database that is behind the code never breaks the apps.
 
 ## 4. Intelligence layer (hybrid)
 
