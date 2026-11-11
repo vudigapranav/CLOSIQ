@@ -12,7 +12,7 @@ import { getCurrentUserId } from './authSession';
 export const AI_PHOTO_CONSENT_KEY = 'closiq_ai_photo_consent';
 
 // Postgres/PostgREST codes for "function does not exist" — the
-// delete_my_account RPC ships in migration 20261111120000_wardrobe_intelligence
+// delete_my_account RPC ships in migration 20261111054834_wardrobe_intelligence
 // which may not be applied to the project yet.
 const MISSING_RPC_CODES = ['PGRST202', '42883'];
 

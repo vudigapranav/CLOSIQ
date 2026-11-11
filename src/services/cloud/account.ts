@@ -4,7 +4,7 @@ import { supabase } from './supabase';
  * Web account & privacy (2026-11-11).
  *
  * - AI photo consent: `profiles.ai_photo_consent` (migration
- *   20261111120000_wardrobe_intelligence.sql) mirrored to localStorage so the
+ *   20261111054834_wardrobe_intelligence.sql) mirrored to localStorage so the
  *   choice is honoured immediately and even before that column exists in
  *   production. A failed cloud write is treated as local-only, silently.
  * - Data export: the user's own rows, fetched with their own session.
