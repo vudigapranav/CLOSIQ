@@ -2,6 +2,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import sharp from 'sharp';
 import * as ort from 'onnxruntime-node';
+import { validateImage } from './validation.js';
 
 /**
  * Studio photo (2026-10-13): cuts the garment out of a user's photo and puts
@@ -26,6 +27,7 @@ const MODELS = {
 const MODEL_NAME = process.env.STUDIO_MODEL || 'u2netp';
 const MODEL_DIR = process.env.STUDIO_MODEL_DIR || path.join(__dirname, 'models');
 
+const MAX_INPUT_PIXELS = 40_000_000; // decompression-bomb guard
 const OUTPUT_SIZE = 1024; // square output, px
 const PADDING = 0.1; // margin around the garment, as a fraction of the canvas
 const MIN_GARMENT_FRACTION = 0.02; // a mask smaller than this means nothing was found
@@ -199,7 +201,7 @@ function maskBounds(mask, width, height) {
 export async function makeStudioPhoto(imageBuffer) {
   const spec = MODELS[MODEL_NAME] || MODELS.u2netp;
 
-  const { data: rgb, info } = await sharp(imageBuffer)
+  const { data: rgb, info } = await sharp(imageBuffer, { limitInputPixels: MAX_INPUT_PIXELS })
     .rotate()
     .resize(OUTPUT_SIZE, OUTPUT_SIZE, { fit: 'inside', withoutEnlargement: true })
     .removeAlpha()
@@ -259,7 +261,6 @@ export async function makeStudioPhoto(imageBuffer) {
     .toBuffer();
 }
 
-const MAX_BASE64_LENGTH = 8 * 1024 * 1024; // ~6 MB image; clients send ~1024px JPEGs
 
 /**
  * POST /api/ai/studio-photo — { imageData: base64 or data URL }
@@ -267,15 +268,14 @@ const MAX_BASE64_LENGTH = 8 * 1024 * 1024; // ~6 MB image; clients send ~1024px 
  * Same response shape as the Gemini endpoints so clients share one parser.
  */
 export async function handleStudioPhotoServer(body) {
-  const raw = typeof body.imageData === 'string' ? body.imageData : '';
-  const base64 = raw.includes(';base64,') ? raw.split(';base64,')[1] : raw;
-  if (!base64) return { ok: false, mode: 'local', errorKind: 'bad_request', error: 'imageData is required' };
-  if (base64.length > MAX_BASE64_LENGTH) {
-    return { ok: false, mode: 'local', errorKind: 'too_large', error: 'Image is too large' };
+  const img = validateImage(body?.imageData, body?.mimeType);
+  if (!img.ok) {
+    const tooLarge = img.error === 'Image is too large';
+    return { ok: false, mode: 'local', errorKind: tooLarge ? 'too_large' : 'invalid_input', error: img.error };
   }
 
   try {
-    const studio = await makeStudioPhoto(Buffer.from(base64, 'base64'));
+    const studio = await makeStudioPhoto(img.value.buffer);
     if (!studio) return { ok: false, mode: 'local', errorKind: 'no_garment', error: 'No garment found in the photo' };
     return { ok: true, mode: 'local', data: { imageData: studio.toString('base64'), mimeType: 'image/jpeg' } };
   } catch (err) {

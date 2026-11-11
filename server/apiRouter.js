@@ -5,6 +5,7 @@ import {
 } from './geminiServer.js';
 import { handleStudioPhotoServer } from './studioPhoto.js';
 import { getAuthenticatedUserId } from './authVerify.js';
+import { consumeRateLimit } from './rateLimit.js';
 
 /**
  * Shared /api/ai/* request dispatch — the one place that knows how to turn a
@@ -21,29 +22,60 @@ const ROUTES = {
   '/api/ai/studio-photo': handleStudioPhotoServer
 };
 
+// Max request body (~6 MB: a ~4.5 MB photo as base64 plus JSON overhead).
+export const MAX_BODY_BYTES = 6 * 1024 * 1024;
+// Rate-limit cost per route (default 1); studio photo is CPU-heavy.
+const ROUTE_COST = { '/api/ai/studio-photo': 3 };
+
+class HttpError extends Error {
+  constructor(status, message) {
+    super(message);
+    this.status = status;
+  }
+}
+
+function tooLarge() {
+  return new HttpError(413, 'Request body too large');
+}
+
 function readJsonBody(req) {
   // Vercel's Node runtime parses JSON bodies itself and drains the stream,
   // exposing the result as req.body; plain Node / Vite leave it to us.
   if (req.body !== undefined) {
     if (typeof req.body === 'string') {
+      if (Buffer.byteLength(req.body) > MAX_BODY_BYTES) return Promise.reject(tooLarge());
       try {
         return Promise.resolve(req.body ? JSON.parse(req.body) : {});
       } catch {
-        return Promise.reject(new Error('Malformed JSON body'));
+        return Promise.reject(new HttpError(400, 'Malformed JSON body'));
       }
     }
-    return Promise.resolve(req.body || {});
+    return Promise.resolve(req.body && typeof req.body === 'object' ? req.body : {});
   }
+  const declared = Number(req.headers?.['content-length']);
+  if (Number.isFinite(declared) && declared > MAX_BODY_BYTES) return Promise.reject(tooLarge());
   return new Promise((resolve, reject) => {
-    let body = '';
+    const chunks = [];
+    let size = 0;
+    let rejected = false;
     req.on('data', (chunk) => {
-      body += chunk;
+      if (rejected) return;
+      size += chunk.length;
+      if (size > MAX_BODY_BYTES) {
+        rejected = true;
+        chunks.length = 0;
+        reject(tooLarge());
+        return;
+      }
+      chunks.push(chunk);
     });
     req.on('end', () => {
+      if (rejected) return;
       try {
+        const body = Buffer.concat(chunks).toString('utf8');
         resolve(body ? JSON.parse(body) : {});
       } catch {
-        reject(new Error('Malformed JSON body'));
+        reject(new HttpError(400, 'Malformed JSON body'));
       }
     });
     req.on('error', reject);
@@ -89,11 +121,27 @@ export async function handleApiRequest(req, res) {
     return true;
   }
 
+  // Per-user rate limit: after auth, before the body is read or parsed.
+  const limit = consumeRateLimit(authenticatedUserId, ROUTE_COST[url] || 1);
+  if (!limit.allowed) {
+    res.statusCode = 429;
+    res.setHeader('Retry-After', String(limit.retryAfterSec));
+    res.end(JSON.stringify({ ok: false, errorKind: 'rate_limited', error: 'Too many requests — try again in a moment.' }));
+    return true;
+  }
+
   try {
     const json = await readJsonBody(req);
     const result = await handler(json);
+    if (result && result.errorKind === 'invalid_input') res.statusCode = 400;
     res.end(JSON.stringify(result));
   } catch (err) {
+    if (err instanceof HttpError) {
+      res.statusCode = err.status;
+      res.end(JSON.stringify({ ok: false, errorKind: err.status === 413 ? 'too_large' : 'invalid_input', error: err.message }));
+      if (err.status === 413) req.resume?.();
+      return true;
+    }
     // Deliberately generic — never forward internal error detail (stack
     // traces, provider response bodies) to the browser.
     console.error('[API Router Error]:', err?.message || err);

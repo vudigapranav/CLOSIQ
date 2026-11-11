@@ -30,6 +30,16 @@ const authClient =
     ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY, { realtime: { transport: ws } })
     : null;
 
+// Verified-token cache: token -> { userId, expires }. Only successes are
+// cached (never failures), for a short TTL, bounded in size.
+const TOKEN_CACHE_TTL_MS = 45_000;
+const TOKEN_CACHE_MAX = 500;
+const tokenCache = new Map();
+
+export function clearAuthCache() {
+  tokenCache.clear();
+}
+
 /**
  * Returns the verified user id for a request's `Authorization: Bearer
  * <token>` header, or null if there is no token, the token is invalid, or
@@ -47,9 +57,15 @@ export async function getAuthenticatedUserId(req) {
   const token = header.slice('Bearer '.length).trim();
   if (!token) return null;
 
+  const cached = tokenCache.get(token);
+  if (cached && cached.expires > Date.now()) return cached.userId;
+  if (cached) tokenCache.delete(token);
+
   try {
     const { data, error } = await authClient.auth.getUser(token);
     if (error || !data?.user) return null;
+    if (tokenCache.size >= TOKEN_CACHE_MAX) tokenCache.delete(tokenCache.keys().next().value);
+    tokenCache.set(token, { userId: data.user.id, expires: Date.now() + TOKEN_CACHE_TTL_MS });
     return data.user.id;
   } catch (err) {
     console.error('[Auth Verify Error]:', err?.message || err);

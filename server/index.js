@@ -66,13 +66,36 @@ function streamFile(filePath, res) {
   stream.pipe(res);
 }
 
+const SECURITY_HEADERS = {
+  'X-Content-Type-Options': 'nosniff',
+  'Referrer-Policy': 'strict-origin-when-cross-origin',
+  'X-Frame-Options': 'DENY',
+  'Permissions-Policy': 'camera=(self), geolocation=(self)'
+};
+
+function applySecurityHeaders(res) {
+  for (const [k, v] of Object.entries(SECURITY_HEADERS)) res.setHeader(k, v);
+}
+
 function serveStatic(req, res) {
-  const requestPath = decodeURIComponent(req.url.split('?')[0]);
+  let requestPath;
+  try {
+    requestPath = decodeURIComponent(req.url.split('?')[0]);
+  } catch {
+    res.statusCode = 400;
+    res.end('Bad request');
+    return;
+  }
+  if (requestPath.includes('\0')) {
+    res.statusCode = 400;
+    res.end('Bad request');
+    return;
+  }
   // Strip any leading ../ segments so a crafted path can't escape dist/.
   const safePath = path.normalize(requestPath).replace(/^(\.\.[/\\])+/, '');
   const filePath = path.join(DIST_DIR, safePath);
 
-  if (!filePath.startsWith(DIST_DIR)) {
+  if (filePath !== DIST_DIR && !filePath.startsWith(DIST_DIR + path.sep)) {
     res.statusCode = 403;
     res.end('Forbidden');
     return;
@@ -80,11 +103,17 @@ function serveStatic(req, res) {
 
   fs.stat(filePath, (err, stats) => {
     if (!err && stats.isFile()) {
+      // Vite emits content-hashed files under /assets: cache them forever.
+      res.setHeader(
+        'Cache-Control',
+        filePath.startsWith(path.join(DIST_DIR, 'assets') + path.sep) ? 'public, max-age=31536000, immutable' : 'public, max-age=3600'
+      );
       streamFile(filePath, res);
       return;
     }
     // SPA fallback: any other GET (no matching static file, not an API
-    // route) resolves to index.html.
+    // route) resolves to index.html, which must never be cached.
+    res.setHeader('Cache-Control', 'no-cache');
     streamFile(path.join(DIST_DIR, 'index.html'), res);
   });
 }
@@ -146,6 +175,7 @@ function logRequest(req, res, startedAt) {
 const server = http.createServer(async (req, res) => {
   const startedAt = Date.now();
   res.on('finish', () => logRequest(req, res, startedAt));
+  applySecurityHeaders(res);
 
   if ((req.method === 'GET' || req.method === 'HEAD') && req.url?.split('?')[0] === '/healthz') {
     handleHealth(req, res);

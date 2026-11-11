@@ -1,4 +1,14 @@
 import { GoogleGenAI } from '@google/genai';
+import {
+  CATEGORIES,
+  filterOutfitIds,
+  isValidReplacement,
+  sanitizeWeatherContext,
+  validateIdList,
+  validateImage,
+  validatePrompt,
+  validateWardrobe
+} from './validation.js';
 
 /**
  * Server-Side Gemini API Handler.
@@ -66,17 +76,17 @@ function shouldTryNextModel(err) {
  * generateContent with the model fallback chain and one shared time budget.
  * Throws the last error when every model fails or the budget runs out.
  */
-async function generateWithFallback(apiKey, request) {
-  const deadline = Date.now() + GEMINI_TIMEOUT_MS;
+async function generateWithFallback(apiKey, request, { fromIndex = 0, deadline = Date.now() + GEMINI_TIMEOUT_MS } = {}) {
   let lastError = null;
-  for (const model of GEMINI_MODELS) {
+  for (let i = fromIndex; i < GEMINI_MODELS.length; i += 1) {
+    const model = GEMINI_MODELS[i];
     const remaining = deadline - Date.now();
     if (remaining < MIN_ATTEMPT_MS) break;
     try {
       const ai = new GoogleGenAI({ apiKey, httpOptions: { timeout: Math.min(remaining, ATTEMPT_TIMEOUT_MS) } });
       const response = await ai.models.generateContent({ ...request, model });
-      if (model !== GEMINI_MODELS[0]) console.log(`[Server Gemini] Served by fallback model ${model}`);
-      return response;
+      if (i !== 0) console.log(`[Server Gemini] Served by fallback model ${model}`);
+      return { response, index: i, deadline };
     } catch (err) {
       lastError = err;
       if (!shouldTryNextModel(err)) throw err;
@@ -87,10 +97,56 @@ async function generateWithFallback(apiKey, request) {
 }
 
 /**
+ * Runs generateWithFallback and parses/validates the JSON answer with
+ * `accept(parsed)` (returns the cleaned data, or null to reject). On a
+ * rejected answer, tries the next model in the chain once if budget allows.
+ * Returns the accepted data, or null when nothing acceptable was produced.
+ */
+async function generateValidated(apiKey, request, accept) {
+  let first = await generateWithFallback(apiKey, request);
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    let parsed = null;
+    try {
+      parsed = first.response.text ? JSON.parse(first.response.text) : null;
+    } catch {
+      parsed = null;
+    }
+    const accepted = parsed ? accept(parsed) : null;
+    if (accepted) return accepted;
+    if (attempt === 1 || first.index + 1 >= GEMINI_MODELS.length) break;
+    try {
+      first = await generateWithFallback(apiKey, request, { fromIndex: first.index + 1, deadline: first.deadline });
+    } catch {
+      break;
+    }
+  }
+  return null;
+}
+
+/**
  * Coarse, non-sensitive classification of a Gemini failure, returned to the
  * client as `errorKind` so it can say "rate limited" or "timed out" instead
  * of a generic failure. Never includes provider response bodies.
  */
+const SAFE_ERRORS = {
+  rate_limited: 'The AI service is busy right now. Please try again in a moment.',
+  timeout: 'The AI service took too long to respond. Please try again.',
+  unavailable: 'The AI service is temporarily unavailable. Please try again.'
+};
+const invalidInput = (error) => ({ ok: false, mode: 'demo', errorKind: 'invalid_input', error });
+const badAnswer = () => ({
+  ok: false,
+  mode: 'demo',
+  errorKind: 'unavailable',
+  error: 'The AI returned an unusable answer. Please try again.'
+});
+function failure(label, err) {
+  // Details stay in the server log (message only — never bodies or tokens).
+  console.error(`[Server Gemini Error] ${label} failed:`, String(err?.message || err).slice(0, 300));
+  const errorKind = classifyGeminiError(err);
+  return { ok: false, mode: 'demo', errorKind, error: SAFE_ERRORS[errorKind] };
+}
+
 export function classifyGeminiError(err) {
   const status = err?.status ?? err?.code;
   const message = String(err?.message || '');
@@ -135,16 +191,16 @@ PERSONALIZATION CONTEXT (all of the following may be null — when a field is nu
 export async function handleAnalyzeGarmentServer(body) {
   const apiKey = getServerApiKey();
   if (!apiKey) {
-    return { ok: false, mode: 'demo', errorKind: 'not_configured', error: 'GEMINI_API_KEY not configured on server' };
+    return { ok: false, mode: 'demo', errorKind: 'not_configured', error: 'The AI service is not configured on the server.' };
+  }
+  const img = validateImage(body?.imageData, body?.mimeType);
+  if (!img.ok) return invalidInput(img.error);
+  const hint = body.categoryHint;
+  if (hint !== undefined && hint !== null && hint !== '' && !CATEGORIES.includes(hint)) {
+    return invalidInput('categoryHint is invalid');
   }
 
   try {
-    const mimeType = body.mimeType || 'image/png';
-    // Strip data URI prefix if present
-    const base64Data = body.imageData.includes(';base64,')
-      ? body.imageData.split(';base64,')[1]
-      : body.imageData;
-
     const prompt = `Analyze this uploaded garment photo as an expert fashion curator for CLOSIQ.
 Return structured JSON output matching this schema:
 {
@@ -155,6 +211,7 @@ Return structured JSON output matching this schema:
   "hexColor": "Hex color code e.g. #1B263B",
   "fabric": "Estimated fabric/material e.g. 100% Cotton Poplin, Heavy Denim",
   "fit": "Fit silhouette e.g. Tailored, Oversized, Relaxed, Slim, Regular",
+  "pattern": "One of: Solid, Striped, Checked, Floral, Printed, Graphic, Other",
   "style": "Short 2-4 word style descriptor e.g. Streetwear Essential, Tailored Modern, Classic Casual, Refined Minimalist",
   "formality": "One of: casual, smart_casual, formal, evening",
   "layeringRole": "One of: base_layer, primary_layer, outer_layer",
@@ -162,20 +219,39 @@ Return structured JSON output matching this schema:
   "aiConfidence": 0.95,
   "pairingNotes": "Concise 1-sentence styling advice for this garment."
 }
-${body.categoryHint ? `Category hint: ${body.categoryHint}.` : 'No category hint: decide the category from the photo (it may be a top, bottom, layer, footwear or an accessory).'}`;
+Only state what is visible. Never guess a brand name, and never guess a fabric or material that cannot be identified from the photo: return an empty string for brand-like fields and "Unknown" for fabric when it is not visually identifiable.
+${hint ? `Category hint: ${hint}.` : 'No category hint: decide the category from the photo (it may be a top, bottom, layer, footwear or an accessory).'}`;
 
-    const response = await generateWithFallback(apiKey, {
+    const str = { type: 'STRING' };
+    const { response } = await generateWithFallback(apiKey, {
       contents: [
         {
           role: 'user',
-          parts: [
-            { inlineData: { mimeType, data: base64Data } },
-            { text: prompt }
-          ]
+          parts: [{ inlineData: { mimeType: img.value.mimeType, data: img.value.base64 } }, { text: prompt }]
         }
       ],
       config: {
         responseMimeType: 'application/json',
+        responseSchema: {
+          type: 'OBJECT',
+          properties: {
+            name: str,
+            category: { type: 'STRING', enum: CATEGORIES },
+            subcategory: str,
+            color: str,
+            hexColor: str,
+            fabric: str,
+            fit: str,
+            pattern: str,
+            style: str,
+            formality: { type: 'STRING', enum: ['casual', 'smart_casual', 'formal', 'evening'] },
+            layeringRole: { type: 'STRING', enum: ['base_layer', 'primary_layer', 'outer_layer'] },
+            tags: { type: 'ARRAY', items: str },
+            aiConfidence: { type: 'NUMBER' },
+            pairingNotes: str
+          },
+          required: ['name', 'category', 'color']
+        },
         temperature: 0.2
       }
     });
@@ -185,10 +261,41 @@ ${body.categoryHint ? `Category hint: ${body.categoryHint}.` : 'No category hint
 
     return { ok: true, mode: 'gemini', data: JSON.parse(text) };
   } catch (err) {
-    console.error('[Server Gemini Error] Garment analysis failed:', err?.message || err);
-    return { ok: false, mode: 'demo', errorKind: classifyGeminiError(err), error: err?.message || 'Vision analysis failed' };
+    return failure('Garment analysis', err);
   }
 }
+
+const OUTFIT_SCHEMA = {
+  type: 'OBJECT',
+  properties: {
+    status: { type: 'STRING' },
+    outfitName: { type: 'STRING' },
+    vibe: { type: 'STRING' },
+    styleMatch: { type: 'NUMBER' },
+    garmentIds: { type: 'ARRAY', items: { type: 'STRING' } },
+    whyItWorks: {
+      type: 'OBJECT',
+      properties: {
+        color: { type: 'STRING' },
+        fit: { type: 'STRING' },
+        occasion: { type: 'STRING' },
+        overall: { type: 'STRING' }
+      }
+    }
+  },
+  required: ['garmentIds']
+};
+
+const SWAP_SCHEMA = {
+  type: 'OBJECT',
+  properties: {
+    status: { type: 'STRING' },
+    replacementGarmentId: { type: 'STRING' },
+    outfitName: { type: 'STRING' },
+    whyItWorks: { type: 'STRING' }
+  },
+  required: ['replacementGarmentId']
+};
 
 /**
  * Endpoint 2: POST /api/ai/generate-outfit
@@ -197,26 +304,37 @@ ${body.categoryHint ? `Category hint: ${body.categoryHint}.` : 'No category hint
 export async function handleGenerateOutfitServer(body) {
   const apiKey = getServerApiKey();
   if (!apiKey) {
-    return { ok: false, mode: 'demo', errorKind: 'not_configured', error: 'GEMINI_API_KEY not configured on server' };
+    return { ok: false, mode: 'demo', errorKind: 'not_configured', error: 'The AI service is not configured on the server.' };
   }
+  const prompt = validatePrompt(body?.prompt, { required: true });
+  if (!prompt.ok) return invalidInput(prompt.error);
+  const wardrobe = validateWardrobe(body?.wardrobe);
+  if (!wardrobe.ok) return invalidInput(wardrobe.error);
+  const exclude = validateIdList(body?.excludeGarmentIds, 'excludeGarmentIds');
+  if (!exclude.ok) return invalidInput(exclude.error);
+  if (wardrobe.value.length === 0) return invalidInput('wardrobe is empty');
 
   try {
-
+    const weatherContext = sanitizeWeatherContext(body.weatherContext);
     const userPrompt = {
-      request: body.prompt,
+      request: prompt.value,
       layeringPreference: body.layeringPreference || 'avoid',
-      excludedGarmentIds: body.excludeGarmentIds || [],
-      wardrobeCount: body.wardrobe?.length || 0,
+      excludedGarmentIds: exclude.value,
+      wardrobeCount: wardrobe.value.length,
       wardrobeSummary: body.wardrobeSummary || null,
-      // Sprint M15: optional personalization context. Each defaults to null
-      // (not omitted) so the prompt's own "may be null" instruction always
-      // has an explicit field to reason about — a request that doesn't send
-      // any of these (every pre-M15 caller) behaves identically to before.
+      // Optional personalization context. Each defaults to null (not
+      // omitted) so the prompt's own "may be null" instruction always has an
+      // explicit field to reason about.
       userProfileContext: body.userProfileContext || null,
-      weatherContext: body.weatherContext || null,
+      // Accepts both the web shape (temperatureC, feelsLikeC, maxC, minC,
+      // precipitationProbability) and the mobile shape (temperatureCelsius).
+      weatherContext,
+      weatherNote: weatherContext
+        ? 'Weather data is provided in weatherContext.'
+        : 'No weather data is available for this request; do not assume or invent any weather.',
       plannerContext: body.plannerContext || null,
       recentOutfitContext: body.recentOutfitContext || null,
-      wardrobe: body.wardrobe
+      wardrobe: wardrobe.value
     };
 
     const promptText = `${SYSTEM_PROMPT}
@@ -239,21 +357,20 @@ Return structured JSON matching this schema:
   }
 }`;
 
-    const response = await generateWithFallback(apiKey, {
-      contents: [{ role: 'user', parts: [{ text: promptText }] }],
-      config: {
-        responseMimeType: 'application/json',
-        temperature: 0.3
+    const data = await generateValidated(
+      apiKey,
+      {
+        contents: [{ role: 'user', parts: [{ text: promptText }] }],
+        config: { responseMimeType: 'application/json', responseSchema: OUTFIT_SCHEMA, temperature: 0.3 }
+      },
+      (parsed) => {
+        const ids = filterOutfitIds(parsed.garmentIds, wardrobe.value, exclude.value);
+        return ids.length ? { ...parsed, garmentIds: ids } : null;
       }
-    });
-
-    const text = response.text;
-    if (!text) throw new Error('Empty response from Gemini Stylist');
-
-    return { ok: true, mode: 'gemini', data: JSON.parse(text) };
+    );
+    return data ? { ok: true, mode: 'gemini', data } : badAnswer();
   } catch (err) {
-    console.error('[Server Gemini Error] Outfit generation failed:', err?.message || err);
-    return { ok: false, mode: 'demo', errorKind: classifyGeminiError(err), error: err?.message || 'Outfit generation failed' };
+    return failure('Outfit generation', err);
   }
 }
 
@@ -264,24 +381,36 @@ Return structured JSON matching this schema:
 export async function handleSwapGarmentServer(body) {
   const apiKey = getServerApiKey();
   if (!apiKey) {
-    return { ok: false, mode: 'demo', errorKind: 'not_configured', error: 'GEMINI_API_KEY not configured on server' };
+    return { ok: false, mode: 'demo', errorKind: 'not_configured', error: 'The AI service is not configured on the server.' };
+  }
+  const prompt = validatePrompt(body?.prompt);
+  if (!prompt.ok) return invalidInput(prompt.error);
+  const wardrobe = validateWardrobe(body?.wardrobe);
+  if (!wardrobe.ok) return invalidInput(wardrobe.error);
+  const current = validateIdList(body?.currentOutfitGarmentIds, 'currentOutfitGarmentIds', 20);
+  if (!current.ok) return invalidInput(current.error);
+  const targetId = body?.targetGarmentIdToSwap;
+  const targetCheck = validateIdList([targetId], 'targetGarmentIdToSwap');
+  if (!targetCheck.ok) return invalidInput(targetCheck.error);
+  const targetCategory = body?.targetCategory;
+  if (targetCategory !== undefined && targetCategory !== null && !CATEGORIES.includes(targetCategory)) {
+    return invalidInput('targetCategory is invalid');
   }
 
   try {
-
     const swapPrompt = {
-      occasion: body.prompt,
-      currentOutfitGarmentIds: body.currentOutfitGarmentIds,
-      targetGarmentIdToSwap: body.targetGarmentIdToSwap,
-      targetGarmentCategory: body.targetCategory,
-      wardrobe: body.wardrobe
+      occasion: prompt.value,
+      currentOutfitGarmentIds: current.value,
+      targetGarmentIdToSwap: targetId,
+      targetGarmentCategory: targetCategory ?? null,
+      wardrobe: wardrobe.value
     };
 
     const promptText = `${SYSTEM_PROMPT}
 
 SWAP REQUEST:
-The user wants to replace garmentId "${body.targetGarmentIdToSwap}" in their current outfit.
-Select a replacement garmentId from the user's wardrobe that belongs to the same category (${body.targetCategory}) or fulfills a compatible role, while preserving overall outfit color harmony and suitability for "${body.prompt}".
+The user wants to replace garmentId "${targetId}" in their current outfit.
+Select a replacement garmentId from the user's wardrobe that belongs to the same category (${targetCategory ?? 'unspecified'}) or fulfills a compatible role, while preserving overall outfit color harmony and suitability for the occasion given in SWAP CONTEXT.
 
 SWAP CONTEXT:
 ${JSON.stringify(swapPrompt, null, 2)}
@@ -294,20 +423,24 @@ Return structured JSON:
   "whyItWorks": "Short rationale for the swapped piece"
 }`;
 
-    const response = await generateWithFallback(apiKey, {
-      contents: [{ role: 'user', parts: [{ text: promptText }] }],
-      config: {
-        responseMimeType: 'application/json',
-        temperature: 0.3
-      }
-    });
-
-    const text = response.text;
-    if (!text) throw new Error('Empty response from Gemini Swap');
-
-    return { ok: true, mode: 'gemini', data: JSON.parse(text) };
+    const data = await generateValidated(
+      apiKey,
+      {
+        contents: [{ role: 'user', parts: [{ text: promptText }] }],
+        config: { responseMimeType: 'application/json', responseSchema: SWAP_SCHEMA, temperature: 0.3 }
+      },
+      (parsed) =>
+        isValidReplacement(parsed.replacementGarmentId, {
+          wardrobe: wardrobe.value,
+          category: targetCategory,
+          currentOutfitIds: current.value,
+          targetId
+        })
+          ? parsed
+          : null
+    );
+    return data ? { ok: true, mode: 'gemini', data } : badAnswer();
   } catch (err) {
-    console.error('[Server Gemini Error] Swap failed:', err?.message || err);
-    return { ok: false, mode: 'demo', errorKind: classifyGeminiError(err), error: err?.message || 'Swap failed' };
+    return failure('Swap', err);
   }
 }

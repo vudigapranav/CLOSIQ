@@ -26,6 +26,9 @@ function geminiApiPlugin() {
 function publicSupabaseDefines(env) {
   const url = env.VITE_SUPABASE_URL || env.SUPABASE_URL || ''
   const anonKey = env.VITE_SUPABASE_ANON_KEY || env.SUPABASE_ANON_KEY || ''
+  if (anonKey.startsWith('sb_secret_')) {
+    throw new Error('Refusing to build: the Supabase key is a secret key (sb_secret_). Use the anon/publishable key.')
+  }
   try {
     const payload = JSON.parse(Buffer.from(anonKey.split('.')[1] || '', 'base64url').toString('utf8'))
     if (payload.role === 'service_role') {
