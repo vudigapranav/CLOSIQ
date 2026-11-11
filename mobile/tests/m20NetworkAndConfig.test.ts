@@ -103,7 +103,7 @@ test('a local-engine outfit carries the reason Gemini was not used', async () =>
 
   assert.equal(res.mode, 'fallback');
   assert.match(res.notice ?? '', /session has expired/i);
-  assert.match(res.notice ?? '', /local engine/i);
+  assert.match(res.notice ?? '', /rule-based/i);
 });
 
 // ------------------------------------------------------ session restore

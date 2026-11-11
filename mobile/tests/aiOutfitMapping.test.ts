@@ -71,7 +71,7 @@ test('the local engine picks for the occasion and claims no score', async () => 
   assert.equal(res.mode, 'fallback');
   assert.equal(res.data.styleScore, 0, 'no AI evaluated it, so no match score');
   assert.deepEqual(new Set(res.data.garmentIds), new Set(['oxford', 'trousers', 'loafers']));
-  assert.match(res.notice ?? '', /local engine/i);
+  assert.match(res.notice ?? '', /rule-based/i);
 });
 
 test('a local swap stays in the same category and is honest when there is none', async () => {
