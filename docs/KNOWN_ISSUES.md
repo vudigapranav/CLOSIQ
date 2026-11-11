@@ -6,7 +6,7 @@ Last updated: 2026-11-11. Ordered by impact.
 
 1. **Migrations are applied to production (2026-11-11)** — `20261111054834_wardrobe_intelligence` and `20261111064644_hardening` are live on project `wibinjtekmadwtbxygrd`. Laundry status, purchase info, pattern, collections, AI-photo consent, weather city, atomic wear counts and account deletion now persist. Still to do in the Supabase dashboard: turn on **Auth → Leaked password protection** (security advisor warning).
 2. **Supabase Auth redirect URLs** — password-reset emails (web and the new mobile "Forgot password?") link to `https://closiq-liard.vercel.app/`; that URL must be in Auth → URL configuration (Site URL + redirect allow-list), and custom SMTP is needed for non-team recipients.
-3. **Not deployed** — none of the 2026-11-11 work is on Vercel or in an OTA update/APK yet. Web: `vercel deploy --prod`. Phone: `eas update --channel preview` (JS only) — no native change was made, runtime stays 1.0.0.
+3. **Deployed 2026-11-11** — website on Vercel (commit `a1352af`) and OTA v1.4 on the `preview` channel (runtime 1.0.0). An installed APK picks the update up on its second launch after download.
 4. **No device verification** — the Android APK has been built in the past but the 2026-11-11 changes have only been verified by type checks, unit tests and an Android JS bundle export. Install on a phone before release.
 
 ## Product gaps
