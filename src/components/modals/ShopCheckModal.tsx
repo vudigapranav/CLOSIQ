@@ -21,6 +21,7 @@ import { OutfitBrain, tasteGarments } from '../../services/outfitBrain';
 import { runShopCheck, shopCandidate, ShopCheckResult, ShopVerdict } from '../../services/shopCheck';
 import { COLOR_FAMILIES, ColorFamily } from '../../services/wardrobeSearch';
 import { analyzeGarmentImageWithGemini } from '../../services/ai';
+import { isAiPhotoConsentGiven } from '../../services/cloud/account';
 import { fileToOptimizedJpegDataUrl } from '../../services/imageResize';
 
 /**
@@ -150,6 +151,11 @@ export const ShopCheckModal: React.FC<ShopCheckModalProps> = ({
       setPhoto(dataUrl);
       setAdded(false);
       setAddedId(null);
+      if (!isAiPhotoConsentGiven()) {
+        setNotice('AI photo analysis is off (Profile → Privacy & account), so the photo stays on your device. Describe the piece and CLOSIQ will still check it.');
+        setStep('describe');
+        return;
+      }
       setStep('scanning');
       const scan = await analyzeGarmentImageWithGemini(dataUrl);
       if (runRef.current !== run) return;

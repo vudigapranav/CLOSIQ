@@ -6,6 +6,7 @@ import { normalizeSize } from '../../data/garmentSizes';
 import { analyzeCatalogGarment, VisionAnalysisResult } from '../../services/aiVisionScanner';
 import { analyzeGarmentImageWithGemini, makeStudioPhoto } from '../../services/ai';
 import { fileToOptimizedJpegDataUrl } from '../../services/imageResize';
+import { isAiPhotoConsentGiven } from '../../services/cloud/account';
 import { GarmentImage } from '../ui/GarmentImage';
 import { PrimaryButton } from '../ui/PrimaryButton';
 import { CategoryChip } from '../ui/CategoryChip';
@@ -53,6 +54,8 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({ wardrobeProfile, cus
   const [pairingNotes, setPairingNotes] = useState('');
   const [aiConfidence, setAiConfidence] = useState(0.95);
   const [aiAnalyzed, setAiAnalyzed] = useState(true);
+  // True when the user switched AI photo analysis off in Profile: no scan ran.
+  const [aiSkipped, setAiSkipped] = useState(false);
   const [storageLocation, setStorageLocation] = useState<string | undefined>(undefined);
   const [size, setSize] = useState<string | undefined>(undefined);
   // White-background "studio" version of an uploaded photo, made alongside
@@ -86,6 +89,7 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({ wardrobeProfile, cus
     setPairingNotes(result.pairingNotes);
     setAiConfidence(result.aiConfidence);
     setAiAnalyzed(result.aiAnalyzed !== false);
+    setAiSkipped(false);
     setStep('confirm');
   };
 
@@ -121,6 +125,19 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({ wardrobeProfile, cus
       const dataUrl = await fileToOptimizedJpegDataUrl(file);
       setSelectedImage(dataUrl);
       setCaptionIndex(0);
+
+      if (!isAiPhotoConsentGiven()) {
+        // Photo stays on this device until the user saves it: no AI scan and
+        // no studio cut-out (that also uploads the photo to our server).
+        setAiSkipped(true);
+        setAiAnalyzed(false);
+        setStudioImage(null);
+        setStudioStatus('idle');
+        setUseStudio(false);
+        setStep('confirm');
+        return;
+      }
+      setAiSkipped(false);
       setStep('scanning');
 
       const run = ++studioRunRef.current;
@@ -447,7 +464,11 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({ wardrobeProfile, cus
                 <GarmentImage src={chosenImage} alt="Garment" category={category} hexColor={hexColor} />
               </div>
               <div style={{ minWidth: 0 }}>
-                {aiAnalyzed ? (
+                {aiSkipped ? (
+                  <span className="text-metadata" style={{ color: 'var(--color-text-secondary)' }}>
+                    AI photo analysis is off — fill in the details below
+                  </span>
+                ) : aiAnalyzed ? (
                   <span className="text-metadata" style={{ color: 'var(--color-primary)' }}>
                     AI Auto-Detected{aiConfidence > 0 ? ` · ${Math.round(aiConfidence * 100)}% confidence` : ''}
                   </span>

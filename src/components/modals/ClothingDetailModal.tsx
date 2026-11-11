@@ -1,11 +1,14 @@
-import React, { useEffect, useMemo, useRef } from 'react';
-import { X, Tag, Sparkles, Layers, Trash2, Shirt } from 'lucide-react';
-import { GarmentItem, GarmentDetailsPatch, LayeringPreference } from '../../types/wardrobe';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { X, Tag, Sparkles, Layers, Trash2, Shirt, Pencil } from 'lucide-react';
+import { AVAILABILITY_OPTIONS, GarmentItem, GarmentDetailsPatch, LayeringPreference } from '../../types/wardrobe';
+import { describeWear } from '../../services/garmentEdit';
 import { OutfitBrain } from '../../services/outfitBrain';
 import { emptyPairingHint, suggestPairings } from '../../services/pairingSuggestions';
 import { GarmentImage } from '../ui/GarmentImage';
 import { StorageLocationField } from '../ui/StorageLocationField';
 import { SizeField } from '../ui/SizeField';
+import { SegmentedControl } from '../ui/SegmentedControl';
+import { GarmentEditForm } from '../ui/GarmentEditForm';
 
 interface ClothingDetailModalProps {
   item: GarmentItem | null;
@@ -38,17 +41,22 @@ export const ClothingDetailModal: React.FC<ClothingDetailModalProps> = ({
     () => (item ? suggestPairings(item, wardrobe, { brain, layeringPreference }) : []),
     [item, wardrobe, brain, layeringPreference]
   );
+  const [editing, setEditing] = useState(false);
+  const collectionNames = useMemo(
+    () => [...new Set(wardrobe.flatMap((g) => g.collections || []))].sort((a, b) => a.localeCompare(b)),
+    [wardrobe]
+  );
   const visibleGroups = pairingGroups.filter((g) => g.suggestions.length > 0);
 
   // Opening a suggested piece swaps the item in place; start it from the top.
   useEffect(() => {
     sheetRef.current?.scrollTo({ top: 0 });
+    setEditing(false);
   }, [item?.id]);
 
   if (!item) return null;
 
-  // Calculate simulated outfit usage count based on wearCount or item id hash
-  const outfitCount = Math.max(3, (item.wearCount || 5) % 9 + 2);
+  const availability = item.availability ?? 'available';
 
   return (
     <div
@@ -149,8 +157,36 @@ export const ClothingDetailModal: React.FC<ClothingDetailModalProps> = ({
             }}
           >
             <Layers size={13} />
-            <span>Used in {outfitCount} outfits</span>
+            <span>{describeWear(item.wearCount, item.lastWornDate)}</span>
           </div>
+
+          {availability !== 'available' && (
+            <div
+              style={{
+                position: 'absolute',
+                top: 12,
+                left: 12,
+                backgroundColor: 'var(--color-surface-elevated)',
+                color: 'var(--color-text-primary)',
+                border: '1px solid var(--color-border)',
+                padding: '4px 12px',
+                borderRadius: 'var(--radius-pill)',
+                fontSize: '0.72rem',
+                fontWeight: 700
+              }}
+            >
+              {availability === 'laundry' ? 'In laundry' : 'Unavailable'}
+            </div>
+          )}
+        </div>
+
+        {/* Quick availability toggle — laundry is a frequent action, so it works without edit mode */}
+        <div style={{ marginBottom: 16 }} aria-label="Availability">
+          <SegmentedControl
+            options={AVAILABILITY_OPTIONS.map((o) => ({ value: o.value, label: o.label }))}
+            value={availability}
+            onChange={(value) => onUpdateItem(item.id, { availability: value })}
+          />
         </div>
 
         {/* Title & Metadata */}
@@ -158,8 +194,37 @@ export const ClothingDetailModal: React.FC<ClothingDetailModalProps> = ({
           {item.name}
         </h2>
         <p className="text-body" style={{ color: 'var(--color-text-secondary)', marginBottom: 20 }}>
-          {item.subcategory} · {item.formality.replace('_', ' ')} · {item.fabric}
+          {[item.subcategory, item.formality.replace('_', ' '), item.fabric, item.pattern].filter(Boolean).join(' · ')}
         </p>
+        {!editing && (
+          <button
+            type="button"
+            onClick={() => setEditing(true)}
+            style={{ display: 'inline-flex', alignItems: 'center', gap: 6, marginBottom: 16, padding: '8px 14px', borderRadius: 'var(--radius-pill)', fontSize: '0.8rem', fontWeight: 600, backgroundColor: 'var(--color-surface-subtle)', color: 'var(--color-text-primary)', border: '1px solid var(--color-border)', cursor: 'pointer' }}
+          >
+            <Pencil size={14} /> Edit details
+          </button>
+        )}
+        {item.collections && item.collections.length > 0 && (
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 16 }}>
+            {item.collections.map((c) => (
+              <span key={c} style={{ padding: '4px 12px', borderRadius: 'var(--radius-pill)', fontSize: '0.75rem', backgroundColor: 'var(--color-surface-subtle)', color: 'var(--color-text-secondary)', border: '1px solid var(--color-border)' }}>{c}</span>
+            ))}
+          </div>
+        )}
+
+        {editing && (
+          <GarmentEditForm
+            key={item.id}
+            item={item}
+            collectionSuggestions={collectionNames}
+            onCancel={() => setEditing(false)}
+            onSave={(patch) => {
+              onUpdateItem(item.id, patch);
+              setEditing(false);
+            }}
+          />
+        )}
 
         {/* Size and where it's kept — editable in place; saved as they change */}
         <div key={item.id} style={{ display: 'flex', flexDirection: 'column', gap: 16, marginBottom: 20 }}>
