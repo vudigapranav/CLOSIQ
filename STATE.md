@@ -6,10 +6,44 @@ This document tracks the live implementation status of **CLOSIQ**. It is updated
 
 ## Current Phase
 
-* **Now (2026-11-01)**: Shop Check + new nav + brain-Q icon — deployed (Vercel), OTA v1.3 published, new APK `47bad076` built. See the LIVE PROGRESS table below.
+* **Now (2026-11-11)**: Wardrobe intelligence sprint — explainable outfit engine, real web weather, laundry/availability, full garment editing, web events + .ics, analytics, account deletion/export/AI-photo consent, API hardening. Built + tested locally, pushed to `main`; **migrations NOT applied, NOT deployed, NOT device-verified**. See "SPRINT: WARDROBE INTELLIGENCE" below.
+* **Previous (2026-11-01)**: Shop Check + new nav + brain-Q icon — deployed (Vercel), OTA v1.3 published, new APK `47bad076` built. See the LIVE PROGRESS table below.
 * **Latest (2026-10-24)**: Wardrobe smart search + stylist filters on web and mobile — see "WARDROBE SEARCH + FILTERS" below.
 * **Phase**: Live deployment + new wardrobe features (2026-10-13) — **WEBSITE LIVE ON VERCEL; ANDROID APK BUILT; NOT DEVICE-VERIFIED**
 * **Status**: Website + AI backend deployed to Vercel at **https://closiq-liard.vercel.app** (login, cloud wardrobe shared with the phone app, responsive desktop/mobile web). Added garment **size** and **"where is it kept"** (Indian household places + custom) on web and mobile, and a free **studio photo** (white background, open-source U²-Net cut-out, no Gemini). Mobile linked to EAS (`@vudigapranav/closiq`) with over-the-air updates; first Android `preview` APK build started. Supabase was paused again and was restored; a daily Vercel Cron keeps it from pausing. **Workflow change at the user's request: commit and push straight to `main` (no PRs), then `git pull` into the local CLOSIQ folder.** Details in "DEPLOYMENT + FEATURES" below.
+
+---
+
+# SPRINT: WARDROBE INTELLIGENCE (2026-11-11) — LIVE PROGRESS
+
+User request: a full audit + engineering pass to turn CLOSIQ into a reliable wardrobe-intelligence product, using Sonnet subagents (3 read-only auditors, 5 implementers with strict file ownership, 1 independent reviewer) with the lead (Opus) owning the outfit engine and integration. Docs: `docs/ARCHITECTURE.md`, `docs/PRODUCT_ROADMAP.md`, `docs/TESTING.md`, `docs/KNOWN_ISSUES.md`, `docs/SECURITY.md`, `docs/ENVIRONMENT.md`.
+
+| # | Step | Status |
+|---|------|--------|
+| 1 | Audit (backend/security, ML, web+mobile parity) | DONE — findings in docs/SECURITY.md, docs/KNOWN_ISSUES.md |
+| 2 | Explainable outfit engine (`src/services/intelligence/outfitEngine.ts`) + rewire web/mobile stylists | DONE — 8 weighted factors, availability filter, alternatives, swaps; 12 tests |
+| 3 | Server hardening (rate limit, body cap, validation, error leakage, output id filter, responseSchema, headers) | DONE — `npm run test:server` 14/14 |
+| 4 | Data layer: availability/purchase/pattern/collections, full garment edit UI, atomic wear RPC, upsert | DONE — falls back when columns/RPCs are missing |
+| 5 | Real weather on web (Open-Meteo, city/geolocation, cache) + richer mobile forecast | DONE |
+| 6 | Web dated events (shared `planner_events`) + .ics export (web download, mobile share), analytics, privacy & account | DONE |
+| 7 | Mobile: password reset, account delete/export, AI-photo consent, honest labels, app.json fixes | DONE |
+| 8 | Verify: web typecheck + lint + build, mobile tsc, tests, server tests, Android bundle export | DONE — 165/165 + 16/16, Android Hermes bundle 4.8 MB |
+| 8b | Independent review (Sonnet) + fixes | DONE — P0: new server validator required `id` but both apps send `garmentId` → every AI call would have been a 400 (fixed + regression test with the real payload); P1: mislabelled image mime now sniffed; top swap can't put a dress over a bottom or a western top over a churidar; P2: laundry-only edit with the migration missing now says it can't be saved instead of silently reverting; mobile wear counts fall back to per-row on any RPC error |
+| 9 | Apply migrations `20261111120000_*`, `20261111130000_*` to production | NOT DONE — needs the owner's go-ahead |
+| 10 | Deploy web (Vercel) + OTA / APK + device test | NOT DONE — not authorized in this sprint |
+
+### What changed (details)
+* **Engine** (`outfitEngine.ts`, shared): factors formality 3, colour 2.5, weather 2, season 1, style 1.5, feedback 1.5, rotation 1, completeness 2 — each 0–1 with a generated note; a factor without data (no weather / prefs / feedback) gets weight 0. `rankOutfits` builds top-K × slot candidates, hard rules (availability, exclusions, dislikes, layering "avoid", ethnic-only bottoms, one-pieces), alternatives with different lead pieces. `aiStylist.ts` keeps its exports but delegates (no more invented 91–99 score, hardcoded 68°, canned "Sensual Evening Tailoring" titles). `pickLocalOutfit` uses the engine. AI outfits are also scored (`ruleScore` + `scoreBreakdown`); any invented/excluded id or incoherent category mix rejects the whole AI outfit (web validator `droppedIds`, mobile same rule via `isCoherentAIOutfit`); validator no longer defaults `styleMatch` to 92. Swaps are ranked by whole-outfit score (no `Math.random`) and drop a stale AI %.
+* **Labels**: `matchLabel` → "AI · N% Match" / "Rule-based · N/100" / "Rule-based pick"; mobile saved looks + events use it.
+* **Server**: `server/rateLimit.js` (per-user bucket, best-effort per Vercel instance), `server/validation.js`, 6 MB cap, fixed error strings, ids filtered server-side + one retry on the next model, Gemini `responseSchema`, weatherContext (web + mobile shapes), scan `pattern` + "don't guess brand/material", static-serving fixes, security headers (index.js + vercel.json), `sb_secret_` build guard, 45 s auth token cache.
+* **Data**: `src/services/cloud/schemaErrors.ts`; web `wardrobeCloud.ts` + mobile `wardrobeStorage.ts` map the new columns, retry without them on PGRST204/42703 (remembered per session), `record_garments_worn` RPC with per-row fallback; `recordShownOutfit` upsert. `src/services/garmentEdit.ts` validates edits. Detail sheets (web + mobile) have a quick availability toggle, laundry badges, "Edit details" form; real wear line replaces the invented "Used in N outfits". Filters: status + collection facets; search matches laundry words, pattern, collections.
+* **Weather**: `src/services/weather/webWeather.ts` (+ `webWeatherHelpers.ts`), `WeatherCard` on Home, weather passed to Today/Stylist/Planner via `App.tsx`; mobile `weatherService.ts` uses `weatherCore` (high/low/rain %), `toWeatherSnapshot`; unknown WMO code → "Unknown".
+* **Planner**: `plannerCloud.ts` (same table as mobile), `EventModal`, "Upcoming events" with forecast per date, suggest/use outfit, `.ics` via `src/services/calendarExport.ts`.
+* **Profile**: `wardrobeAnalytics.ts` insights (most/least worn, pairs, category/colour, utilisation, repetition) replace invented numbers; Privacy & account (AI photo toggle, download data, delete account behind typed DELETE). Consent off → no AI scan and no studio cut-out upload (web), no AI scan (mobile).
+* **Mobile**: "Forgot password?" → reset email opening the website's set-new-password screen; `accountService.ts` + `AccountPrivacySection`; StylistScreen saves real formality/temperature; app.json: duplicate splash plugin removed, `runtimeVersion` top-level (still appVersion → 1.0.0).
+* **Tooling**: root `tsconfig.json` + `npm run typecheck` (uses mobile's TypeScript), `npm test`, `npm run test:server`.
+* **Migrations** (additive, idempotent, NOT applied): `20261111120000_wardrobe_intelligence.sql`, `20261111130000_hardening.sql`; replay guard in `20260818090711`. Old `supabase/sql/*` moved into `supabase/migrations/`.
+* NOT TESTED in a browser or on a device (standing preference). Not deployed.
 
 ---
 
