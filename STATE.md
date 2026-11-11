@@ -6,7 +6,7 @@ This document tracks the live implementation status of **CLOSIQ**. It is updated
 
 ## Current Phase
 
-* **Now (2026-11-11)**: Wardrobe intelligence sprint — explainable outfit engine, real web weather, laundry/availability, full garment editing, web events + .ics, analytics, account deletion/export/AI-photo consent, API hardening. Built + tested locally, pushed to `main`; **migrations NOT applied, NOT deployed, NOT device-verified**. See "SPRINT: WARDROBE INTELLIGENCE" below.
+* **Now (2026-11-11)**: Wardrobe intelligence sprint — explainable outfit engine, real web weather, laundry/availability, full garment editing, web events + .ics, analytics, account deletion/export/AI-photo consent, API hardening. Built + tested locally, pushed to `main`; **migrations APPLIED to production Supabase**; NOT deployed, NOT device-verified. See "SPRINT: WARDROBE INTELLIGENCE" below.
 * **Previous (2026-11-01)**: Shop Check + new nav + brain-Q icon — deployed (Vercel), OTA v1.3 published, new APK `47bad076` built. See the LIVE PROGRESS table below.
 * **Latest (2026-10-24)**: Wardrobe smart search + stylist filters on web and mobile — see "WARDROBE SEARCH + FILTERS" below.
 * **Phase**: Live deployment + new wardrobe features (2026-10-13) — **WEBSITE LIVE ON VERCEL; ANDROID APK BUILT; NOT DEVICE-VERIFIED**
@@ -29,7 +29,7 @@ User request: a full audit + engineering pass to turn CLOSIQ into a reliable war
 | 7 | Mobile: password reset, account delete/export, AI-photo consent, honest labels, app.json fixes | DONE |
 | 8 | Verify: web typecheck + lint + build, mobile tsc, tests, server tests, Android bundle export | DONE — 165/165 + 16/16, Android Hermes bundle 4.8 MB |
 | 8b | Independent review (Sonnet) + fixes | DONE — P0: new server validator required `id` but both apps send `garmentId` → every AI call would have been a 400 (fixed + regression test with the real payload); P1: mislabelled image mime now sniffed; top swap can't put a dress over a bottom or a western top over a churidar; P2: laundry-only edit with the migration missing now says it can't be saved instead of silently reverting; mobile wear counts fall back to per-row on any RPC error |
-| 9 | Apply migrations `20261111120000_*`, `20261111130000_*` to production | NOT DONE — needs the owner's go-ahead |
+| 9 | Apply migrations to production (owner said "Yes, apply them") | DONE — `20261111054834_wardrobe_intelligence` was already live (applied by the session that started this work); `20261111064644_hardening` applied now. Verified: 6 new columns, both RPCs (anon revoked), FORCE RLS on outfit_feedback, 3 length checks (NOT VALID; 0 existing rows exceed them). Local files renamed to the recorded versions. Advisor: enable Auth leaked-password protection (dashboard) |
 | 10 | Deploy web (Vercel) + OTA / APK + device test | NOT DONE — not authorized in this sprint |
 
 ### What changed (details)
@@ -42,7 +42,7 @@ User request: a full audit + engineering pass to turn CLOSIQ into a reliable war
 * **Profile**: `wardrobeAnalytics.ts` insights (most/least worn, pairs, category/colour, utilisation, repetition) replace invented numbers; Privacy & account (AI photo toggle, download data, delete account behind typed DELETE). Consent off → no AI scan and no studio cut-out upload (web), no AI scan (mobile).
 * **Mobile**: "Forgot password?" → reset email opening the website's set-new-password screen; `accountService.ts` + `AccountPrivacySection`; StylistScreen saves real formality/temperature; app.json: duplicate splash plugin removed, `runtimeVersion` top-level (still appVersion → 1.0.0).
 * **Tooling**: root `tsconfig.json` + `npm run typecheck` (uses mobile's TypeScript), `npm test`, `npm run test:server`.
-* **Migrations** (additive, idempotent, NOT applied): `20261111120000_wardrobe_intelligence.sql`, `20261111130000_hardening.sql`; replay guard in `20260818090711`. Old `supabase/sql/*` moved into `supabase/migrations/`.
+* **Migrations** (additive, idempotent, APPLIED 2026-11-11): `20261111054834_wardrobe_intelligence.sql`, `20261111064644_hardening.sql`; replay guard in `20260818090711`. Old `supabase/sql/*` moved into `supabase/migrations/`.
 * NOT TESTED in a browser or on a device (standing preference). Not deployed.
 
 ---
