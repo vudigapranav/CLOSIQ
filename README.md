@@ -195,7 +195,6 @@ Development status, stated plainly:
 - **The backend must be reachable from the phone.** Dev setup requires the phone and the computer on the same Wi-Fi, with the LAN IP set in `mobile/.env.local`.
 - **No end-to-end device test automation.** The test suite covers services and logic, not the UI on a real device.
 - **The web app (`src/`) is an earlier surface**, kept for the browser prototype and for serving seed garment assets. It does not match the mobile app feature for feature.
-- **No license file at the repository root.** `mobile/LICENSE` is Expo's template license, not a license for this project.
 - **`STATE.md` is a large internal engineering log** (400KB+) kept for development context, not documentation. It contains development LAN IP addresses. Review it before making this repository public.
 
 ---
@@ -218,3 +217,11 @@ Development status, stated plainly:
 ```
 
 `CLAUDE.md` holds product and design-system context; `STATE.md` is the running implementation log.
+
+---
+
+## License
+
+CLOSIQ is released under the [MIT License](LICENSE). Copyright (c) 2026 vudigapranav.
+
+Third-party components keep their own licenses: the U²-Net background-removal model in `server/models/` is Apache License 2.0 (see `server/models/README.md`), and `mobile/LICENSE` is the MIT notice from Expo's project template.
