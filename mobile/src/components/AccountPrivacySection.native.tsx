@@ -84,10 +84,13 @@ export function AccountPrivacySection() {
     const picked = await Picker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 1 });
     if (picked.canceled) return 'Photo selection cancelled.';
     const photo = await optimizeGarmentImage(picked.assets[0].uri);
+    const controller = new AbortController();
+    abort.current = controller;
     try {
       const start = performance.now();
       await initializeBenchmark(gpu);
       const loaded = performance.now();
+      if (controller.signal.aborted) return 'Benchmark cancelled.';
       const answer = await infer(
         'Identify the garment and its main colour. Say unknown if unclear.',
         photo.uri
@@ -108,6 +111,9 @@ export function AccountPrivacySection() {
     } finally {
       const temp = new File(photo.uri);
       if (temp.exists && photo.uri !== picked.assets[0].uri) temp.delete();
+      // Garment scans and styling initialize on the CPU. Release a GPU engine
+      // after its benchmark so later scans don't silently keep using it.
+      if (gpu) await unloadModel().catch(() => {});
     }
   }
   return (

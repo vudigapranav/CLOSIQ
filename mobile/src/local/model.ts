@@ -61,11 +61,33 @@ export async function deleteModel() {
   await runtime().remove();
 }
 export const unloadModel = async () => native?.unload();
-export const cancelGeneration = async () => native?.cancel();
-if (native)
+// The native runtime stops a cancelled conversation and returns whatever text
+// it had produced so far. Each cancel (user, timeout, app backgrounding) moves
+// this epoch, so infer() reports that partial text as an interruption instead
+// of a finished answer, and a cancel during initialization also stops the
+// generation that would otherwise start right after it.
+let cancelEpoch = 0;
+export const cancelGeneration = async () => {
+  cancelEpoch++;
+  await native?.cancel();
+};
+export class GenerationCancelled extends Error {
+  constructor() {
+    super('Local analysis was interrupted. Try again or enter details manually.');
+    this.name = 'GenerationCancelled';
+  }
+}
+if (native) {
   AppState.addEventListener('memoryWarning', () => {
+    cancelEpoch++;
     void native.unload().catch(() => {});
   });
+  // Android releases the engine when the activity backgrounds (cancelling any
+  // running conversation), so the answer in flight is incomplete.
+  AppState.addEventListener('change', (state) => {
+    if (state === 'background') cancelEpoch++;
+  });
+}
 
 export async function infer(prompt: string, photo?: string) {
   if (working) throw new Error('Another model operation is running.');
@@ -73,11 +95,15 @@ export async function infer(prompt: string, photo?: string) {
   working = true;
   let timer: ReturnType<typeof setTimeout> | undefined;
   let expired = false;
+  const epoch = cancelEpoch;
   const task = async () => {
     try {
       await api.initialize();
       if (expired) throw new Error('Model initialization timed out.');
-      return await api.answer(prompt.slice(0, 2400), photo ?? null);
+      if (epoch !== cancelEpoch) throw new GenerationCancelled();
+      const answer = await api.answer(prompt.slice(0, 2400), photo ?? null);
+      if (epoch !== cancelEpoch) throw new GenerationCancelled();
+      return answer;
     } finally {
       working = false;
     }
@@ -88,6 +114,7 @@ export async function infer(prompt: string, photo?: string) {
       new Promise<never>((_, reject) => {
         timer = setTimeout(() => {
           expired = true;
+          cancelEpoch++;
           void api.cancel().catch(() => {});
           reject(new Error('Local analysis timed out. Try again or enter details manually.'));
         }, 60000);
