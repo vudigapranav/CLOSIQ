@@ -2,6 +2,69 @@
 
 Codex records its changes here, newest first.
 
+## 2026-11-19 (evening) — Independent review by Claude of the Codex and DeepSeek work; fixes, tests, rebuilt APK
+
+Reviewed the whole diff `7767584...b1837de` on `feature/closiq-v2-local-ai` (Codex: `b060ff1`…`db75bc2` plus the previously uncommitted files folded into `04dcd42`; DeepSeek: the Android build fixes in `04dcd42` and the `b1837de` handoff). No newer work had landed. No phone was attached (`adb devices -l` empty), so nothing below is device evidence.
+
+### Findings and fixes
+
+| # | Severity | File / function | Trigger → user impact | Fix | Verification |
+| --- | --- | --- | --- | --- | --- |
+| 1 | High | `mobile/src/local/photos.ts` `stagePhoto`, `services/wardrobeStorage.native.ts` `saveUserGarment` | expo-file-system 57 made `File.copy()` asynchronous; it was called without `await`. The garment row was committed before the photo existed, a failed copy became an unhandled rejection with the row still saved (permanent placeholder), and the wardrobe returned to the screen could show no photo. | `stagePhoto` is async, awaits the copy, checks the file, deletes a partial copy on failure; the record is written only afterwards. | New test fails on the old code (row written despite copy failure), passes now. |
+| 2 | High | `mobile/src/local/backup.ts` `exportBackup` / `restoreBackup` | On Android the folder picker returns a Storage Access Framework `content://` tree. The code addressed children with `new File(folder, name)`, which does not resolve a child document, and also did not await `copy()`. Export could report success while photos were not written; restore could not find `wardrobe.json` and inserted rows before photo copies finished. | Children are created with `createFile`/`createDirectory` and found with `list()`; all bytes are read/written with awaits; restore copies photos inside the transaction and deletes them on rollback. | Round-trip test through a simulated SAF folder (joined child URIs do not resolve, `copy` is async): export, wipe, failed restore leaves 0 rows and 0 photos, restore, repeat restore inserts 0. Old code fails it. Real SAF behaviour still needs the phone. |
+| 3 | Medium | `backup.ts` | One photo file missing on the phone made export throw for the whole wardrobe; one photo missing from a backup made restore throw. | Missing photos become the standard placeholder (`imageUrl: ''`) and the result message counts them. | Same test (export with a lost photo; restore after deleting a photo from the backup). |
+| 4 | Medium | `mobile/src/local/model.ts` `infer`, `cancelGeneration` | The Kotlin bridge returns the text produced so far when a conversation is cancelled. A user Cancel, the 60 s timeout, or the app backgrounding (Kotlin `release()`) surfaced that partial text as a finished chat answer / benchmark result, or as model output to validate. Cancelling while the engine was still initializing did nothing, so generation started anyway and kept the model busy. | A cancel epoch: cancel, timeout, memory warning and AppState `background` move it; `infer` throws `GenerationCancelled` if it moved before or during `answer`. | `tests/v2Model.test.ts` (4 cases); old code hangs/fails. |
+| 5 | Low | `AccountPrivacySection.native.tsx` `benchmark` | Cancel during benchmark initialization was ignored; after a GPU benchmark the engine stayed on GPU, so every later scan silently ran on GPU while the docs say CPU. | Benchmark checks its own abort signal; a GPU engine is unloaded after its benchmark. | Typecheck; device check pending. |
+| 6 | Medium | `mobile/src/local/validation.ts` `parseObject` | Only bare JSON or an exactly fenced block parsed. A 500M model's usual "Here is the JSON: {...}" sent every scan to manual entry and every ranking to the rule fallback. | Take the first balanced top-level object (string/escape aware); all field checks unchanged (fabricated IDs and extra fields still rejected). | New test; old code fails it. |
+| 7 | Medium | `mobile/src/local/legacyImport.ts` `mapLook` → `cloudRows.ts` `mapLegacyLook` | A saved look naming a V1 garment ID present in both wardrobes, without a profile on the snapshot, threw "ambiguous legacy garment reference". The importer resumes from the same row, so every retry failed at the same look and planner events were never imported. | Pure `mapLegacyLook`: unique or profile-matched garment, otherwise the archived snapshot without a photo. Never throws. | New test. Live import still unexercised (no authorized account, and no V1 env in the APK, see below). |
+| 8 | Low | `ai/training/evaluate_checkpoint.py` | Evaluation parsed with strict `json.loads` (scoring fenced output as invalid although the app accepts it), loaded the base from a hard-coded path instead of `configs/base-model.yaml`, and did not record which split was scored. | Same first-object rule as the app; base directory from the config; output records base model/revision, split path and SHA-256, and the raw text. | Parser checked with fenced, escaped and truncated inputs; `py_compile` OK. |
+| 9 | Low (docs) | `mobile/plugins/with-android-build-compat.js` | The generated comment said re-running `expo prebuild` refreshes the pins, but the marker stops the block from being rewritten. | Comment now says `npx expo prebuild --clean`. | Two consecutive prebuilds produce byte-identical `android/build.gradle` and `app/build.gradle`; the block appears once. |
+| 10 | Low (build scope) | `mobile/plugins/with-android-build-compat.js` | `-Xskip-metadata-version-check` was added to **every** Kotlin module. | Scoped to `:expo` and `:app`; `closiq-vision` keeps its own module flag. | Without the project-wide flag only `:expo:compileReleaseKotlin` fails (Kotlin stdlib 2.4.0 from LiteRT-LM on its classpath); with `:expo`+`:app` a `--rerun-tasks` build (659/659 executed, 15 Kotlin compiles) and a fresh `prebuild --clean` build both succeed, and the APK is identical to the project-wide-flag build in all 1,121 entries except `assets/app.manifest` (build-time update manifest): same dex, `.so` and bundle. |
+
+Reviewed with no change needed: Metro resolution (the exported Android bundle contains `closiq-device-v2.db`, `ClosiqVision` and the new code, and **no** `/api/ai/analyze-garment`, `/api/ai/generate-outfit`, `/api/ai/swap-garment`, `studio-photo` or `u.expo.dev`; the only `supabase.co` strings are supabase-js/config validation constants); native startup never calls Supabase; weather only on explicit refresh; OTA disabled; outfit choice is an index into engine-built candidates from available owned pieces; swaps use `rankSwapCandidates` over `eligibleWardrobe` (laundry/unavailable excluded); chat output is display-only; SQLite scoping per wardrobe; Kotlin install hashes before an atomic `Os.rename`, GPU load failure closes the engine; DeepSeek's NDK/Build Tools pins apply only when the preferred version is absent. Dataset preparation, group split and leakage checks were correct for exact duplicates; near-duplicate photos (re-encoded/resized) are not detected by the pixel hash, so curators must keep views of one garment in one `group`.
+
+DeepSeek's NDK/Build Tools overrides were kept as written (needed on this host: NDK 27 and Build Tools 35 are absent and the SDK directory is not writable); they only apply when the preferred version is missing.
+
+### Commands and results on this Mac (current checkout)
+
+| Check | Result |
+| --- | --- |
+| Baseline before edits: root `npm run typecheck`, mobile `tsc`, `npm test`, `npm run test:server` | Pass, 170/170, 16/16 |
+| After fixes: mobile `npm test` | **178/178** (8 new in `tests/v2Storage.test.ts`, `tests/v2Model.test.ts`) |
+| New tests against the original sources | 5 of the new tests fail (cancel-during-init hangs to the 60 s timeout) |
+| `npm run test:server` | 16/16 |
+| Root `npm run typecheck`, mobile `npx tsc -p tsconfig.json --noEmit` | Pass |
+| `npm run lint` | 0 errors, 6 pre-existing warnings |
+| `npm run build` (web) | Pass (pre-existing chunk-size warning) |
+| `npm run check:release-env` | OK |
+| `npx expo export -p android` | Pass, 3.3 MB bundle (`--no-bytecode`, for string inspection) |
+| `npx expo prebuild --platform android` ×2 | Identical output |
+| `python3 ai/evaluation/test_pipeline.py` (system Python 3.13, Pillow 11.1) / `validate_dataset.py` | 3/3 OK / `{train: 14, validation: 4, test: 2}` |
+| `:app:assembleRelease -PreactNativeArchitectures=arm64-v8a` (default `~/.gradle`, now writable and pre-populated; no separate `GRADLE_USER_HOME` needed) | BUILD SUCCESSFUL in 4m 51s (project-wide flag); `--rerun-tasks` 2m 47s (scoped flag, 659/659 executed); final after `prebuild --clean` from the committed plugin 1m 38s |
+| Kotlin narrowing experiment (`compileReleaseKotlin --continue` without the project-wide flag) | Fails only in `:expo` ("metadata version is 2.4.0 … can read up to 2.2.0") |
+| `adb devices -l` (start and end of session) | No devices |
+
+### Revised APK
+
+```text
+builds/CLOSIQ-V2-2.0.0-review-20261119-arm64-release.apk
+60,423,870 bytes · SHA-256 ab92f43d948a94e35fc71167bf977ede15d4d8ac9e34f07050bfb1c22ed2f556
+package com.closiq.app.v2 · versionCode 1 · versionName 2.0.0 (unchanged) · arm64-v8a only
+signed with the Expo template's local debug certificate (CN=Android Debug, cert SHA-256 fac61745…033b9c)
+```
+
+`lib/arm64-v8a/liblitertlm_jni.so` (22.7 MB) and a Hermes `assets/index.android.bundle` are inside; the bundle contains `GenerationCancelled`, `firstJsonObject`, `mapLegacyLook` and no `/api/ai/analyze-garment`. The original `builds/CLOSIQ-V2-2.0.0-arm64-release.apk` is kept unchanged (60,417,798 bytes, SHA-256 `79d40430…e10e` re-verified). Both use the same package, versionCode and debug key, so `adb install -r` of the review build updates an installed original **in place, keeping its data**; V1 (`com.closiq.app`) is a different app and is untouched. The shipped file is the final build from `prebuild --clean` with the committed plugin. Disk on this Mac ran down to 1 GiB during the experiments (the 6 GB Gradle daemon); stopping it restored ~7.6 GiB. `mobile/android/` (≈0.9 GB) and the library `android/build` folders under `mobile/node_modules` (≈0.8 GB) are generated and can be deleted.
+
+### Still open — needs the phone or the owner
+
+- Everything in the previous entry's device list: install, model download, airplane-mode inference text, backend, Init/Inference/PSS, restart persistence, swap/save/planner on device.
+- Real SAF behaviour of export/restore (the host test simulates it). Use a folder on internal storage, not Drive.
+- V1 import: needs `mobile/.env.local` with the public V1 URL/anon key at build time and an authorized test account. Neither APK has it.
+- Training stays pending: 20 synthetic text-ranking records, zero rights-reviewed garment photos, no base-inference proof.
+
+### Files changed
+`mobile/src/local/{photos,backup,model,validation,cloudRows,legacyImport}.ts`, `mobile/src/services/wardrobeStorage.native.ts`, `mobile/src/components/AccountPrivacySection.native.tsx`, `mobile/plugins/with-android-build-compat.js`, `mobile/tests/{v2Storage,v2Model}.test.ts`, `mobile/tests/helpers/nativeV2Mocks.ts`, `ai/training/evaluate_checkpoint.py`, `docs/v2/{MOBILE_DEPLOYMENT,KNOWN_LIMITATIONS,TESTING,RELEASE_CHECKLIST}.md`, `astra.md`.
+
 ## 2026-11-19 — ARM64 APK built for the first time; base-model artifact verified; device proof still open
 
 Continued the same checkout on branch `feature/closiq-v2-local-ai` (five Codex commits `b060ff1`, `3c4a283`, `04360ba`, `de3e284`, `db75bc2` plus all uncommitted edits preserved; parent checkout `../` is still V1 on `main`). Repeated the full verification suite on the dirty tree, fixed the real Kotlin/Gradle failures that had blocked every earlier native build, and produced an installable arm64 APK. Nothing was run on a phone.

@@ -5,6 +5,7 @@
 - [x] Host SQLite file persistence/rollback checks and native model-output validation tests.
 - [x] Functional dataset preparation, provenance checks, group split and leakage test.
 - [x] Native release APK compiled for arm64-v8a with the LiteRT-LM runtime bundled (2026-11-19, see MOBILE_DEPLOYMENT.md).
+- [x] Independent review of the Codex and DeepSeek changes; data-integrity, backup/restore, cancellation and model-output fixes with regression tests (2026-11-19, see astra.md).
 - [ ] APK installed and run on an ARM64 Android phone.
 - [ ] Real garment response, CPU/GPU comparison, interruption and airplane-mode restart on that phone.
 - [ ] On-device CRUD, photo persistence, user settings, planner and backup/restore regression.

@@ -16,4 +16,4 @@ From the root run npm test, npm run test:server, npm run typecheck and npm run b
 
 Use the release-style APK from [MOBILE_DEPLOYMENT.md](MOBILE_DEPLOYMENT.md). A Metro export or an emulator result cannot close the physical Android vision test. iPhone testing is outside the requested acceptance process.
 
-Host-side runs close only the software gates: TypeScript, 170 mobile/shared tests, 16 server tests, the Android JS export, the arm64 APK build and model-artifact checksum verification. Everything in the table above needs the phone.
+Host-side runs close only the software gates: TypeScript, 178 mobile/shared tests (2026-11-19 review: photo copies finish before records are written, backup/restore through an Android picked folder with rollback and missing photos, model cancellation and backgrounding, wrapped model JSON, non-blocking V1 look mapping), 16 server tests, the Android JS export (which also proves the `.native.ts` services are the ones bundled: no `/api/ai/*` strings in the Android bundle), the arm64 APK build and model-artifact checksum verification. Everything in the table above needs the phone.
