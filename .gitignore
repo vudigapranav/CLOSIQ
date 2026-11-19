@@ -31,3 +31,18 @@ mobile/.test-build
 
 # Vercel CLI project link
 .vercel
+
+# Local fashion model development and private data
+ai/.venv/
+__pycache__/
+ai/artifacts/
+ai/adapters/
+ai/checkpoints/
+ai/benchmarks/results/
+ai/data/images/
+ai/data/processed/
+ai/data/splits/
+ai/data/*.jsonl
+*.safetensors
+*.litertlm
+*.ipa
