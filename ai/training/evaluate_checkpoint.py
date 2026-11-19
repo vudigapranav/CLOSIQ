@@ -1,10 +1,49 @@
 """Score fixed held-out records without fallback, with identical prompts for base and adapter."""
 import argparse
+import hashlib
 import json
 import os
 from pathlib import Path
 from examples import ROOT, inputs_for
 from records import rows
+
+
+def first_json_object(text):
+    """Same rule as the app (mobile/src/local/validation.ts firstJsonObject):
+    the first balanced top-level object, so the score reflects what the phone
+    would accept rather than penalising a code fence or a leading sentence."""
+    start = text.find("{")
+    if start < 0:
+        return None
+    depth, quoted, escaped = 0, False, False
+    for i in range(start, len(text)):
+        c = text[i]
+        if quoted:
+            if escaped:
+                escaped = False
+            elif c == "\\":
+                escaped = True
+            elif c == '"':
+                quoted = False
+        elif c == '"':
+            quoted = True
+        elif c == "{":
+            depth += 1
+        elif c == "}":
+            depth -= 1
+            if depth == 0:
+                return text[start:i + 1]
+    return None
+
+
+def parse_answer(raw):
+    candidate = first_json_object(raw)
+    if candidate is None:
+        return None
+    try:
+        return json.loads(candidate)
+    except ValueError:
+        return None
 
 
 def main():
@@ -19,7 +58,8 @@ def main():
     os.environ["HF_HUB_OFFLINE"] = "1"
     import torch
     from transformers import SmolVLMForConditionalGeneration, AutoProcessor
-    base = ROOT / "artifacts/base"
+    config = json.loads((ROOT / "configs/base-model.yaml").read_text())
+    base = ROOT / config["directory"]
     processor = AutoProcessor.from_pretrained(base, local_files_only=True)
     model = SmolVLMForConditionalGeneration.from_pretrained(base, local_files_only=True,
             torch_dtype=torch.float16, attn_implementation="eager")
@@ -33,11 +73,8 @@ def main():
         with torch.inference_mode():
             generated = model.generate(**inputs, do_sample=False, max_new_tokens=160)
         raw = processor.decode(generated[0, inputs["input_ids"].shape[1]:], skip_special_tokens=True)
-        try:
-            parsed = json.loads(raw)
-        except ValueError:
-            parsed = None
-        record = {"id": row["id"], "task": row["task"], "valid": False}
+        parsed = parse_answer(raw)
+        record = {"id": row["id"], "task": row["task"], "valid": False, "raw": raw}
         if row["task"] == "garment":
             output = parsed if isinstance(parsed, dict) else {}
             record["category_correct"] = output.get("category") == row["answer"]["category"]
@@ -56,7 +93,10 @@ def main():
         scores = [r[metric] for r in results if metric in r]
         rates[metric] = {"correct": sum(scores), "total":len(scores)}
     args.output.parent.mkdir(parents=True,exist_ok=True)
-    args.output.write_text(json.dumps({"adapter":str(args.adapter) if args.adapter else None, "metrics":rates, "examples":results},indent=2))
+    args.output.write_text(json.dumps({"adapter":str(args.adapter) if args.adapter else None,
+        "base_model": config["model"], "base_revision": config["revision"], "split": str(args.split),
+        "split_sha256": hashlib.sha256(args.split.read_bytes()).hexdigest(),
+        "metrics":rates, "examples":results},indent=2))
 
 
 if __name__ == "__main__":
