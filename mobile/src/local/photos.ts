@@ -4,13 +4,21 @@ import type { GarmentItem, Outfit } from '../../../src/types/wardrobe';
 
 export const photoDir = () => new Directory(Paths.document, 'closiq-wardrobe-v2');
 export const validPhoto = (name: string) => /^[a-f0-9-]{36}\.jpg$/.test(name);
-export function stagePhoto(uri: string) {
+// expo-file-system 57: File.copy() is asynchronous. The record must only be
+// written after the copy has finished, so the caller awaits this.
+export async function stagePhoto(uri: string) {
   if (!uri) return '';
   if (!uri.startsWith('file://')) throw new Error('Choose a local photograph.');
   const folder = photoDir();
   folder.create({ intermediates: true, idempotent: true });
   const target = new File(folder, uuid.v4() + '.jpg');
-  new File(uri).copy(target);
+  try {
+    await new File(uri).copy(target);
+    if (!target.exists) throw new Error('The photo could not be saved on this phone.');
+  } catch (error) {
+    if (target.exists) target.delete();
+    throw error;
+  }
   return target.name;
 }
 

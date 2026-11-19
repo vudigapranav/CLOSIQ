@@ -12,7 +12,7 @@ export async function loadUserWardrobe(profile: WardrobeProfile) {
   return (await list<GarmentItem>('garment', profile)).map(showGarment);
 }
 export async function saveUserGarment(item: GarmentItem, profile: WardrobeProfile) {
-  const imageUrl = stagePhoto(item.imageUrl);
+  const imageUrl = await stagePhoto(item.imageUrl);
   try {
     await put('garment', profile, item.id, { ...item, profile, imageUrl });
   } catch (error) {

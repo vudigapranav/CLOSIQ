@@ -73,3 +73,24 @@ export function rowToEvent(row: Tables<'planner_events'>): PlannerEvent {
     outfit: (row.outfit as unknown as Outfit) || undefined
   };
 }
+
+/**
+ * Rewrites a V1 saved look for the device store. Each piece becomes the
+ * imported local garment it refers to; a piece that cannot be matched to
+ * exactly one imported garment (deleted, never imported, or the same V1 ID in
+ * both wardrobes without a profile on the snapshot) keeps its snapshot as an
+ * archived item with no photo. It never throws: one unclear reference must not
+ * block every later look and planner event on each retry.
+ */
+export function mapLegacyLook(look: Outfit, originals: Map<string, GarmentItem[]>, prefix: string): Outfit {
+  return {
+    ...look,
+    id: prefix + 'look:' + look.id,
+    items: (look.items || []).map((item) => {
+      const choices = originals.get(item.id) ?? [];
+      const matched =
+        choices.length === 1 ? choices[0] : choices.find((g) => !!item.profile && g.profile === item.profile);
+      return matched ?? { ...item, id: prefix + 'archived:' + item.id, imageUrl: '' };
+    })
+  };
+}

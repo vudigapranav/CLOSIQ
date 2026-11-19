@@ -2,8 +2,31 @@ import type { VisionAnalysisResult } from '../services/visionAnalysis';
 const categories = ['tops', 'bottoms', 'outerwear', 'shoes', 'accessories'] as const;
 const formalities = ['casual', 'smart_casual', 'formal', 'evening'] as const;
 
+/**
+ * Small vision-language models often wrap the requested JSON in a code fence
+ * or a sentence ("Here is the JSON: {...}"). Take the first complete,
+ * balanced top-level object; every field is still validated strictly below.
+ */
+export function firstJsonObject(text: string): string {
+  const start = text.indexOf('{');
+  if (start < 0) throw new Error('Expected a JSON object.');
+  let depth = 0,
+    quoted = false,
+    escaped = false;
+  for (let i = start; i < text.length; i++) {
+    const c = text[i];
+    if (quoted) {
+      if (escaped) escaped = false;
+      else if (c === '\\') escaped = true;
+      else if (c === '"') quoted = false;
+    } else if (c === '"') quoted = true;
+    else if (c === '{') depth++;
+    else if (c === '}' && --depth === 0) return text.slice(start, i + 1);
+  }
+  throw new Error('Expected a complete JSON object.');
+}
 function parseObject(text: string): Record<string, unknown> {
-  const value: unknown = JSON.parse(text.trim().replace(/^\x60{3}(?:json)?\s*|\s*\x60{3}$/gi, ''));
+  const value: unknown = JSON.parse(firstJsonObject(text));
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('Expected a JSON object.');
   return value as Record<string, unknown>;
 }

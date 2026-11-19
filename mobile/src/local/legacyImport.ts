@@ -5,7 +5,7 @@ import type { Database, Tables } from '../types/supabase';
 import type { GarmentItem, Outfit, WardrobeProfile } from '../../../src/types/wardrobe';
 import { checkSupabaseConfig } from '../services/supabaseConfig';
 import { database, put, type Kind, type Scope } from './store';
-import { rowToGarment, rowToOutfit, rowToEvent } from './cloudRows';
+import { rowToGarment, rowToOutfit, rowToEvent, mapLegacyLook } from './cloudRows';
 import { photoDir } from './photos';
 
 export async function importLegacy(email: string, password: string, progress: (s: string) => void) {
@@ -80,19 +80,7 @@ export async function importLegacy(email: string, password: string, progress: (s
     }
     if (garment) originals.set(row.garment_id, [...(originals.get(row.garment_id) ?? []), garment]);
   }
-  function mapLook(look: Outfit): Outfit {
-    return {
-      ...look,
-      id: prefix + 'look:' + look.id,
-      items: look.items.map((item) => {
-        const choices = originals.get(item.id) ?? [];
-        const matched = choices.length === 1 ? choices[0] : choices.find((g) => g.profile === item.profile);
-        if (!matched && choices.length > 1)
-          throw new Error('An outfit contains an ambiguous legacy garment reference.');
-        return matched ?? { ...item, id: prefix + 'archived:' + item.id, imageUrl: '' };
-      })
-    };
-  }
+  const mapLook = (look: Outfit) => mapLegacyLook(look, originals, prefix);
   try {
     for (const table of ['garments', 'saved_outfits', 'planner_events'] as const) {
       for (let offset = 0; ; offset += 100) {
