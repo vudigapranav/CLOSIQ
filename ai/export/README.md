@@ -1,0 +1,5 @@
+# Custom mobile export
+
+Neither a trained CLOSIQ adapter nor a custom mobile bundle exists yet. The installed-model manifest in the app allows only the published **base** bundle. The original model and the adapter use Hugging Face format. A PEFT merge would produce Hugging Face weights; the LiteRT language decoder, vision encoder, connector, tokenizer, prompt template, image processing metadata and package would still need conversion and on-device validation.
+
+Use the upstream [SmolVLM2 LiteRT conversion notes](https://huggingface.co/litert-community/SmolVLM2-500M) to identify the exporter revision matching the baseline. First reproduce the upstream artifact from unmodified weights. Compare outputs on identical garment images before attempting a merged checkpoint. Investigate 4-bit decoder/8-bit vision options only after the reference build is reproducible. No custom export command was run because no trained weights are available. Record converter versions, full commands, evaluation deltas and Android latency before adding another manifest.

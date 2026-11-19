@@ -1,0 +1,1 @@
+{"model_name":"CLOSIQ-VLM-500M","batch_size":1,"accumulation":4,"steps":100,"learning_rate":0.00005,"rank":8,"alpha":16,"seed":42,"eval_steps":10,"max_tokens":1536,"target_modules":"(?:.*\\.)?text_model\\.layers\\.\\d+\\.self_attn\\.(?:q_proj|v_proj)"}

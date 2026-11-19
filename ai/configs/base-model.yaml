@@ -1,6 +1,6 @@
 {
   "model": "HuggingFaceTB/SmolVLM2-500M-Video-Instruct",
-  "revision": "d52b9cddd52922722e9e0780315d209dd8311f45",
+  "revision": "abf83ca8a19096fcfa511aa8e7aaaefb02753f41",
   "directory": "artifacts/base",
   "max_new_tokens": 96
 }
