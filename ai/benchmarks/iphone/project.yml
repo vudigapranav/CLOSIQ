@@ -1,0 +1,22 @@
+name: ClosiqPhotoBench
+options:
+  deploymentTarget:
+    iOS: '17.0'
+packages:
+  LiteRTLM:
+    url: https://github.com/google-ai-edge/LiteRT-LM
+    exactVersion: 0.19.1
+targets:
+  ClosiqPhotoBench:
+    type: application
+    platform: iOS
+    sources:
+      - PhotoBench.swift
+      - ../../../mobile/modules/closiq-vision/ios/VisionRuntime.swift
+    settings:
+      PRODUCT_BUNDLE_IDENTIFIER: com.closiq.photobench
+      GENERATE_INFOPLIST_FILE: YES
+      INFOPLIST_KEY_UILaunchScreen_Generation: YES
+      SWIFT_VERSION: '5.0'
+    dependencies:
+      - package: LiteRTLM
