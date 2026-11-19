@@ -2,6 +2,8 @@
 
 This document is the permanent instruction and context guide for every Claude session working on **CLOSIQ**.
 
+Before starting work, read the latest entry in [astra.md](astra.md) for changes made by Codex and any open follow-ups.
+
 ---
 
 ## 1. Project Identity
