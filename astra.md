@@ -48,8 +48,11 @@ Code review of the local paths (unchanged behaviour, no edits needed): native st
 
 Unchanged and still gated: 20 text-only ranking records (14/4/2 split), zero rights-reviewed garment photos, no LoRA run, no checkpoint, no exported custom model. The published base stays labelled `SmolVLM2-500M · base`; `CLOSIQ-VLM-500M` remains reserved and has no weights. Base inference on Android must be proven before any training work resumes.
 
-### Files changed in this milestone
+### Remote and housekeeping
 
+GitHub was reachable this session, so the reviewed milestone was committed as `04dcd42` on `feature/closiq-v2-local-ai` together with the previously uncommitted Codex working tree, and pushed: `origin/feature/closiq-v2-local-ai` now tracks it. `main` on the remote is unchanged at `7767584`, and the parent V1 checkout was not touched (still on `main`). After the build the git-ignored `mobile/.gradle-home` (3.2 GB) and `mobile/android/` (746 MB) were deleted, because the development Mac runs at about 1% free disk; the APK is preserved in `builds/` and the first rebuild re-downloads about 2 GB of Gradle dependencies.
+
+### Files changed in this milestone
 - `mobile/modules/closiq-vision/android/build.gradle` — module identity, `defaultConfig`, LiteRT-LM metadata flag.
 - `mobile/plugins/with-android-build-compat.js` — new config plugin (NDK/Build Tools pinning, Kotlin metadata relaxation).
 - `mobile/app.json` — registers that plugin.
