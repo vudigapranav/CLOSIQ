@@ -19,7 +19,8 @@
  *    2.1.20 ("Class 'com.google.ai.edge.litertlm.Engine' was compiled with an
  *    incompatible version of Kotlin"). The 2.4 stdlib wins dependency
  *    resolution for the whole app anyway (it is what ships in the APK), so the
- *    compiler is told to accept that newer metadata. Remove this once the
+ *    compiler is told to accept that newer metadata in the modules that see
+ *    it (closiq-vision itself, plus :expo and :app). Remove this once the
  *    project builds with Kotlin 2.4+.
  *
  * Nothing here changes app behaviour or the JavaScript bundle.
@@ -101,7 +102,8 @@ module.exports = function withAndroidBuildCompat(config, props = {}) {
       lines.push(
         '// The preferred NDK / Build Tools are not installed here, so the app',
         '// and every Android module use the newest installed versions.',
-        '// Re-run `npx expo prebuild` to refresh these pins.',
+        '// The marker above keeps this block from being added twice; run',
+        '// `npx expo prebuild --clean` to recompute these pins.',
         'ext {'
       );
       if (ndk) lines.push(`  ndkVersion = '${ndk}'`);
@@ -136,11 +138,17 @@ module.exports = function withAndroidBuildCompat(config, props = {}) {
         '}'
       );
     }
-    // Accept the Kotlin 2.4 metadata that the on-device model runtime carries.
+    // Accept the Kotlin 2.4 metadata that the on-device model runtime carries,
+    // only where it reaches the compile classpath. `closiq-vision` sets the flag
+    // in its own build.gradle; `expo` (the autolinking aggregator) and `app`
+    // depend on it and see kotlin-stdlib 2.4.0. Verified 2026-11-19: without
+    // the flag `:expo:compileReleaseKotlin` fails; every other module compiles.
     lines.push(
       'subprojects { subproject ->',
-      "  subproject.plugins.withId('org.jetbrains.kotlin.android') {",
-      "    subproject.kotlin.compilerOptions.freeCompilerArgs.add('-Xskip-metadata-version-check')",
+      "  if (subproject.name in ['expo', 'app']) {",
+      "    subproject.plugins.withId('org.jetbrains.kotlin.android') {",
+      "      subproject.kotlin.compilerOptions.freeCompilerArgs.add('-Xskip-metadata-version-check')",
+      '    }',
       '  }',
       '}',
       '',
@@ -151,7 +159,7 @@ module.exports = function withAndroidBuildCompat(config, props = {}) {
     console.log(
       `[closiq] Android build compat — ndk: ${ndk ?? 'preferred installed'}, buildTools: ${
         buildTools ?? 'preferred installed'
-      }, kotlin metadata check: relaxed for LiteRT-LM`
+      }, kotlin metadata check: relaxed for :expo and :app (LiteRT-LM)`
     );
     return cfg;
   });
