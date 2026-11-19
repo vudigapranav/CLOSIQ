@@ -64,7 +64,7 @@ export const PlannerScreen: React.FC<PlannerScreenProps> = ({
   // Outfit"/"Change Outfit" action). Reuses generateOutfitMobile/
   // swapGarmentMobile exactly as Today/Stylist do — no second AI engine.
   const [planningEvent, setPlanningEvent] = useState<PlannerEvent | null>(null);
-  const [outfitResult, setOutfitResult] = useState<{ mode: 'gemini' | 'fallback'; notice?: string; data: MobileOutfitResult } | null>(null);
+  const [outfitResult, setOutfitResult] = useState<{ mode: 'gemini' | 'on_device' | 'fallback'; notice?: string; data: MobileOutfitResult } | null>(null);
   const [planLoading, setPlanLoading] = useState(false);
   const [planError, setPlanError] = useState<string | null>(null);
   const [selectedGarmentForSwap, setSelectedGarmentForSwap] = useState<GarmentItem | null>(null);

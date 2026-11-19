@@ -1,0 +1,100 @@
+import { requireOptionalNativeModule } from 'expo-modules-core';
+import { File, Paths } from 'expo-file-system';
+import { AppState } from 'react-native';
+
+export const model = {
+  name: 'SmolVLM2-500M · base',
+  revision: '307bf6d1018edd2c2d0903b92628151bdb5cc2b7',
+  bytes: 363085824,
+  repo: 'litert-community/SmolVLM2-500M',
+  file: 'SmolVLM2-500M.litertlm'
+} as const;
+type Status = 'missing' | 'installed' | 'ready' | 'unsupported';
+interface NativeVision {
+  memoryKiB?(): Promise<number>;
+  status(): Promise<Status>;
+  initialize(): Promise<void>;
+  install(uri: string): Promise<void>;
+  answer(prompt: string, photo: string | null): Promise<string>;
+  cancel(): Promise<void>;
+  unload(): Promise<void>;
+  remove(): Promise<void>;
+}
+const native = requireOptionalNativeModule<NativeVision>('ClosiqVision');
+function runtime() {
+  if (!native) throw new Error('Install a CLOSIQ native mobile build to use photo analysis.');
+  return native;
+}
+export const modelStatus = async (): Promise<Status> => (native ? native.status() : 'unsupported');
+let working = false;
+export async function installModel(progress: (percent: number) => void, signal: AbortSignal) {
+  const api = runtime();
+  if (working) throw new Error('Another model operation is running.');
+  if (Paths.availableDiskSpace < model.bytes * 2 + 64 * 1024 * 1024)
+    throw new Error('Free at least 800 MB before installing.');
+  working = true;
+  const stage = new File(Paths.cache, 'closiq-model.partial');
+  try {
+    if (stage.exists) stage.delete();
+    await File.downloadFileAsync(
+      'https://huggingface.co/' + model.repo + '/resolve/' + model.revision + '/' + model.file,
+      stage,
+      {
+        signal,
+        onProgress: ({ bytesWritten }) =>
+          progress(Math.min(100, Math.floor((bytesWritten / model.bytes) * 100)))
+      }
+    );
+    if (signal.aborted) throw new Error('Installation cancelled.');
+    await api.install(stage.uri);
+  } finally {
+    working = false;
+    if (stage.exists) stage.delete();
+  }
+}
+export async function initializeModel() {
+  await runtime().initialize();
+}
+export async function deleteModel() {
+  if (working) throw new Error('Finish the current operation before deleting the model.');
+  await runtime().remove();
+}
+export const unloadModel = async () => native?.unload();
+export const cancelGeneration = async () => native?.cancel();
+if (native)
+  AppState.addEventListener('memoryWarning', () => {
+    void native.unload().catch(() => {});
+  });
+
+export async function infer(prompt: string, photo?: string) {
+  if (working) throw new Error('Another model operation is running.');
+  const api = runtime();
+  working = true;
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  let expired = false;
+  const task = async () => {
+    try {
+      await api.initialize();
+      if (expired) throw new Error('Model initialization timed out.');
+      return await api.answer(prompt.slice(0, 2400), photo ?? null);
+    } finally {
+      working = false;
+    }
+  };
+  try {
+    return await Promise.race([
+      task(),
+      new Promise<never>((_, reject) => {
+        timer = setTimeout(() => {
+          expired = true;
+          void api.cancel().catch(() => {});
+          reject(new Error('Local analysis timed out. Try again or enter details manually.'));
+        }, 60000);
+      })
+    ]);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+export const memoryKiB = async () => native?.memoryKiB?.();

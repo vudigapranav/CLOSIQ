@@ -60,7 +60,7 @@ export const StylistScreen: React.FC<StylistScreenProps> = ({
   const [swapping, setSwapping] = useState(false);
   const [selectedGarmentForSwap, setSelectedGarmentForSwap] = useState<GarmentItem | null>(null);
   const [outfitResult, setOutfitResult] = useState<{
-    mode: 'gemini' | 'fallback';
+    mode: 'gemini' | 'on_device' | 'fallback';
     notice?: string;
     data: MobileOutfitResult;
   } | null>(null);
@@ -270,7 +270,7 @@ export const StylistScreen: React.FC<StylistScreenProps> = ({
         },
         saved: true,
         dateCreated: new Date().toISOString(),
-        source: outfitResult.mode === 'gemini' ? 'ai' : 'local',
+        source: outfitResult.mode !== 'fallback' ? 'ai' : 'local',
         status
       };
 

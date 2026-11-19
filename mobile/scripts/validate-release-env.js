@@ -55,12 +55,13 @@ function checkPublicHttpsUrl(name, value, problems) {
 /** Pure: returns the list of problems for an env object (empty = valid). */
 function validateReleaseEnv(env) {
   const problems = [];
-  checkPublicHttpsUrl('EXPO_PUBLIC_API_URL', env.EXPO_PUBLIC_API_URL, problems);
-  checkPublicHttpsUrl('EXPO_PUBLIC_SUPABASE_URL', env.EXPO_PUBLIC_SUPABASE_URL, problems);
+  const offline = env.CLOSIQ_V2_OFFLINE === '1';
+  if (!offline) checkPublicHttpsUrl('EXPO_PUBLIC_API_URL', env.EXPO_PUBLIC_API_URL, problems);
+  if (!offline || env.EXPO_PUBLIC_SUPABASE_URL || env.EXPO_PUBLIC_SUPABASE_ANON_KEY) checkPublicHttpsUrl('EXPO_PUBLIC_SUPABASE_URL', env.EXPO_PUBLIC_SUPABASE_URL, problems);
 
   const anonKey = env.EXPO_PUBLIC_SUPABASE_ANON_KEY || '';
   if (!anonKey) {
-    problems.push('EXPO_PUBLIC_SUPABASE_ANON_KEY is not set.');
+    if (!offline || env.EXPO_PUBLIC_SUPABASE_URL) problems.push('EXPO_PUBLIC_SUPABASE_ANON_KEY is not set.');
   } else if (/your_supabase|placeholder/i.test(anonKey)) {
     problems.push('EXPO_PUBLIC_SUPABASE_ANON_KEY is still the example placeholder.');
   } else if (isServiceRoleKey(anonKey)) {
@@ -99,11 +100,11 @@ if (require.main === module) {
     console.log(`[release-env] Skipped (EAS_BUILD_PROFILE=${profile || 'unset'}; enforced for preview/production only).`);
     process.exit(0);
   }
-  const problems = validateReleaseEnv(process.env);
+  const problems = validateReleaseEnv({ ...process.env, CLOSIQ_V2_OFFLINE: '1' });
   if (problems.length > 0) {
     console.error(`[release-env] ${problems.length} problem(s) for profile "${profile || 'local --force'}":`);
     for (const p of problems) console.error(`  - ${p}`);
     process.exit(1);
   }
-  console.log('[release-env] OK — API and Supabase configuration are valid for a release build.');
+  console.log('[release-env] OK — Offline mobile release configuration passed.');
 }

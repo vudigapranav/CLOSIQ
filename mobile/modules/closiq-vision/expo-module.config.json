@@ -1,1 +1,5 @@
-{"platforms":["apple"],"apple":{"modules":["ClosiqVisionModule"]}}
+{
+  "platforms": ["android", "apple"],
+  "android": {"modules": ["app.closiq.vision.ClosiqVisionModule"]},
+  "apple": {"modules": ["ClosiqVisionModule"]}
+}

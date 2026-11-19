@@ -1,27 +1,28 @@
 {
   "expo": {
-    "name": "CLOSIQ",
+    "name": "CLOSIQ V2",
     "slug": "closiq",
-    "version": "1.0.0",
+    "version": "2.0.0",
     "orientation": "portrait",
     "icon": "./assets/app-icon.png",
-    "scheme": "closiq",
+    "scheme": "closiq-v2",
     "userInterfaceStyle": "light",
     "backgroundColor": "#F7F2E9",
     "ios": {
       "supportsTablet": false,
-      "bundleIdentifier": "com.closiq.app",
+      "bundleIdentifier": "com.closiq.app.v2",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
       }
     },
     "android": {
-      "package": "com.closiq.app",
+      "package": "com.closiq.app.v2",
       "adaptiveIcon": {
         "backgroundColor": "#F7F2E9",
         "foregroundImage": "./assets/adaptive-icon-foreground.png",
         "monochromeImage": "./assets/adaptive-icon-monochrome.png"
-      }
+      },
+      "allowBackup": false
     },
     "web": {
       "favicon": "./assets/app-icon.png"
@@ -59,7 +60,7 @@
     },
     "owner": "vudigapranav",
     "updates": {
-      "url": "https://u.expo.dev/859d629b-60ac-4860-b325-16eee1c362d7"
+      "enabled": false
     },
     "runtimeVersion": {
       "policy": "appVersion"

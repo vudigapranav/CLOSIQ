@@ -89,7 +89,7 @@ export const TodayScreen: React.FC<TodayScreenProps> = ({
   const [swapping, setSwapping] = useState(false);
   const [selectedGarmentForSwap, setSelectedGarmentForSwap] = useState<GarmentItem | null>(null);
   const [outfitResult, setOutfitResult] = useState<{
-    mode: 'gemini' | 'fallback';
+    mode: 'gemini' | 'on_device' | 'fallback';
     notice?: string;
     data: MobileOutfitResult;
   } | null>(null);

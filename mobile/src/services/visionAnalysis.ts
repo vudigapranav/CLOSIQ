@@ -13,6 +13,8 @@ export interface VisionAnalysisResult {
   layeringRole?: LayeringRole;
   style: string;
   tags: string[];
+  pattern?: string;
+  secondaryColors?: string[];
   pairingNotes: string;
   /** Present ONLY when the model itself returned a numeric confidence. */
   aiConfidence?: number;

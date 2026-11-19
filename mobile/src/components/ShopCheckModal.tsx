@@ -1,3 +1,5 @@
+import { uuid } from 'expo-modules-core';
+import { Platform } from 'react-native';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Modal,
@@ -226,8 +228,9 @@ export const ShopCheckModal: React.FC<ShopCheckModalProps> = ({
       }
       setStep('scanning');
       const run = ++runRef.current;
-      const scan = optimized.base64
-        ? await analyzeGarmentImageMobile(optimized.base64, 'image/jpeg')
+      const scanInput = Platform.OS !== 'web' ? optimized.uri : optimized.base64;
+      const scan = scanInput
+        ? await analyzeGarmentImageMobile(scanInput, 'image/jpeg')
         : { ok: false as const, message: "Couldn't read that photo." };
       if (runRef.current !== run) return;
       if (scan.ok) {
@@ -285,10 +288,11 @@ export const ShopCheckModal: React.FC<ShopCheckModalProps> = ({
     setStep('result');
   };
 
-  const handleBought = () => {
-    if (!described || added) return;
+  const saving = useRef(false);
+  const handleBought = async () => {
+    if (!described || added || saving.current) return;
     const garment: GarmentItem = {
-      id: `user-upload-${Date.now()}`,
+      id: `user-upload-${uuid.v4()}`,
       name: described.name,
       category: described.category,
       subcategory: described.subcategory,
@@ -308,7 +312,10 @@ export const ShopCheckModal: React.FC<ShopCheckModalProps> = ({
       pairingNotes: described.pairingNotes
     };
     setAddedId(garment.id);
-    onGarmentAdded(garment);
+    saving.current = true;
+    try { await onGarmentAdded(garment); }
+    catch (error) { Alert.alert('Couldn’t save garment', String(error)); return; }
+    finally { saving.current = false; }
     setAdded(true);
   };
 

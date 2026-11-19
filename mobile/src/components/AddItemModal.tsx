@@ -1,3 +1,5 @@
+import { uuid } from 'expo-modules-core';
+import { Platform } from 'react-native';
 import React, { useRef, useState } from 'react';
 import {
   StyleSheet,
@@ -91,7 +93,10 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({
   // photo is ignored.
   const studioRunRef = useRef(0);
 
+  const scanAttempt = useRef(0);
+  const saving = useRef(false);
   const resetState = () => {
+    scanAttempt.current++;
     setStep('choose');
     setImageUri(null);
     setBase64Data(null);
@@ -110,6 +115,9 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({
   };
 
   const handleClose = () => {
+    if (step === 'analyzing' && Platform.OS !== 'web') {
+      void import('../local/model').then(m => m.cancelGeneration()).catch(() => {});
+    }
     resetState();
     onClose();
   };
@@ -159,7 +167,7 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({
         // below), so the source buttons stay disabled through this step too.
         const optimized = await optimizeGarmentImage(asset.uri);
         setImageUri(optimized.uri);
-        setBase64Data(optimized.base64 || null);
+        setBase64Data(Platform.OS !== 'web' ? optimized.uri : optimized.base64 || null);
         setStep('preview');
       }
     } catch (err) {
@@ -178,7 +186,9 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({
 
     // Consent gate: with AI photo analysis off, skip the scan entirely and
     // go straight to manual entry.
+    const attempt = ++scanAttempt.current;
     const consented = await getAiPhotoConsent();
+    if (attempt !== scanAttempt.current) return;
     if (!consented) {
       setAnalysisResult(null);
       setAnalysisFailure('AI photo analysis is turned off in Profile.');
@@ -188,7 +198,7 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({
     }
 
     setStep('analyzing');
-    if (studioStatus !== 'ready') {
+    if (Platform.OS === 'web' && studioStatus !== 'ready') {
       const run = ++studioRunRef.current;
       setStudioStatus('loading');
       makeStudioPhotoMobile(base64Data).then((uri) => {
@@ -198,6 +208,7 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({
       });
     }
     const result = await analyzeGarmentImageMobile(base64Data, 'image/jpeg', selectedCategory);
+    if (attempt !== scanAttempt.current) return;
     if (!result.ok) {
       setAnalysisResult(null);
       setAnalysisFailure(result.message);
@@ -251,6 +262,13 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({
     );
   };
 
+  const persistGarment = async (garment: GarmentItem) => {
+    if (saving.current) return;
+    saving.current = true;
+    try { await onGarmentAdded(garment); handleClose(); }
+    catch (error) { Alert.alert("Couldn’t save garment", String(error)); }
+    finally { saving.current = false; }
+  };
   const handleAddManual = () => {
     if (!imageUri || !manualName.trim()) return;
     const categoryLabel = CATEGORY_HINTS.find((c) => c.key === editedCategory)?.label ?? 'Garment';
@@ -258,7 +276,7 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({
     // placeholders for required fields — no invented fabric, style,
     // pairing note or confidence score.
     const newGarment: GarmentItem = {
-      id: `user-upload-${Date.now()}`,
+      id: `user-upload-${uuid.v4()}`,
       name: manualName.trim(),
       category: editedCategory,
       subcategory: categoryLabel,
@@ -275,8 +293,7 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({
       storageLocation,
       size
     };
-    onGarmentAdded(newGarment);
-    handleClose();
+    void persistGarment(newGarment);
   };
 
   const handleConfirmAndAdd = () => {
@@ -284,11 +301,13 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({
 
     // Create stable application ID for user upload
     const newGarment: GarmentItem = {
-      id: `user-upload-${Date.now()}`,
+      id: `user-upload-${uuid.v4()}`,
       name: analysisResult.name,
       category: editedCategory,
       subcategory: analysisResult.subcategory,
       color: analysisResult.color,
+      secondaryColors: analysisResult.secondaryColors,
+      pattern: analysisResult.pattern,
       hexColor: analysisResult.hexColor,
       fabric: analysisResult.fabric,
       fit: analysisResult.fit,
@@ -307,8 +326,7 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({
       size
     };
 
-    onGarmentAdded(newGarment);
-    handleClose();
+    void persistGarment(newGarment);
   };
 
   return (

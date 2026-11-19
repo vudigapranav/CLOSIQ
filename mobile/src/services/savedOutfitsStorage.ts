@@ -34,24 +34,7 @@ const BASE_STORAGE_KEY = '@closiq_saved_outfits';
  * auth.uid()`, live-verified) is now the durable source of truth.
  * AsyncStorage remains as a read cache for offline continuity.
  */
-function rowToOutfit(row: Tables<'saved_outfits'>): Outfit {
-  return {
-    id: row.outfit_id,
-    title: row.title,
-    occasion: row.occasion,
-    vibe: row.vibe,
-    formalityLabel: row.formality_label,
-    temperature: row.temperature ?? 0,
-    items: ((row.items as unknown) as Outfit['items']) || [],
-    styleScore: row.style_score ?? 0,
-    explanation: (row.explanation as unknown) as Outfit['explanation'],
-    saved: true,
-    dateCreated: row.date_created,
-    wornToday: row.worn_today,
-    missingCategories: ((row.missing_categories as unknown) as Outfit['missingCategories']) || undefined,
-    status: row.status === 'worn' ? 'worn' : 'try_later'
-  };
-}
+import {rowToOutfit} from '../local/cloudRows';
 
 async function readCache(scope: SessionScope): Promise<Outfit[]> {
   try {

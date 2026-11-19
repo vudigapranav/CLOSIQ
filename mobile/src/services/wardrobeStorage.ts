@@ -67,43 +67,9 @@ function isLocalDeviceUri(uri: string): boolean {
   return /^(file:|content:|ph:|assets-library:)/i.test(uri);
 }
 
-function rowToGarment(row: Tables<'garments'>): GarmentItem {
-  return {
-    id: row.garment_id,
-    name: row.name,
-    category: row.category as GarmentItem['category'],
-    subcategory: row.subcategory,
-    color: row.color,
-    hexColor: row.hex_color,
-    secondaryColors: row.secondary_colors || undefined,
-    fabric: row.fabric,
-    seasons: (row.seasons as GarmentItem['seasons']) || [],
-    formality: row.formality as GarmentItem['formality'],
-    // Durable references only (Sprint M20): an uploaded photo's bucket path,
-    // signed by refreshGarmentImages() in loadUserWardrobe; a seed photo's
-    // `/wardrobe/...` path on the CURRENT API host, however stale the host
-    // stored in the row is.
-    imageUrl: row.storage_path ? storageReferenceUrl(row.storage_path) : resolveStaticImageUrl(row.image_url),
-    brand: row.brand || undefined,
-    favorite: row.favorite,
-    wearCount: row.wear_count,
-    lastWornDate: row.last_worn_date || undefined,
-    dateAdded: row.date_added,
-    tags: row.tags || [],
-    aiConfidence: row.ai_confidence ?? undefined,
-    pairingNotes: row.pairing_notes || undefined,
-    fit: row.fit || undefined,
-    style: row.style || undefined,
-    layeringRole: (row.layering_role as GarmentItem['layeringRole']) || undefined,
-    profile: (row.source_profile as WardrobeProfile) || undefined,
-    isSeedItem: row.is_seed_item,
-    storageLocation: row.storage_location || undefined,
-    size: row.size || undefined,
-    availability: row.availability === 'laundry' || row.availability === 'unavailable' ? row.availability : undefined,
-    purchaseDate: row.purchase_date || undefined,
-    pattern: row.pattern || undefined,
-    collections: row.collections && row.collections.length > 0 ? row.collections : undefined
-  };
+import {rowToGarment as mapGarment} from '../local/cloudRows';
+function rowToGarment(row: Tables<'garments'>) {
+  return mapGarment(row, row.storage_path ? storageReferenceUrl(row.storage_path) : resolveStaticImageUrl(row.image_url));
 }
 
 async function loadCachedWardrobe(
