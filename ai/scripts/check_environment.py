@@ -1,8 +1,8 @@
 """Inspect the active Python environment without fetching packages or weights."""
 import json
+import os
 import platform
 import shutil
-import subprocess
 import sys
 from importlib import metadata
 from pathlib import Path
@@ -20,13 +20,14 @@ def version(name):
 
 if __name__ == "__main__":
     mac = platform.system() == "Darwin"
-    mem = subprocess.run(["sysctl", "-n", "hw.memsize"], capture_output=True, text=True) if mac else None
+    pages = os.sysconf("SC_PHYS_PAGES") if mac else 0
+    mem = pages * os.sysconf("SC_PAGE_SIZE") if pages > 0 else None
     deps = {name: version(name) for name in ("mlx", "mlx-vlm", "torch", "torchvision", "transformers", "Pillow", "numpy", "huggingface-hub", "peft")}
     model = ROOT / CONFIG["directory"]
     print(json.dumps({
         "macos": platform.mac_ver()[0], "python": sys.version.split()[0],
         "apple_silicon": mac and platform.machine() == "arm64",
-        "unified_memory_bytes": int(mem.stdout) if mem and mem.stdout.strip().isdigit() else None,
+        "unified_memory_bytes": mem,
         "free_disk_bytes": shutil.disk_usage(ROOT).free, "packages": deps,
         "model": CONFIG["model"], "weight_files_present": any(model.glob("*.safetensors")),
         "training_compatibility": "requires a base inference and training smoke test"

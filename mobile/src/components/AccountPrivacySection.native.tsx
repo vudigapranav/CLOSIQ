@@ -21,6 +21,7 @@ import {
   deleteModel,
   infer,
   initializeModel,
+  initializeBenchmark,
   installModel,
   memoryKiB,
   model,
@@ -39,6 +40,7 @@ export function AccountPrivacySection() {
   const [message, setMessage] = useState(''),
     [progress, setProgress] = useState<number | null>(null),
     [consent, setConsent] = useState(true);
+  const [gpu, setGpu] = useState(false);
   const [legacy, setLegacy] = useState(false),
     [email, setEmail] = useState(''),
     [password, setPassword] = useState('');
@@ -84,7 +86,7 @@ export function AccountPrivacySection() {
     const photo = await optimizeGarmentImage(picked.assets[0].uri);
     try {
       const start = performance.now();
-      await initializeModel();
+      await initializeBenchmark(gpu);
       const loaded = performance.now();
       const answer = await infer(
         'Identify the garment and its main colour. Say unknown if unclear.',
@@ -93,6 +95,7 @@ export function AccountPrivacySection() {
       const seconds = (performance.now() - loaded) / 1000,
         memory = await memoryKiB();
       return (
+        (Platform.OS === 'android' ? (gpu ? 'GPU' : 'CPU') + ' · ' : '') +
         'Init ' +
         ((loaded - start) / 1000).toFixed(2) +
         ' s · Inference ' +
@@ -122,10 +125,18 @@ export function AccountPrivacySection() {
           })
         }
       />
-      <Button title="Refresh weather using my location" disabled={busy} onPress={()=>void run(async()=>{
-        const result=await fetchCurrentWeather(true);
-        return result.status==='success' && result.weather ? 'Saved the latest weather on this phone.' : 'Weather could not refresh. Previous readings are kept.';
-      })}/>
+      <Button
+        title="Refresh weather using my location"
+        disabled={busy}
+        onPress={() =>
+          void run(async () => {
+            const result = await fetchCurrentWeather(true);
+            return result.status === 'success' && result.weather
+              ? 'Saved the latest weather on this phone.'
+              : 'Weather could not refresh. Previous readings are kept.';
+          })
+        }
+      />
       <Button title="Manage local AI" onPress={() => setPage(true)} />
       <Button title="Export wardrobe and photos" disabled={busy} onPress={() => void run(exportBackup)} />
       <Button
@@ -207,6 +218,17 @@ export function AccountPrivacySection() {
                 })
               }
             />
+            {Platform.OS === 'android' && (
+              <View>
+                <Text>Benchmark with GPU</Text>
+                <Switch
+                  accessibilityLabel="Benchmark with GPU"
+                  value={gpu}
+                  disabled={busy}
+                  onValueChange={setGpu}
+                />
+              </View>
+            )}
             <Button
               title={'Test a garment photo on ' + (Platform.OS === 'android' ? 'Android' : 'iOS')}
               disabled={busy || !consent || !['installed', 'ready'].includes(status)}

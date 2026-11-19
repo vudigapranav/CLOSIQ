@@ -1,5 +1,12 @@
 # CLOSIQ
 
+## V2 Android development branch
+
+This checkout adds a guest wardrobe, SQLite, app-owned photographs and local SmolVLM2 integration for Android device testing. The base model is an optional download. Android prebuild and JavaScript export have passed. Native APK compilation, phone inference and custom model training are pending. The V1 architecture and demo below describe the existing web and legacy flows.
+
+[Android build and test instructions](docs/v2/MOBILE_DEPLOYMENT.md) · [V2 architecture](docs/v2/ARCHITECTURE.md) · [Current limitations](docs/v2/KNOWN_LIMITATIONS.md) · [Claude handoff](astra.md)
+
+
 **An AI stylist for the clothes you already own.**
 
 CLOSIQ is a mobile app that turns a photo of a garment into a structured wardrobe entry, then builds outfits from *your actual clothes* for a given occasion — and explains why each look works.

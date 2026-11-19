@@ -11,6 +11,7 @@ export const model = {
 } as const;
 type Status = 'missing' | 'installed' | 'ready' | 'unsupported';
 interface NativeVision {
+  initializeBackend?(gpu: boolean): Promise<void>;
   memoryKiB?(): Promise<number>;
   status(): Promise<Status>;
   initialize(): Promise<void>;
@@ -98,3 +99,9 @@ export async function infer(prompt: string, photo?: string) {
 }
 
 export const memoryKiB = async () => native?.memoryKiB?.();
+
+export async function initializeBenchmark(gpu: boolean) {
+  const api = runtime();
+  if (api.initializeBackend) await api.initializeBackend(gpu);
+  else await api.initialize();
+}

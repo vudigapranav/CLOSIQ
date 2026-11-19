@@ -103,3 +103,34 @@ test('restore validates data before opening the write transaction', () => {
     'false'
   );
 });
+
+test('native styling uses owned available items through model success, rejection, and absence', async () => {
+  const loader = Module as unknown as { _load:(name:string,...args:unknown[])=>unknown };
+  const original = loader._load;
+  let status = 'ready';
+  let output = '{"choice":1,"explanation":"This combination suits the occasion."}';
+  loader._load = function(name,...args) {
+    if (name === '../local/model') return { modelStatus:async()=>status, infer:async()=>output };
+    return original.call(this,name,...args);
+  };
+  try {
+    const {generateOutfitMobile,swapGarmentMobile} = await import('../src/services/outfitStylist.native');
+    const base:import('../../src/types/wardrobe').GarmentItem = {
+      id:'shirt',name:'Blue shirt',category:'tops',subcategory:'shirt',color:'blue',hexColor:'#002277',
+      fabric:'unknown',seasons:['summer'],formality:'casual',imageUrl:'',favorite:false,
+      wearCount:0,dateAdded:'2026-11-19',tags:[]
+    };
+    const closet = [base,{...base,id:'slacks',name:'Trousers',category:'bottoms' as const},
+      {...base,id:'second',name:'Green shirt'}, {...base,id:'wash',availability:'laundry' as const}];
+    const result = await generateOutfitMobile('dinner',closet,'avoid',['second']);
+    assert.equal(result.mode,'on_device');
+    assert.deepEqual(new Set(result.data.garmentIds),new Set(['shirt','slacks']));
+    output='{"choice":1,"garmentIds":["invention"],"explanation":"fake"}';
+    assert.equal((await generateOutfitMobile('dinner',closet)).mode,'fallback');
+    status='missing';
+    assert.equal((await generateOutfitMobile('dinner',closet)).mode,'fallback');
+    assert.equal((await generateOutfitMobile('dinner',[])).ok,false);
+    const swapped=await swapGarmentMobile(['shirt','slacks'],'shirt','tops','dinner',closet);
+    assert.equal(swapped.data.replacementGarmentId,'second');
+  } finally { loader._load=original; }
+});

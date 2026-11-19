@@ -1,3 +1,5 @@
+import { Platform } from 'react-native';
+import { StylingChat } from '../components/StylingChat';
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
   StyleSheet,
@@ -463,6 +465,7 @@ export const StylistScreen: React.FC<StylistScreenProps> = ({
           </View>
         </View>
       </Modal>
+      {Platform.OS !== 'web' && wardrobe.length > 0 && <StylingChat key={profile} items={wardrobe} />}
     </ScrollView>
   );
 };

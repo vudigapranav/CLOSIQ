@@ -46,3 +46,6 @@ ai/data/*.jsonl
 *.safetensors
 *.litertlm
 *.ipa
+
+# Local APK artifacts
+/builds/

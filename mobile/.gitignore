@@ -39,3 +39,9 @@ yarn-error.*
 # generated native folders
 /ios
 /android
+
+# Local Gradle home used when ~/.gradle is not writable
+/.gradle-home/
+
+# Local module build output
+/modules/closiq-vision/android/build/

@@ -4,6 +4,8 @@ This document is the permanent instruction and context guide for every Claude se
 
 Before starting work, read the latest entry in [astra.md](astra.md) for changes made by Codex and any open follow-ups.
 
+This feature branch targets physical Android testing. Use [the Android deployment guide](docs/v2/MOBILE_DEPLOYMENT.md) and record hardware evidence before declaring offline visual inference ready. The V1 notes below describe the original architecture.
+
 ---
 
 ## 1. Project Identity

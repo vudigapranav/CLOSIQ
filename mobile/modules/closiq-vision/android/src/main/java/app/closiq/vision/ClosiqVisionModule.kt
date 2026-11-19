@@ -1,5 +1,7 @@
 package app.closiq.vision
 
+import android.content.ComponentCallbacks2
+import android.content.res.Configuration
 import android.net.Uri
 import android.os.Debug
 import com.google.ai.edge.litertlm.Backend
@@ -55,6 +57,24 @@ class ClosiqVisionModule : Module() {
     }
   }
 
+  private val pressure = object : ComponentCallbacks2 {
+    override fun onConfigurationChanged(config: Configuration) {}
+    override fun onLowMemory() { release() }
+    override fun onTrimMemory(level: Int) {
+      if (level == ComponentCallbacks2.TRIM_MEMORY_RUNNING_CRITICAL || level >= ComponentCallbacks2.TRIM_MEMORY_BACKGROUND) release()
+    }
+  }
+
+  private fun load(gpu: Boolean) {
+    if (engine != null) return
+    check(model.isFile) { "Install the base model first." }
+    check(android.os.Build.SUPPORTED_ABIS.contains("arm64-v8a")) { "This runtime requires an ARM64 Android phone." }
+    val backend = if (gpu) Backend.GPU() else Backend.CPU()
+    val next = Engine(EngineConfig(modelPath = model.path, backend = backend, visionBackend = backend,
+      maxNumTokens = 1024, maxNumImages = 1, cacheDir = context.cacheDir.path))
+    try { next.initialize(); engine = next } catch (error: Throwable) { next.close(); throw error }
+  }
+
   override fun definition() = ModuleDefinition {
     Name("ClosiqVision")
     AsyncFunction("status") { if (engine != null) "ready" else if (model.isFile) "installed" else "missing" }
@@ -88,15 +108,11 @@ class ClosiqVisionModule : Module() {
       }
     }
     AsyncFunction("initialize") Coroutine { ->
+      withContext(Dispatchers.IO) { exclusive { load(false) } }
+    }
+    AsyncFunction("initializeBackend") Coroutine { gpu: Boolean ->
       withContext(Dispatchers.IO) {
-        exclusive {
-          if (engine == null) {
-            check(model.isFile) { "Install the base model first." }
-            val next = Engine(EngineConfig(modelPath = model.path, backend = Backend.CPU(),
-              visionBackend = Backend.CPU(), maxNumTokens = 1024, maxNumImages = 1, cacheDir = context.cacheDir.path))
-            try { next.initialize(); engine = next } catch (error: Throwable) { next.close(); throw error }
-          }
-        }
+        exclusive { engine?.close(); engine = null; load(gpu) }
       }
     }
     AsyncFunction("answer") Coroutine { prompt: String, photo: String? ->
@@ -131,6 +147,7 @@ class ClosiqVisionModule : Module() {
       exclusive { engine?.close(); engine = null; check(!model.exists() || model.delete()) { "Could not delete model." } }
     }
     OnActivityEntersBackground { release() }
-    OnDestroy { release() }
+    OnCreate { context.registerComponentCallbacks(pressure) }
+    OnDestroy { appContext.reactContext?.unregisterComponentCallbacks(pressure); release() }
   }
 }

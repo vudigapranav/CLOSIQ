@@ -3,8 +3,28 @@ plugins {
   id 'expo-module-gradle-plugin'
 }
 group = 'app.closiq.vision'
-version = '0.1.0'
-android { namespace 'app.closiq.vision' }
+version = '2.0.0'
+android {
+  namespace 'app.closiq.vision'
+  defaultConfig {
+    versionCode 1
+    versionName '2.0.0'
+  }
+}
 dependencies {
   implementation 'com.google.ai.edge.litertlm:litertlm-android:0.19.1'
+}
+// LiteRT-LM 0.19.1 is published with Kotlin 2.4 metadata and a kotlin-stdlib
+// 2.4.0 dependency, while Expo SDK 57 / React Native 0.86 compile with Kotlin
+// 2.1.20, which refuses metadata newer than 2.2.0 ("Class
+// 'com.google.ai.edge.litertlm.Engine' was compiled with an incompatible
+// version of Kotlin"). Every LiteRT-LM release from 0.16 onward has the same
+// stdlib, so downgrading does not help. Accept the newer metadata here only:
+// the public API this module calls is ordinary engine/content classes, and the
+// runtime classpath already carries the matching stdlib. Remove this flag once
+// the project compiles with Kotlin 2.4 or newer.
+kotlin {
+  compilerOptions {
+    freeCompilerArgs.add('-Xskip-metadata-version-check')
+  }
 }
