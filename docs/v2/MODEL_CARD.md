@@ -6,7 +6,8 @@
 | Mac candidate | The MLX community publishes a conversion. The checked-in runner uses the upstream Transformers model and processor. |
 | Mobile base | litert-community/SmolVLM2-500M, revision 307bf6d1018edd2c2d0903b92628151bdb5cc2b7, Apache-2.0 per distributor. Credits belong to the upstream authors and converter. |
 | Publisher manifest | 363,085,824 bytes, SHA-256 7b432bbc0a5c54ba15ecb2f039a7711c1cfb1fe38badec01397a076b5043f74e. Verified on 2026-11-19 by streaming the revision-pinned file and hashing it on the development Mac: both values matched exactly. The phone still re-checks size and hash at install time. |
-| Runtime | Kotlin LiteRT-LM on Android, one image per conversation. The app validates local file size and hash before installation. |
+| Runtime | Kotlin LiteRT-LM 0.19.1 on Android, CPU, one image per conversation, one short question per conversation. The app checks size and SHA-256 before installation. Shown to customers as "CLOSIQ AI". |
+| Measured (emulator, CPU) | Load 0.66 s; answer ≈ 5.5 s; scan 7–9 s; outfit pick ≈ 7 s; app PSS 836 MiB. Correct names for two test photos (light blue button-down shirt; black cargo pants). |
 | CLOSIQ-VLM-500M | Reserved for a future fashion-adapted checkpoint. No trained weights, mobile export or performance claims. |
 
 Garment recognition and outfit explanations may be wrong, particularly with small objects, cluttered backgrounds and unfamiliar garments. Users can correct attributes. Textile composition defaults to unknown. The outfit engine controls garment IDs.

@@ -2,6 +2,60 @@
 
 Codex records its changes here, newest first.
 
+## 2026-11-20 — V2 redesigned as an update of V1: accounts kept, CLOSIQ AI instead of Gemini; emulator demo
+
+**Owner's direction (2026-11-19):** V2 must not use Gemini or any API key for scanning, pairing or styling; it must **not** be a guest/offline app; existing V1 users (the owner's brother) must keep all data and receive V2 **as an update**; customers must never see "local"/"on-device" wording, only "CLOSIQ AI". Offline is fine but not the goal.
+
+### What changed (feature/closiq-v2-local-ai)
+- **Back to V1's app shell and data:** `App.tsx`, Onboarding, Profile, weather, release-env script and `imageOptimizer` reverted to V1; the guest SQLite layer, backup/restore, V1 import and all storage `.native.ts` overrides deleted (`src/local/{store,records,backup,legacyImport,photos}.ts`, ten `services/*.native.ts`, `sessionLifecycle.ts`, `AccountPrivacySection.native.tsx`); `expo-sqlite` removed (lockfile identical to V1 again). `app.json` is V1's (package `com.closiq.app`, OTA URL) with version **2.0.0**, so V1 OTAs (runtime 1.0.0) cannot land on V2.
+- **Kept and improved CLOSIQ AI:** `visionAnalysis.native.ts` and `outfitStylist.native.ts` (Metro picks them on Android; no `/api/ai/analyze-garment|generate-outfit|swap-garment` in the Android bundle). Add Clothing passes the photo file to the scan and keeps base64 for V1's optional studio cut-out (server U²-Net, not Gemini).
+- **Short questions instead of forms** (`local/validation.ts`): emulator testing showed the 500M base model answers one question well but skips fields and loops on a JSON or 7-line form. Scan = "What is this garment and what colour is it?" (+ type/colour only if missing) + "casual, smart casual, formal or evening?"; category/colour/formality derived and checked against allowed values. Outfit pick = "number only" among rule-built owned outfits + one "why" sentence; any other number → rules. Chat = question first, numbered owned list, reply cut to two distinct sentences.
+- **Native:** Kotlin returns the collected text when CLOSIQ caps length (LiteRT-LM throws `CancellationException` on `cancelProcess()`), cap 700 chars; **crash guard** marker file so a SIGILL during engine start makes status `failed` (manual entry + rules, "Try starting it again") instead of crashing on every scan/outfit; `resetLoadFailure`.
+- **UI:** `components/LocalModelSection.tsx` (Profile "CLOSIQ AI" section + Home "Turn on CLOSIQ AI" card, hidden when AI photo analysis is off); every customer string says CLOSIQ AI (also V1's "Local pick" → "CLOSIQ pick", "local weather" wording); model name, GPU switch, timings and memory only when `EXPO_PUBLIC_CLOSIQ_AI_DEMO=1`. Swap now returns V1's `no_alternative` contract; JS timeout frees the lock.
+- **Demo build:** `mobile/src/demo/AiDemoApp.tsx`, selected in `index.ts` only when `EXPO_PUBLIC_CLOSIQ_AI_DEMO=1` (no sign-in, nothing saved, sample men's catalog).
+- **Sign-up bug (V1 too, mobile + web):** signing up with an email that already has an account showed "Account created — check your email"; Supabase sends nothing in that case (`identities: []`). Now says the account exists → log in / reset. Found via Supabase auth logs (`user_repeated_signup`); the owner's account (created 2026-10-15) was intact. Password-reset email delivery verified in logs; the reset link redirects to `localhost:3000` because the project's Site URL / redirect allow-list are not set to `https://closiq-liard.vercel.app` — **owner to fix in Supabase → Auth → URL Configuration** (not changed by Claude).
+- A Sonnet subagent independently reviewed the conversion (no V1 data-loss risk, no remaining Gemini path); its swap-contract, timeout-lock and banner findings were fixed.
+
+### Emulator evidence (Android 16 arm64 AVD on the M4 Mac, 4 GB RAM, `arm64.nosme`, Wi-Fi + data disabled)
+| Step | Result |
+| --- | --- |
+| Download 363 MB model + SHA-256 | OK in ~43 s (online, the only download) |
+| First engine start (before `arm64.nosme`) | **SIGILL** in `liblitertlm_jni.so` `nativeCreateEngine`: emulator advertises the M4's SME2 but the hypervisor cannot run it |
+| Free-form test (CPU) | Load 0.66 s, answer 5.49 s, PSS 836 MiB: "The garment is a light blue button-down shirt." |
+| Scan, black cargo pants | 7.3 s → Black cargo pants · bottoms · black · casual |
+| Scan, light blue shirt | 7.1 s → Light blue button-down shirt · tops · light blue · casual |
+| Outfit pick, "Dinner with friends on Friday" (first two-line Choice/Reason prompt was ignored by the model → rules; fixed to number-only + why) | 6.9 s, picked by CLOSIQ AI: White Oxford Shirt + Taupe Parachute Pants + Leather Loafers + Black Sling Bag, with its own reason |
+| Swap top | White Oxford Shirt → Light Blue Poplin Shirt |
+| Chat, first prompt (JSON wardrobe) | Ignored the wardrobe ("a white dress or a white shirt") and looped on one sentence |
+| Chat, numbered list prompt | Copied the list ("Charcoal Art Tee 2. Cream Graphic Tee 3.") |
+| Chat, final (question → grounded outfit path) | "Try your White Oxford Shirt, Taupe Parachute Pants, Leather Loafers and Black Sling Bag. … are suitable for a wedding reception." |
+
+Not run: sign-in and cloud screens (needs the owner's password), a physical phone, the EAS-signed update.
+
+### Commands / results
+| Check | Result |
+| --- | --- |
+| Mobile `npm test` | **177/177** (V1 suites + `v2LocalAi`, `v2Model`, repeated-sign-up case) |
+| `npm run test:server` | 16/16 |
+| Root `npm run typecheck`, mobile `tsc --noEmit` | Pass |
+| `npm run lint` | 0 errors, **0 warnings** (Codex's 6 unused imports removed) |
+| `npm run build` (web) | Pass |
+| `npm run check:release-env` (with V1's public Supabase env) | OK |
+| `npx expo export -p android` (production, no demo flag) | 0 hits for `/api/ai/analyze-garment`, `generate-outfit`, `swap-garment`, `generativelanguage`, `GEMINI`; demo screen not in the bundle; no "On-device AI" / "Local pick" / "local weather" / "Ask local" strings. Remaining "on this device" strings are V1's account-sync messages. |
+| Sonnet subagent review of the conversion | No V1 data-loss risk, no Gemini path left; 3 findings fixed |
+
+### APKs
+- Demo: `builds/CLOSIQ-V2-2.0.0-ai-demo-20261120-arm64.apk` — 58,553,717 bytes, SHA-256 `eb1cb02c3d9683c0eee37c086a5022c2a5a05e4d3bd3927d996b6b447e3bf861`, package `com.closiq.app.demo`, label "CLOSIQ V2 demo", debug-signed, bundled with `EXPO_PUBLIC_CLOSIQ_AI_DEMO=1`. Installs next to V1.
+- **No local `com.closiq.app` APK is shipped**: a Mac build is debug-signed and cannot update V1. The update is the EAS `preview` build (owner).
+- Earlier artifacts kept unchanged: `builds/CLOSIQ-V2-2.0.0-arm64-release.apk` (first build) and `builds/CLOSIQ-V2-2.0.0-review-20261119-arm64-release.apk` (review build, old `com.closiq.app.v2` guest design, superseded).
+- Build-time note: with the emulator running, Gradle builds took 11–17 min on this Mac (swap); use `-Xmx3g`/`-Xmx4g`.
+
+### Open
+- Owner: `npx eas-cli build -p android --profile preview` in `CLOSIQ-v2/mobile` (Expo login) → install over V1 on the brother's phone; turn on CLOSIQ AI; report scans/timings.
+- Owner: Supabase Site URL + redirect URLs → `https://closiq-liard.vercel.app` so reset/confirm links stop pointing at localhost.
+- Web still uses Gemini (V2 scope = Android). Training of `CLOSIQ-VLM-500M` still needs rights-reviewed photos.
+- Emulator config changed: `~/.android/avd/Medium_Phone.avd/config.ini` now `hw.ramSize=4096` and `kernel.parameters=arm64.nosme` (original saved as `config.ini.before-closiq`); demo app `com.closiq.app.demo` and two sample photos are on the emulator.
+
 ## 2026-11-19 (evening) — Independent review by Claude of the Codex and DeepSeek work; fixes, tests, rebuilt APK
 
 Reviewed the whole diff `7767584...b1837de` on `feature/closiq-v2-local-ai` (Codex: `b060ff1`…`db75bc2` plus the previously uncommitted files folded into `04dcd42`; DeepSeek: the Android build fixes in `04dcd42` and the `b1837de` handoff). No newer work had landed. No phone was attached (`adb devices -l` empty), so nothing below is device evidence.

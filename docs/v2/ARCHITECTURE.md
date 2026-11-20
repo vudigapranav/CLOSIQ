@@ -1,13 +1,27 @@
 # CLOSIQ V2 mobile architecture
 
-Android is the device acceptance target. Install the V2 build alongside V1 using the separate application ID com.closiq.app.v2. The Vite application and Node endpoints retain their V1 contracts.
+**V2 is an update of the V1 Android app** (decided by the owner on 2026-11-19, replacing the earlier guest/offline design). Same package `com.closiq.app`, same Supabase accounts, same cloud wardrobe, saved looks, planner and profile, same photo storage. Existing V1 users, after updating, sign in as before and keep everything. App version is `2.0.0`, so with `runtimeVersion.policy = appVersion` a V1 OTA bundle (runtime 1.0.0) can never land on the V2 binary and vice versa.
 
-The shared mobile screens call the existing service entry points. Metro resolves their .native.ts implementations for Android and iOS. App startup selects a local guest, opens a separate SQLite database, and reads profile and wardrobe records. Native builds disable Expo OTA and background weather fetching. Profile offers explicit weather refresh and V1 import.
+The only product change: **on Android, no Gemini call and no API key.** Garment photo scans, Shop Check scans, outfit picks, swaps and the Stylist chat use **CLOSIQ AI**, the published SmolVLM2-500M model running in the app through LiteRT-LM (`mobile/modules/closiq-vision`). Customers see only "CLOSIQ AI"; model names and diagnostics appear only in the demo build.
 
-SQLite records have a composite primary key of entity kind, scope and stable ID. Scope separates the device and the two wardrobes. Schema version uses SQLite user_version. Saved looks and planner events retain outfit snapshots with owned garment IDs. References point to UUID-named photos relative to the application documents directory. Missing files render the existing image placeholder. Deleting a garment preserves photos referenced by historical snapshots. Orphan photo collection is a remaining storage optimization.
+| Feature | V1 (Android) | V2 (Android) |
+| --- | --- | --- |
+| Sign-in, wardrobe, saved looks, planner, profile | Supabase + AsyncStorage cache | unchanged |
+| Garment / Shop Check photo scan | `/api/ai/analyze-garment` → Gemini | `visionAnalysis.native.ts` → CLOSIQ AI |
+| Outfit generation | `/api/ai/generate-outfit` → Gemini, rules fallback | `outfitStylist.native.ts`: rules build up to 3 owned outfits, CLOSIQ AI picks one by number |
+| Swap | `/api/ai/swap-garment` → Gemini | rules (`rankSwapCandidates`) |
+| Studio white-background photo | `/api/ai/studio-photo` (U²-Net on the server, no Gemini) | unchanged |
+| Weather | Open-Meteo | unchanged |
+| Web app and server | Gemini | unchanged (V2 scope is the Android app) |
 
-Every native AI request goes through local/model.ts and the ClosiqVision Expo module. Installation first checks free space, downloads to cache, then copies and hashes the staging file natively and renames it on the same filesystem. The model directory is excluded from ordinary backup. Status becomes ready only after engine initialization. Restarting an interrupted download starts over. Android releases the engine on background or memory pressure. A fresh conversation owns each photo. Local validation rejects malformed garment results. A bounded list of outfit candidates comes from outfitEngine, and the model can select only an offered index. Single-piece swaps use the existing deterministic rankings. The Stylist also supports short conversational follow-ups using available garment descriptions and the previous exchange. Conversation text cannot write to SQLite or select trusted IDs.
+Metro resolves `X.native.ts` before `X.ts` on Android, so the two `.native.ts` AI services replace the Gemini clients only in the phone build; the exported Android bundle contains none of the Gemini endpoints.
 
-File backup exports records and referenced photos to a folder chosen by the user. Restore merges missing records in a transaction and gives imported photo files new names. Explicit cloud import authenticates to the V1 project and pages through the user's garments, saved looks and planner events. Import progress is recorded with each local write. Private Storage photos are downloaded using short-lived authorized URLs. Historical catalog photos without a private storage object are reported. Archived snapshot items retain metadata. Reopening or retrying import skips completed records. There is no bidirectional sync.
+## CLOSIQ AI on the phone
 
-Research and training run separately under ai/. The training pipeline has no mobile runtime or server dependency. Custom checkpoints require a separate export, new manifest and device acceptance before release.
+- **Install.** Profile → CLOSIQ AI (and a Home card until installed): one 363 MB download of the revision-pinned file; Kotlin checks size and SHA-256 before an atomic rename into `noBackupFilesDir`.
+- **Questions, not forms.** The 500M base model answers one short question reliably but does not fill multi-field forms. A scan asks "What is this garment and what colour is it?", adds "What type of clothing is this?" / "main colour?" only when the name lacks them, and asks "casual, smart casual, formal or evening?". `local/validation.ts` derives category, colour and formality from the answers and accepts only the app's allowed values. An outfit pick asks for "the number only" from the rule-built options and then one "why" sentence; any number not offered falls back to the rules. Model text never supplies garment IDs.
+- **Lifecycle.** Single-flight inference with a 60 s timeout; cancel, timeout or app backgrounding reports "interrupted" (`GenerationCancelled`) instead of partial text. Kotlin caps an answer at 700 characters and returns the text so far. The engine is released on background or memory pressure.
+- **Crash guard.** A marker file is written before the native engine starts and removed afterwards. If the process dies inside the engine (for example SIGILL on an unsupported CPU path), status becomes `failed`, scans fall back to manual entry and outfits to rules, and Profile offers "Try starting it again".
+- **Demo build.** `EXPO_PUBLIC_CLOSIQ_AI_DEMO=1` at bundle time makes `index.ts` open `src/demo/AiDemoApp.tsx`: CLOSIQ AI on a sample catalog wardrobe with no sign-in and no storage, plus diagnostics. Normal builds never load it.
+
+Research and training run separately under `ai/`. `CLOSIQ-VLM-500M` (a fashion-tuned checkpoint) remains planned; the shipped model is the published base.
