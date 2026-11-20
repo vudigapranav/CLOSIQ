@@ -278,7 +278,7 @@ function singular(word: string): string {
 export interface SearchTerm {
   /** The word as the user typed it (after phrase folding). */
   word: string;
-  /** What CLOSIQ understood it as, e.g. "Blue shades", "Jackets (any type)". */
+  /** What HeyHanger understood it as, e.g. "Blue shades", "Jackets (any type)". */
   concepts: Concept[];
 }
 

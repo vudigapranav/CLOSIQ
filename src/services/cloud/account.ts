@@ -58,7 +58,7 @@ export async function setAiPhotoConsent(userId: string, value: boolean): Promise
 
 const EXPORT_TABLES = ['profiles', 'user_preferences', 'garments', 'saved_outfits', 'planner_events', 'outfit_feedback', 'outfit_history'] as const;
 
-/** Everything CLOSIQ stores about the user, as one object (their own rows only). */
+/** Everything HeyHanger stores about the user, as one object (their own rows only). */
 export async function collectMyData(userId: string, email?: string): Promise<Record<string, unknown>> {
   const out: Record<string, unknown> = { exportedAt: new Date().toISOString(), account: { id: userId, email: email ?? null } };
   for (const table of EXPORT_TABLES) {
@@ -75,7 +75,7 @@ export async function downloadMyData(userId: string, email?: string): Promise<vo
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = `closiq-my-data-${new Date().toISOString().slice(0, 10)}.json`;
+  a.download = `heyhanger-my-data-${new Date().toISOString().slice(0, 10)}.json`;
   document.body.appendChild(a);
   a.click();
   a.remove();

@@ -110,7 +110,7 @@ function vevent(event: CalendarEventInput, stamp: string): string[] {
     lines.push(`DTSTART;VALUE=DATE:${compactDate(event.date)}`);
     lines.push(`DTEND;VALUE=DATE:${compactDate(addDays(event.date, 1))}`);
   }
-  lines.push(`SUMMARY:${escapeIcsText(event.title || event.occasion || 'CLOSIQ event')}`);
+  lines.push(`SUMMARY:${escapeIcsText(event.title || event.occasion || 'HeyHanger event')}`);
   const description = describe(event);
   if (description) lines.push(`DESCRIPTION:${escapeIcsText(description)}`);
   if (event.occasion) lines.push(`CATEGORIES:${escapeIcsText(event.occasion)}`);
@@ -121,7 +121,7 @@ function vevent(event: CalendarEventInput, stamp: string): string[] {
 /** One VCALENDAR for any number of events. Lines end with CRLF as required. */
 export function buildIcs(events: CalendarEventInput[], now: Date = new Date()): string {
   const stamp = utcStamp(now);
-  const lines = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//CLOSIQ//Planner//EN', 'CALSCALE:GREGORIAN', 'METHOD:PUBLISH'];
+  const lines = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//HeyHanger//Planner//EN', 'CALSCALE:GREGORIAN', 'METHOD:PUBLISH'];
   for (const event of events) {
     if (!/^\d{4}-\d{2}-\d{2}$/.test(event.date)) continue;
     lines.push(...vevent(event, stamp));
@@ -133,5 +133,5 @@ export function buildIcs(events: CalendarEventInput[], now: Date = new Date()): 
 /** Safe file name for a downloaded .ics. */
 export function icsFileName(title: string): string {
   const slug = title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 40);
-  return `${slug || 'closiq-event'}.ics`;
+  return `${slug || 'heyhanger-event'}.ics`;
 }

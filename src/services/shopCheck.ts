@@ -9,7 +9,7 @@ import { StyleDnaAxis, computeStyleDna, styleArchetype } from '../data/styleDna'
  *
  * The user's ask: "I'm in a shop, I see a light-yellow T-shirt. I don't know
  * which of my pants would go with it." Point the camera at a piece BEFORE
- * buying it and CLOSIQ answers like a stylist who knows your closet:
+ * buying it and HeyHanger answers like a stylist who knows your closet:
  *   - wear it with: YOUR pieces that suit it, spread across colours
  *     ("your brown chinos, black trousers or blue jeans"),
  *   - whole outfits it would make with what you own, by occasion,
@@ -237,7 +237,7 @@ function styleFitFor(candidate: GarmentItem, wardrobe: GarmentItem[], options: S
     return {
       level: 'unknown',
       title: 'Style DNA not built yet',
-      detail: 'Add a few of your clothes and CLOSIQ can tell whether new pieces match your style.',
+      detail: 'Add a few of your clothes and HeyHanger can tell whether new pieces match your style.',
       archetype: archetype.name
     };
   }
@@ -409,7 +409,7 @@ export function runShopCheck(candidate: GarmentItem, wardrobe: GarmentItem[], op
     return {
       verdict: 'unknown',
       verdictTitle: 'Add your clothes first',
-      verdictSummary: "CLOSIQ can only judge a new piece against what you already own — and your wardrobe is empty. Add a few of your clothes, then scan again.",
+      verdictSummary: "HeyHanger can only judge a new piece against what you already own — and your wardrobe is empty. Add a few of your clothes, then scan again.",
       points: [{ tone: 'info', text: 'Your wardrobe is empty, so there is nothing to pair it with yet.' }],
       styleFit,
       wearWith: [],

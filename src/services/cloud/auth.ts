@@ -17,11 +17,11 @@ function friendlyError(err: { message?: string; status?: number; code?: string }
   const message = (err?.message || '').toLowerCase();
   if (err?.status === 429 || message.includes('rate limit')) return 'Too many attempts. Please wait a minute and try again.';
   if (message.includes('invalid login credentials')) return 'That email and password don’t match an account.';
-  if (message.includes('email not confirmed')) return 'Please confirm your email first — check your inbox for the link from CLOSIQ.';
+  if (message.includes('email not confirmed')) return 'Please confirm your email first — check your inbox for the link from HeyHanger.';
   if (message.includes('already registered') || message.includes('already exists')) return 'An account with this email already exists. Try signing in.';
   if (message.includes('password') && message.includes('characters')) return 'Use a password with at least 6 characters.';
   if (message.includes('invalid') && message.includes('email')) return 'Please enter a valid email address.';
-  if (message.includes('failed to fetch') || message.includes('network')) return 'Couldn’t reach CLOSIQ. Check your connection and try again.';
+  if (message.includes('failed to fetch') || message.includes('network')) return 'Couldn’t reach HeyHanger. Check your connection and try again.';
   return 'Something went wrong. Please try again.';
 }
 
@@ -40,7 +40,7 @@ export async function signUp(email: string, password: string): Promise<AuthOutco
   // An email that already has an account gets a success-shaped reply with no
   // identities and no email from Supabase.
   if (!data.session && data.user && data.user.identities?.length === 0) {
-    return { ok: true, message: 'This email already has a CLOSIQ account. Sign in with it, or use "Forgot password?" to reset it.' };
+    return { ok: true, message: 'This email already has a HeyHanger account. Sign in with it, or use "Forgot password?" to reset it.' };
   }
   if (!data.session) {
     return { ok: true, message: 'Account created! Check your email and tap the confirmation link, then sign in here.' };

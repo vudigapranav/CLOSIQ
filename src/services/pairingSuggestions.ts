@@ -188,9 +188,9 @@ const EMPTY_LABEL: Record<GarmentCategory, string> = {
   accessories: 'accessories'
 };
 
-/** "Add bottoms or footwear and CLOSIQ will suggest what to pair with this." */
+/** "Add bottoms or footwear and HeyHanger will suggest what to pair with this." */
 export function emptyPairingHint(groups: PairingGroup[]): string {
   const names = groups.map((g) => EMPTY_LABEL[g.category]);
   const list = names.length > 1 ? `${names.slice(0, -1).join(', ')} or ${names[names.length - 1]}` : names[0] ?? 'more pieces';
-  return `Add ${list} to your wardrobe and CLOSIQ will suggest what to pair with this.`;
+  return `Add ${list} to your wardrobe and HeyHanger will suggest what to pair with this.`;
 }

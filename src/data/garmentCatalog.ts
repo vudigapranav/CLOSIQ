@@ -1073,7 +1073,7 @@ function catalogEntryToGarmentItem(entry: CatalogEntry): GarmentItem {
     seasons: entry.seasons,
     formality: entry.formality,
     imageUrl: entry.imagePath,
-    brand: 'CLOSIQ Wardrobe',
+    brand: 'HeyHanger Wardrobe',
     favorite: false,
     wearCount: 0,
     dateAdded: new Date().toISOString().split('T')[0],

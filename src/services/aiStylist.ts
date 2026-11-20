@@ -54,7 +54,7 @@ const contextFor = (request: StyleRequest, extras: StyleContextExtras = {}): Out
 });
 
 /**
- * @deprecated Kept for older callers. Returns CLOSIQ's explainable rule-based
+ * @deprecated Kept for older callers. Returns HeyHanger's explainable rule-based
  * score (0–100) for the pieces — it used to return an invented 91–99.
  */
 export function calculateStyleMatchScore(items: GarmentItem[], occasion = ''): number {
@@ -64,7 +64,7 @@ export function calculateStyleMatchScore(items: GarmentItem[], occasion = ''): n
 /** "Why it works", built from the computed score factors (no canned copy). */
 export function generateWhyItWorksExplanation(items: GarmentItem[], occasion: string): string {
   if (items.length === 0) {
-    return 'Add a few pieces to your Collection and CLOSIQ can start building outfits from what you actually own.';
+    return 'Add a few pieces to your Collection and HeyHanger can start building outfits from what you actually own.';
   }
   return explainScore(scoreOutfit(items, { prompt: occasion })).summary;
 }

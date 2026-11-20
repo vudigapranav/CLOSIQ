@@ -24,7 +24,7 @@ import {
 } from './garmentTraits';
 
 /**
- * CLOSIQ's deterministic outfit engine (2026-11-11) — shared by web and mobile.
+ * HeyHanger's deterministic outfit engine (2026-11-11) — shared by web and mobile.
  *
  * This is the "rule-based" half of the hybrid stylist:
  *   - it BUILDS outfits when the AI is unavailable (and is labelled as such),

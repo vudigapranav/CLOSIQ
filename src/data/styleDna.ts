@@ -123,13 +123,13 @@ export function styleArchetype(wardrobe: GarmentItem[], stylePreferences: string
     const labels = stylePreferences.slice(0, 2).map(stylePreferenceLabel);
     return {
       name: labels.join(' + '),
-      description: 'Your starting point, from what you told us. Add your clothes and CLOSIQ will learn your real style.',
+      description: 'Your starting point, from what you told us. Add your clothes and HeyHanger will learn your real style.',
       source: 'preferences'
     };
   }
   return {
     name: 'Not discovered yet',
-    description: 'Add a few of your clothes and CLOSIQ will work out your style.',
+    description: 'Add a few of your clothes and HeyHanger will work out your style.',
     source: 'none'
   };
 }

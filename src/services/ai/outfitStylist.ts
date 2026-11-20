@@ -192,7 +192,7 @@ export async function generateAIOutfitWithGemini(
   if (validated.valid && (validated.droppedIds > 0 || !isCoherentAIOutfit(validated.items, options.excludeGarmentIds))) {
     // The model invented a piece, used an excluded one, or built an
     // unwearable look — don't show a silently "repaired" outfit as AI.
-    console.warn('[CLOSIQ Stylist] AI outfit rejected (invented/excluded/incoherent pieces); using the rule-based stylist.');
+    console.warn('[HeyHanger Stylist] AI outfit rejected (invented/excluded/incoherent pieces); using the rule-based stylist.');
     return localPick();
   }
 
@@ -202,7 +202,7 @@ export async function generateAIOutfitWithGemini(
   }
 
   if (!validated.valid || validated.items.length === 0) {
-    console.warn('[CLOSIQ Stylist] AI output validation failed, falling back to demo engine:', validated.reason);
+    console.warn('[HeyHanger Stylist] AI output validation failed, falling back to demo engine:', validated.reason);
     return localPick();
   }
 

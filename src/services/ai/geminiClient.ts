@@ -25,7 +25,7 @@ export async function postJsonToApi<T>(endpoint: string, payload: any): Promise<
     const json = await res.json();
     return json;
   } catch (err: any) {
-    console.warn(`[CLOSIQ AI Service] Fetch to ${endpoint} failed, switching to demo mode:`, err?.message || err);
+    console.warn(`[HeyHanger.ai Service] Fetch to ${endpoint} failed, switching to demo mode:`, err?.message || err);
     return { ok: false, mode: 'demo', error: err?.message || 'Network error' };
   }
 }

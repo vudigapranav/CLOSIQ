@@ -128,13 +128,13 @@ export interface Outfit {
   wornToday?: boolean;
   /** Core categories (tops/bottoms/shoes) the wardrobe had nothing to fill — lets the UI explain a sparse outfit instead of looking broken. */
   missingCategories?: GarmentCategory[];
-  /** 'ai' = chosen by the AI stylist; 'local' = CLOSIQ's on-device fallback
+  /** 'ai' = chosen by the AI stylist; 'local' = HeyHanger's on-device fallback
    *  (no AI evaluated it, so it carries no match score). */
   source?: 'ai' | 'local';
   /** Saved Looks only: 'try_later' = "I'll try this next time";
    *  'worn' = "I'm wearing / wore this". */
   status?: SavedLookStatus;
-  /** CLOSIQ's own explainable rule-based fit score (0–100) — computed by
+  /** HeyHanger's own explainable rule-based fit score (0–100) — computed by
    *  src/services/intelligence/outfitEngine.ts for every outfit, AI or local. */
   ruleScore?: number;
   /** Per-factor breakdown behind `ruleScore` ("why this works"). */
@@ -168,7 +168,7 @@ export type SavedLookStatus = 'try_later' | 'worn';
 export type OutfitRating = 'dislike' | 'okay' | 'nice';
 
 /** "96% Match" only for an AI-scored outfit; a local pick says it is
- *  rule-based and shows CLOSIQ's own explainable score — never an invented number. */
+ *  rule-based and shows HeyHanger's own explainable score — never an invented number. */
 export function matchLabel(outfit: Pick<Outfit, 'source' | 'styleScore' | 'ruleScore'>): string {
   if (outfit.source === 'local' || !outfit.styleScore) {
     return typeof outfit.ruleScore === 'number' ? `Rule-based · ${outfit.ruleScore}/100` : 'Rule-based pick';
