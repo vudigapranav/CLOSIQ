@@ -67,7 +67,7 @@ const REQUIRED = [
   'mobile/App.tsx',
   'mobile/metro.config.js',
   'mobile/tsconfig.json',
-  'mobile/assets/closiq-logo.png',
+  'mobile/assets/heyhanger-logo.png',
   'mobile/scripts/validate-release-env.js',
   'src/data/garmentCatalog.ts',
   'src/types/wardrobe.ts'

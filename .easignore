@@ -1,4 +1,4 @@
-# EAS Build upload rules for CLOSIQ (deployment prep, 2026-09-11).
+# EAS Build upload rules for HeyHanger (deployment prep, 2026-09-11).
 #
 # Verified against the installed eas-cli 21.7.0 source (build/vcs/clients/git.js,
 # build/vcs/local.js): EAS clones the WHOLE git repository from its top level,
@@ -69,3 +69,22 @@ mobile/expo-env.d.ts
 *.tsbuildinfo
 mobile/ios
 mobile/android
+
+# V2 local AI work and build artifacts (mirrors .gitignore; never uploaded to EAS)
+ai/.venv/
+ai/models/
+ai/checkpoints/
+ai/benchmarks/results/
+ai/data/images/
+ai/data/processed/
+ai/data/splits/
+*.safetensors
+*.litertlm
+*.apk
+*.aab
+*.ipa
+builds/
+ai/artifacts/
+ai/adapters/
+__pycache__/
+.vercel

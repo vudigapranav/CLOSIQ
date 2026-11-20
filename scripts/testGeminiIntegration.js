@@ -14,7 +14,7 @@ async function runTests() {
   try {
     const response = await ai.models.generateContent({
       model: 'gemini-flash-latest',
-      contents: 'Say hello in 3 words for CLOSIQ AI Stylist.'
+      contents: 'Say hello in 3 words for HeyHanger.ai Stylist.'
     });
     console.log('Gemini API Connection Test Successful:', response.text?.trim());
   } catch (err) {

@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Post-deploy verification for the CLOSIQ backend — makes ZERO Gemini calls
+ * Post-deploy verification for the HeyHanger backend — makes ZERO Gemini calls
  * and needs no credentials. Usage (from the repo root):
  *
  *   node scripts/verify-deployment.mjs https://api.example.com
@@ -44,7 +44,7 @@ async function req(url, init = {}) {
   }
 }
 
-console.log(`CLOSIQ deployment check → ${base}\n`);
+console.log(`HeyHanger deployment check → ${base}\n`);
 
 // 1. Transport
 const u = new URL(base);
