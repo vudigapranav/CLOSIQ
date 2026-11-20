@@ -6,7 +6,7 @@ import * as Updates from 'expo-updates';
  * By default expo-updates downloads a new update in the background and only
  * runs it on the next cold start — the user reopened the app after the
  * "Wardrobe search + filters" OTA and still saw the old Wardrobe. Now, on
- * launch, CLOSIQ checks for an update and, if one downloads within
+ * launch, HeyHanger checks for an update and, if one downloads within
  * RELOAD_WINDOW_MS (i.e. while the intro is still playing), restarts into
  * it straight away. A slower download is kept for the next launch rather
  * than yanking the screen away mid-use.

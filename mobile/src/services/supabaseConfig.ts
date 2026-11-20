@@ -65,7 +65,7 @@ export function checkSupabaseConfig(url: string, key: string): SupabaseConfigChe
       ok: false,
       problem: 'missing',
       message:
-        "CLOSIQ's account service isn't configured in this build, so signing in can't work. This is a build configuration problem, not your connection."
+        "HeyHanger's account service isn't configured in this build, so signing in can't work. This is a build configuration problem, not your connection."
     };
   }
 
@@ -76,7 +76,7 @@ export function checkSupabaseConfig(url: string, key: string): SupabaseConfigChe
     return {
       ok: false,
       problem: 'malformed_url',
-      message: "CLOSIQ's account service address is invalid in this build. This is a build configuration problem, not your connection."
+      message: "HeyHanger's account service address is invalid in this build. This is a build configuration problem, not your connection."
     };
   }
 
@@ -84,7 +84,7 @@ export function checkSupabaseConfig(url: string, key: string): SupabaseConfigChe
     return {
       ok: false,
       problem: 'not_https',
-      message: "CLOSIQ's account service address must use https in this build. This is a build configuration problem, not your connection."
+      message: "HeyHanger's account service address must use https in this build. This is a build configuration problem, not your connection."
     };
   }
 
@@ -93,7 +93,7 @@ export function checkSupabaseConfig(url: string, key: string): SupabaseConfigChe
       ok: false,
       problem: 'placeholder',
       message:
-        "CLOSIQ's account service is still set to a placeholder in this build, so signing in can't work. This is a build configuration problem, not your connection."
+        "HeyHanger's account service is still set to a placeholder in this build, so signing in can't work. This is a build configuration problem, not your connection."
     };
   }
 
@@ -103,7 +103,7 @@ export function checkSupabaseConfig(url: string, key: string): SupabaseConfigChe
     return {
       ok: false,
       problem: 'service_role_key',
-      message: "CLOSIQ's account service is misconfigured in this build (wrong key type). Sign-in is disabled for safety."
+      message: "HeyHanger's account service is misconfigured in this build (wrong key type). Sign-in is disabled for safety."
     };
   }
 

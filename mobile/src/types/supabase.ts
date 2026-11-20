@@ -1,5 +1,5 @@
 /**
- * CLOSIQ — generated Supabase database types.
+ * HeyHanger — generated Supabase database types.
  *
  * Generated from the live project (wibinjtekmadwtbxygrd) AFTER the M18
  * infrastructure migrations. Regenerate at any time rather than

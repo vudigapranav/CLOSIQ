@@ -1,5 +1,5 @@
 /**
- * CLOSIQ Mobile API Configuration
+ * HeyHanger Mobile API Configuration
  *
  * ONE centralized backend base URL for the whole app — every service file
  * (`visionAnalysis.ts`, `outfitStylist.ts`) imports API_BASE_URL from here
@@ -28,7 +28,7 @@
  * (server/geminiServer.js). This file only ever holds a public HTTP origin.
  */
 const DEV_FALLBACK_URL = 'http://localhost:3000';
-const PROD_UNCONFIGURED_URL = 'https://closiq-backend-not-yet-deployed.invalid';
+const PROD_UNCONFIGURED_URL = 'https://heyhanger-backend-not-yet-deployed.invalid';
 
 const configuredUrl = process.env.EXPO_PUBLIC_API_URL;
 
@@ -36,7 +36,7 @@ export const API_BASE_URL = configuredUrl || (__DEV__ ? DEV_FALLBACK_URL : PROD_
 
 if (__DEV__ && !configuredUrl) {
   console.warn(
-    '[CLOSIQ] EXPO_PUBLIC_API_URL is not set — falling back to',
+    '[HeyHanger] EXPO_PUBLIC_API_URL is not set — falling back to',
     DEV_FALLBACK_URL,
     '(only reachable from the iOS Simulator or Expo web, not a physical device). ' +
       "For a physical device on the same Wi-Fi, set EXPO_PUBLIC_API_URL to your computer's LAN IP " +

@@ -63,7 +63,7 @@ const TIMEOUT_RE = /timed? ?out|timeout|etimedout|aborted|the operation was abor
 const UNAVAILABLE_RE = /service unavailable|bad gateway|gateway timeout|project is paused|temporarily unavailable/i;
 
 const UNREACHABLE_ADVICE =
-  "Couldn't reach CLOSIQ's account service. It may be paused, misconfigured, or unreachable from this network.";
+  "Couldn't reach HeyHanger's account service. It may be paused, misconfigured, or unreachable from this network.";
 
 function messageOf(error: unknown): string {
   if (!error) return '';
@@ -94,7 +94,7 @@ export function classifyAuthError(error: unknown): ClassifiedAuthError {
   if (status === 502 || status === 503 || status === 504) {
     return {
       kind: 'service_unavailable',
-      message: "CLOSIQ's account service is temporarily unavailable. Try again in a few minutes.",
+      message: "HeyHanger's account service is temporarily unavailable. Try again in a few minutes.",
       detail
     };
   }
@@ -133,14 +133,14 @@ export function classifyAuthError(error: unknown): ClassifiedAuthError {
   if (TIMEOUT_RE.test(text)) {
     return {
       kind: 'timeout',
-      message: "CLOSIQ's account service didn't respond in time. Try again in a moment.",
+      message: "HeyHanger's account service didn't respond in time. Try again in a moment.",
       detail
     };
   }
   if (UNAVAILABLE_RE.test(text)) {
     return {
       kind: 'service_unavailable',
-      message: "CLOSIQ's account service is temporarily unavailable. Try again in a few minutes.",
+      message: "HeyHanger's account service is temporarily unavailable. Try again in a few minutes.",
       detail
     };
   }

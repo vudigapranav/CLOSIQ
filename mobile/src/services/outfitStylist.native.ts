@@ -50,7 +50,7 @@ export async function generateOutfitMobile(
   }
   let index = 0,
     summary = '',
-    notice = 'Styled with CLOSIQ wardrobe rules.';
+    notice = 'Styled with HeyHanger wardrobe rules.';
   let mode: 'on_device' | 'fallback' = 'fallback';
   try {
     const status = await modelStatus();
@@ -72,10 +72,10 @@ export async function generateOutfitMobile(
       ).catch(() => '');
       summary = reasonSentence(why);
       mode = 'on_device';
-      notice = 'Picked by CLOSIQ AI from your wardrobe.';
+      notice = 'Picked by HeyHanger.ai from your wardrobe.';
     }
   } catch {
-    notice = "CLOSIQ AI couldn't rank these looks, so wardrobe rules picked this one.";
+    notice = "HeyHanger.ai couldn't rank these looks, so wardrobe rules picked this one.";
   }
   const look = buildEngineOutfit(options[index], ctx);
   const data: MobileOutfitResult = {
@@ -123,8 +123,8 @@ export async function swapGarmentMobile(
 /**
  * Stylist chat. A 500M model asked an open question about a wardrobe list
  * copies the list or invents clothes, so the chat reuses the grounded path:
- * the question is the occasion, CLOSIQ builds outfits from owned, available
- * pieces and CLOSIQ AI picks one and says why.
+ * the question is the occasion, HeyHanger builds outfits from owned, available
+ * pieces and HeyHanger.ai picks one and says why.
  */
 export async function answerWardrobeQuestion(question: string, wardrobe: GarmentItem[]) {
   const res = await generateOutfitMobile(question, wardrobe);

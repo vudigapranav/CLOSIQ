@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * CLOSIQ connectivity diagnostics (login repair, 2026-09-12).
+ * HeyHanger connectivity diagnostics (login repair, 2026-09-12).
  *
  *   cd mobile && npm run diagnose
  *
@@ -50,7 +50,7 @@ async function checkDns(label, host) {
   }
 }
 
-console.log('CLOSIQ connectivity diagnostics\n');
+console.log('HeyHanger connectivity diagnostics\n');
 
 // 1. Configuration presence (never values)
 console.log('Configuration');
@@ -112,8 +112,8 @@ if (projectResolves && SUPABASE_URL) {
   warn('skipped — the project host does not resolve');
 }
 
-// 4. CLOSIQ backend
-console.log('\nCLOSIQ backend');
+// 4. HeyHanger backend
+console.log('\nHeyHanger backend');
 if (API_URL) {
   try {
     const { res, ms } = await timedFetch(`${API_URL.replace(/\/+$/, '')}/healthz`);

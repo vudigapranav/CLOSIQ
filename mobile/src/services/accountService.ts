@@ -108,7 +108,7 @@ export async function exportMyData(): Promise<ExportResult> {
   const built = await buildDataExport();
   if (!built.ok) return built;
   try {
-    await Share.share({ title: 'CLOSIQ data export', message: built.json });
+    await Share.share({ title: 'HeyHanger data export', message: built.json });
     return { ok: true };
   } catch {
     return { ok: false, message: "Couldn't open the share sheet." };

@@ -16,7 +16,7 @@ import { supabase, SUPABASE_URL } from './supabaseClient';
  *    and that path IS the durable reference: re-signing from it needs no
  *    schema change, no data rewrite, and never regenerates an outfit.
  *
- * 2. Seed/catalog images are static files served by the CLOSIQ backend at
+ * 2. Seed/catalog images are static files served by the HeyHanger backend at
  *    `/wardrobe/...`. The demo seed stored them as ABSOLUTE URLs built from
  *    whatever `EXPO_PUBLIC_API_URL` was at seed time (a LAN IP like
  *    `http://192.168.31.215:3000`), so they broke as soon as the network or

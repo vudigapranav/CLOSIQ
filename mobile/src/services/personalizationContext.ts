@@ -8,7 +8,7 @@ import { OutfitBrain, BrainAIContext, buildOutfitBrain, brainContextForAI } from
 
 /**
  * Composes the personalization context sent alongside an outfit-generation
- * request. Every field here is read from data CLOSIQ already collects and
+ * request. Every field here is read from data HeyHanger already collects and
  * stores elsewhere (onboarding profile, M14's weather service, M13's
  * planner events, M10's outfit history) — this module introduces NO new
  * storage, it only shapes existing data into the small request-context

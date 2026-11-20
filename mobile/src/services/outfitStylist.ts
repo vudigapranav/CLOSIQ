@@ -53,7 +53,7 @@ export interface MobileOutfitResult {
     occasionFit?: string;
     fit?: string;
   };
-  /** CLOSIQ's explainable rule-based score (0–100) — set for AI and local picks alike. */
+  /** HeyHanger's explainable rule-based score (0–100) — set for AI and local picks alike. */
   ruleScore?: number;
   scoreBreakdown?: OutfitScoreFactor[];
 }
@@ -87,7 +87,7 @@ export async function generateOutfitMobile(
         garmentIds: [],
         explanation: {
           summary: inLaundry
-            ? 'Mark a few pieces as ready to wear and CLOSIQ can style them again.'
+            ? 'Mark a few pieces as ready to wear and HeyHanger can style them again.'
             : 'Add items to your wardrobe to unlock personalized styling.'
         }
       },
@@ -188,14 +188,14 @@ export async function generateOutfitMobile(
       ok: false,
       mode: 'fallback',
       data: { title: '', vibe: '', styleScore: 0, garmentIds: [], explanation: { summary: '' } },
-      error: "You've passed on every look CLOSIQ can make from these clothes. Add a few more pieces for fresh outfits."
+      error: "You've passed on every look HeyHanger can make from these clothes. Add a few more pieces for fresh outfits."
     };
   }
 
   return {
     ok: true,
     mode: 'fallback',
-    notice: `${notice} Showing a rule-based pick from CLOSIQ's own engine instead.`,
+    notice: `${notice} Showing a rule-based pick from HeyHanger's own engine instead.`,
     data: {
       title: local.title,
       vibe: local.vibe,
@@ -294,7 +294,7 @@ export async function swapGarmentMobile(
   return {
     ok: true,
     mode: 'fallback',
-    notice: `${notice} Swapped using CLOSIQ's rule-based engine instead.`,
+    notice: `${notice} Swapped using HeyHanger's rule-based engine instead.`,
     data: {
       replacementGarmentId: replacement.id,
       whyItWorks: `${replacement.name} (${replacement.color}) scores best with the rest of this outfit for "${prompt}".`

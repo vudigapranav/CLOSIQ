@@ -6,7 +6,7 @@ import { checkSupabaseConfig } from './supabaseConfig';
 import { timedSupabaseFetch } from './supabaseTransport';
 
 /**
- * CLOSIQ Mobile — Supabase client (Sprint M17).
+ * HeyHanger Mobile — Supabase client (Sprint M17).
  *
  * `EXPO_PUBLIC_SUPABASE_URL` / `EXPO_PUBLIC_SUPABASE_ANON_KEY` are public,
  * Row-Level-Security-protected values — Supabase's own design intends for
@@ -35,7 +35,7 @@ export const isSupabaseConfigured = supabaseConfigCheck.ok;
 
 if (!isSupabaseConfigured) {
   console.warn(
-    `[CLOSIQ] Supabase is not usable in this build (${supabaseConfigCheck.problem}). ` +
+    `[HeyHanger] Supabase is not usable in this build (${supabaseConfigCheck.problem}). ` +
       'Login/Create Account will explain this instead of attempting a request. See mobile/.env.example.'
   );
 }

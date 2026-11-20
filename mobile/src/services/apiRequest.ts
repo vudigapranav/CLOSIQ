@@ -2,7 +2,7 @@ import { API_BASE_URL } from '../config';
 import { getAuthHeader } from './authService';
 
 /**
- * Sprint M20 — the one way the mobile app calls CLOSIQ's own `/api/ai/*`.
+ * Sprint M20 — the one way the mobile app calls HeyHanger's own `/api/ai/*`.
  *
  * Before this, `visionAnalysis.ts` and `outfitStylist.ts` each called
  * `fetch()` directly with NO timeout — a stalled LAN connection, or the
@@ -84,9 +84,9 @@ export async function postApi(
 export function describeApiFailure(reason: ApiFailureReason): string {
   switch (reason) {
     case 'timeout':
-      return 'CLOSIQ took too long to respond.';
+      return 'HeyHanger took too long to respond.';
     case 'offline':
-      return "Couldn't reach CLOSIQ — check your connection.";
+      return "Couldn't reach HeyHanger — check your connection.";
     case 'unauthorized':
       return 'Your session has expired — log out and back in to use AI features.';
     case 'rate_limited':
@@ -94,6 +94,6 @@ export function describeApiFailure(reason: ApiFailureReason): string {
     case 'ai_unavailable':
       return 'The AI service is unavailable right now.';
     case 'server_error':
-      return 'The CLOSIQ server ran into a problem.';
+      return 'The HeyHanger server ran into a problem.';
   }
 }

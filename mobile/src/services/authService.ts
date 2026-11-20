@@ -5,7 +5,7 @@ import { classifyAuthError, AuthFailureKind } from './authErrors';
 import { API_BASE_URL } from '../config';
 
 /**
- * CLOSIQ Mobile — Authentication service (Sprint M17).
+ * HeyHanger Mobile — Authentication service (Sprint M17).
  *
  * Thin wrapper over Supabase Auth: every function returns a small,
  * human-readable result rather than a raw Supabase error object, so
@@ -44,7 +44,7 @@ async function attemptAuth(run: () => Promise<AuthResult>): Promise<AuthResult> 
     return await run();
   } catch (err) {
     const { kind, message } = classifyAuthError(err);
-    console.warn(`[CLOSIQ] Auth request threw (${kind})`);
+    console.warn(`[HeyHanger] Auth request threw (${kind})`);
     return { ok: false, session: null, kind, message };
   }
 }
@@ -132,7 +132,7 @@ export async function signUp(email: string, password: string): Promise<AuthResul
     return {
       ok: true,
       session: null,
-      message: 'This email already has a CLOSIQ account. Log in with it, or tap "Forgot password?" to reset the password.'
+      message: 'This email already has a HeyHanger account. Log in with it, or tap "Forgot password?" to reset the password.'
     };
   }
   if (!data.session) {
@@ -183,13 +183,13 @@ export async function signOut(): Promise<{ ok: boolean; message?: string }> {
     const { error } = await supabase.auth.signOut();
     if (error) {
       const classified = classifyAuthError(error);
-      console.warn(`[CLOSIQ] Sign-out failed (${classified.kind})`);
+      console.warn(`[HeyHanger] Sign-out failed (${classified.kind})`);
       return { ok: false, message: classified.message };
     }
     return { ok: true };
   } catch (err) {
     const classified = classifyAuthError(err);
-    console.warn(`[CLOSIQ] Sign-out threw (${classified.kind})`);
+    console.warn(`[HeyHanger] Sign-out threw (${classified.kind})`);
     return { ok: false, message: classified.message };
   }
 }

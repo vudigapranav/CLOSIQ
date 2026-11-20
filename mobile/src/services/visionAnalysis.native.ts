@@ -11,10 +11,10 @@ export async function analyzeGarmentImageMobile(
     if (!photo.startsWith('file://')) throw new Error('Choose a garment photo from this phone.');
     const status = await modelStatus();
     if (status === 'missing')
-      throw new Error('Turn on CLOSIQ AI (Profile → CLOSIQ AI, a one-time 363 MB download) to scan photos. You can enter the details yourself now.');
-    if (status === 'unsupported') throw new Error('Photo scanning needs the CLOSIQ Android app build.');
+      throw new Error('Turn on HeyHanger.ai (Profile → HeyHanger.ai, a one-time 363 MB download) to scan photos. You can enter the details yourself now.');
+    if (status === 'unsupported') throw new Error('Photo scanning needs the HeyHanger Android app build.');
     if (status === 'failed')
-      throw new Error("CLOSIQ AI couldn't start on this phone, so photo scanning is paused. You can enter the details yourself.");
+      throw new Error("HeyHanger.ai couldn't start on this phone, so photo scanning is paused. You can enter the details yourself.");
     // One short question per conversation: the 500M base model answers these
     // reliably, while a multi-field form makes it skip fields and repeat.
     const transcript: string[] = [];

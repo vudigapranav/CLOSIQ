@@ -65,7 +65,7 @@ export function createTimedFetch(options: TimedFetchOptions = {}) {
     if (timedOut) {
       // Reworded so classifyAuthError() reports a timeout rather than an
       // opaque "aborted", which reads like a user cancellation.
-      throw new Error(`Request to CLOSIQ's account service timed out after ${budget / 1000}s`);
+      throw new Error(`Request to HeyHanger's account service timed out after ${budget / 1000}s`);
     }
     throw err;
   } finally {

@@ -118,7 +118,7 @@ function AppContent() {
     restoreSession().then(({ session, restoreFailed }) => {
       if (restoreFailed && mounted) {
         setSessionNotice(
-          "You're still signed in on this device, but CLOSIQ couldn't be reached to refresh your session. " +
+          "You're still signed in on this device, but HeyHanger couldn't be reached to refresh your session. " +
             "Reconnect and you'll be signed back in automatically — or log in again."
         );
       }
