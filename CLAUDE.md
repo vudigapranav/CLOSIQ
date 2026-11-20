@@ -1,18 +1,18 @@
-# CLAUDE.md — CLOSIQ Permanent Project Context & Rules
+# CLAUDE.md — HeyHanger Permanent Project Context & Rules
 
-This document is the permanent instruction and context guide for every Claude session working on **CLOSIQ**.
+This document is the permanent instruction and context guide for every Claude session working on **HeyHanger**.
 
 Before starting work, read the latest entry in [astra.md](astra.md) for changes made by Codex and any open follow-ups.
 
-This feature branch targets physical Android testing. Use [the Android deployment guide](docs/v2/MOBILE_DEPLOYMENT.md) and record hardware evidence before declaring offline visual inference ready. The V1 notes below describe the original architecture.
+Android 2.0.0 (HeyHanger.ai on the phone, no Gemini on Android) is the current product; it was merged into `main` on 2026-11-20 and ships as an EAS-signed update of the 1.x app. Use [the Android deployment guide](docs/v2/MOBILE_DEPLOYMENT.md) and record hardware evidence before claiming device results. The notes below still describe the shared web/V1 architecture.
 
 ---
 
 ## 1. Project Identity
 
-* **Project**: CLOSIQ
+* **Project**: HeyHanger
 * **Description**: AI-powered personal wardrobe and styling application.
-* **Core Promise**: **Upload the clothes you own → CLOSIQ understands them → organize them into a digital wardrobe → ask what you want to wear → CLOSIQ creates an outfit using your actual wardrobe.**
+* **Core Promise**: **Upload the clothes you own → HeyHanger understands them → organize them into a digital wardrobe → ask what you want to wear → HeyHanger creates an outfit using your actual wardrobe.**
 * **Core Loop**:
   `UPLOAD → UNDERSTAND → COLLECTION → OCCASION → AI STYLIST → OUTFIT → WHY IT WORKS → SWAP`
 
@@ -20,13 +20,13 @@ This feature branch targets physical Android testing. Use [the Android deploymen
 
 ## 2. Product Philosophy
 
-### CLOSIQ IS:
+### HeyHanger IS:
 * A personal digital wardrobe
 * An AI stylist
 * A wardrobe intelligence system
 * Personalized strictly to the user's actual clothes
 
-### CLOSIQ IS NOT:
+### HeyHanger IS NOT:
 * An ecommerce marketplace
 * A clothing store (no shopping cart, no prices, no buy buttons)
 * A generic AI chatbot
@@ -46,7 +46,7 @@ This feature branch targets physical Android testing. Use [the Android deploymen
 3. **Shop Check** (centre camera button, not a tab — `"Will this piece work with my wardrobe?"`): scan or pick a photo of a garment BEFORE buying it → the AI garment scan reads it (or the user describes it in a few taps) → `src/services/shopCheck.ts` shows, from the user's OWN clothes only, what to wear it with (spread across colours), up to 3 outfits by occasion, Style DNA fit, near-twins already owned, styling tips and a verdict. Nothing is added unless the user taps "I bought it". Web `src/components/modals/ShopCheckModal.tsx`, mobile `mobile/src/components/ShopCheckModal.tsx`. Not ecommerce: no prices, no shops, no buy buttons.
    * **AI Stylist** (internal key `stylist`, opened from Home, with a back link): natural-language prompt input, Occasion chips, an optional Style chip row (Minimal/Streetwear/Smart Casual/Vintage/Athleisure — folds into the prompt, not a separate filter), and real-time outfit generation with single-piece swapper.
 4. **Planner** (internal key `planner`, `src/components/screens/PlannerScreen.tsx`): Weekly outfit planner — Mon–Sun rows, each with an editable free-text occasion label and an optional outfit assigned from Saved Looks. State lives in `App.tsx` (`weeklyPlan`, persisted to `localStorage` under `closiq_weekly_plan`) using the `WeeklyPlanEntry`/`WeekDay` types in `src/types/wardrobe.ts`.
-5. **Profile** (`"What does CLOSIQ know about my style?"`): Style Archetype card, quick links to Wardrobe/Planner, Style DNA archetype, closet color breakdown, saved looks, Style Preferences (Wardrobe Profile Men/Women + Layering, grouped), and Settings (Notifications — informational only, no backend — plus the working appearance theme toggle).
+5. **Profile** (`"What does HeyHanger know about my style?"`): Style Archetype card, quick links to Wardrobe/Planner, Style DNA archetype, closet color breakdown, saved looks, Style Preferences (Wardrobe Profile Men/Women + Layering, grouped), and Settings (Notifications — informational only, no backend — plus the working appearance theme toggle).
 
 ---
 
@@ -93,12 +93,12 @@ This feature branch targets physical Android testing. Use [the Android deploymen
 
 ## 5. Brand Identity & Launch Experience
 
-* **Official Wordmark**: `CLOSIQ`, with the brain/neural symbol integrated inside the final **Q** (the Q's counter is replaced by a brain icon; its tail remains a plain diagonal stroke).
-* **Official Asset Location**: `public/brand/closiq-logo.png` is the official wordmark — the only CLOSIQ *logo*.
-* **Official App Symbol** (chosen by the user 2026-11-01, replacing the 2026-10-14 "Spark hanger"): the **brain-Q** — the Q with the brain inside, CROPPED from the official wordmark `public/brand/closiq-logo.png` (never redrawn). It is the app icon on iOS, Android (adaptive + themed), the web favicon and the iPhone home-screen icon. Regenerate every size with `node scripts/generate-app-icons.mjs`; never edit the generated PNGs by hand. A changed icon only reaches phones through a new APK/IPA build — an OTA update cannot change it. (`public/brand/closiq-symbol.svg`, the retired Spark hanger, is kept for reference only.)
-* **Rule — Do Not Recreate or Substitute**: Never redraw the wordmark in text/CSS, never use a generic brain icon, never redesign the Q, and never fabricate a placeholder logo. Change the app symbol only when the user asks. If either asset is ever missing, stop and ask — do not invent a replacement.
-* **Asset Notes**: The PNG has an opaque baked-in warm-ivory background (`#F5F6F2`, not transparent). `ClosiqLogo` (`src/components/ui/ClosiqLogo.tsx`) wraps it in a plate matching that exact swatch so it reads cleanly with zero seam in both light and dark mode without altering the artwork.
-* **Launch Intro Requirement** (cinematic since 2026-10-13, at the user's request — supersedes the earlier "1–2 s minimal splash" rule): every application launch and every browser/app reload shows the CLOSIQ intro — web `src/components/ui/SplashScreen.tsx` (+ `.intro*` in `src/index.css`), mobile `mobile/src/components/IntroSplash.tsx`. **Full film once per calendar day per device** (~4.2 s): letterbox bars → warm light through the door seam → almirah doors swing open → logo focus-pull → tagline "Style what you already own" → gold rule → bars retract. Other launches play a ~1.9 s "lite" cut (bars + logo + tagline). **Tap anywhere to skip, always.** `prefers-reduced-motion` / Reduce Motion → a still frame with a short fade. Still: no particles, no neon, no spinning logo, official logo asset only (doors, light and bars are plain shapes). Must NOT reappear on in-app tab navigation — it is gated on `<App>` mounting, not on route/tab changes.
+* **Name** (rebranded from CLOSIQ on 2026-11-20 at the user's request): product and project **HeyHanger** (both Hs capitalised, one word); the assistant **HeyHanger.ai** (screens can say "Ask HeyHanger.ai"; the user chose this spelling on 2026-11-20 — it is a display name, not a web address, and no heyhanger.ai domain is used); the custom model family **HeyHanger-VLM** (`HeyHanger-VLM-500M` where the 500M designation applies); plain identifier `heyhanger`, assistant slug `heyhanger-ai`. Personality: friendly, personal, easy to talk to — the friend you ask "What goes with this shirt?". Older notes (STATE.md, earlier astra.md entries) keep the old name as history.
+* **Logo**: an original **HH monogram** — two capital Hs with one subtle hanger cue, a small hook rising from the gap between them — plus a monoline rounded "HeyHanger" wordmark. Full reference: [docs/BRANDING.md](docs/BRANDING.md); preview sheet `docs/brand/heyhanger-preview.png`.
+* **Editable masters**: `public/brand/heyhanger-mark.svg` and `public/brand/heyhanger-wordmark.svg`. Every other brand file (lockups, single-colour/reversed variants, app icon tile, Android adaptive foreground/monochrome, favicon, apple-touch icon, phone lockup `mobile/assets/heyhanger-logo.png`, social images) is generated by `node scripts/generate-app-icons.mjs`; never edit generated files by hand. A changed icon only reaches phones through a new APK/IPA build — an OTA update cannot change it.
+* **Rule — Do Not Recreate or Substitute**: never redraw the mark or wordmark in text/CSS, never swap in a generic hanger/clothing icon, and never fabricate a placeholder. Change the logo only when the user asks, by editing the masters and regenerating. If the masters are missing, stop and ask.
+* **Asset Notes**: the app icon is an olive-brown `#6B5A3D` tile with an ivory `#F7F2E9` mark (Android adaptive background colour in `mobile/app.json` must match). In the UI the lockup sits on a warm-ivory `#F7F2E9` plate (`HeyHangerLogo`, `src/components/ui/HeyHangerLogo.tsx`; mobile `IntroSplash` plate) so it reads on light, dark and the charcoal intro.
+* **Launch Intro Requirement** (cinematic since 2026-10-13, at the user's request — supersedes the earlier "1–2 s minimal splash" rule): every application launch and every browser/app reload shows the HeyHanger intro — web `src/components/ui/SplashScreen.tsx` (+ `.intro*` in `src/index.css`), mobile `mobile/src/components/IntroSplash.tsx`. **Full film once per calendar day per device** (~4.2 s): letterbox bars → warm light through the door seam → almirah doors swing open → logo focus-pull → tagline "Style what you already own" → gold rule → bars retract. Other launches play a ~1.9 s "lite" cut (bars + logo + tagline). **Tap anywhere to skip, always.** `prefers-reduced-motion` / Reduce Motion → a still frame with a short fade. Still: no particles, no neon, no spinning logo, official HeyHanger lockup only (doors, light and bars are plain shapes). Must NOT reappear on in-app tab navigation — it is gated on `<App>` mounting, not on route/tab changes.
 ---
 
 ## 6. Wardrobe Architecture
@@ -135,7 +135,7 @@ AI engine must reference stable garment IDs/data rather than randomly selecting 
 
 ## 7. Wardrobe Profiles
 
-CLOSIQ supports two wardrobe profile modes:
+HeyHanger supports two wardrobe profile modes:
 * **Men**
 * **Women**
 
@@ -169,7 +169,7 @@ User selectable preference:
 * `usually` ("Usually")
 
 ### AI Rule:
-If the user selects `avoid_base_layer`, CLOSIQ must NOT automatically recommend base layers/tank tops underneath another garment unless explicitly requested by the user prompt.
+If the user selects `avoid_base_layer`, HeyHanger must NOT automatically recommend base layers/tank tops underneath another garment unless explicitly requested by the user prompt.
 
 ---
 
@@ -195,44 +195,44 @@ The AI engine must use stable garment IDs from the active wardrobe.
 ## 11. Existing Architecture
 
 ### Live Application Structure:
-* **Entry Point**: [src/main.tsx](file:///Users/pranav07vudiga/Desktop/Projects/Hackathon/Demux/CLOSIQ/src/main.tsx)
-* **Main Container**: [src/App.tsx](file:///Users/pranav07vudiga/Desktop/Projects/Hackathon/Demux/CLOSIQ/src/App.tsx)
+* **Entry Point**: [src/main.tsx](src/main.tsx)
+* **Main Container**: [src/App.tsx](src/App.tsx)
 * **Screen Views**:
-  * [src/components/screens/OnboardingScreen.tsx](file:///Users/pranav07vudiga/Desktop/Projects/Hackathon/Demux/CLOSIQ/src/components/screens/OnboardingScreen.tsx)
-  * [src/components/screens/TodayScreen.tsx](file:///Users/pranav07vudiga/Desktop/Projects/Hackathon/Demux/CLOSIQ/src/components/screens/TodayScreen.tsx)
-  * [src/components/screens/CollectionScreen.tsx](file:///Users/pranav07vudiga/Desktop/Projects/Hackathon/Demux/CLOSIQ/src/components/screens/CollectionScreen.tsx)
-  * [src/components/screens/StylistScreen.tsx](file:///Users/pranav07vudiga/Desktop/Projects/Hackathon/Demux/CLOSIQ/src/components/screens/StylistScreen.tsx)
-  * [src/components/screens/PlannerScreen.tsx](file:///Users/pranav07vudiga/Desktop/Projects/Hackathon/Demux/CLOSIQ/src/components/screens/PlannerScreen.tsx)
-  * [src/components/screens/ProfileScreen.tsx](file:///Users/pranav07vudiga/Desktop/Projects/Hackathon/Demux/CLOSIQ/src/components/screens/ProfileScreen.tsx)
+  * [src/components/screens/OnboardingScreen.tsx](src/components/screens/OnboardingScreen.tsx)
+  * [src/components/screens/TodayScreen.tsx](src/components/screens/TodayScreen.tsx)
+  * [src/components/screens/CollectionScreen.tsx](src/components/screens/CollectionScreen.tsx)
+  * [src/components/screens/StylistScreen.tsx](src/components/screens/StylistScreen.tsx)
+  * [src/components/screens/PlannerScreen.tsx](src/components/screens/PlannerScreen.tsx)
+  * [src/components/screens/ProfileScreen.tsx](src/components/screens/ProfileScreen.tsx)
 * **UI Components**:
-  * [src/components/ui/AppHeader.tsx](file:///Users/pranav07vudiga/Desktop/Projects/Hackathon/Demux/CLOSIQ/src/components/ui/AppHeader.tsx)
-  * [src/components/ui/BottomNavigation.tsx](file:///Users/pranav07vudiga/Desktop/Projects/Hackathon/Demux/CLOSIQ/src/components/ui/BottomNavigation.tsx)
-  * [src/components/ui/PrimaryButton.tsx](file:///Users/pranav07vudiga/Desktop/Projects/Hackathon/Demux/CLOSIQ/src/components/ui/PrimaryButton.tsx)
-  * [src/components/ui/SecondaryButton.tsx](file:///Users/pranav07vudiga/Desktop/Projects/Hackathon/Demux/CLOSIQ/src/components/ui/SecondaryButton.tsx)
-  * [src/components/ui/IconButton.tsx](file:///Users/pranav07vudiga/Desktop/Projects/Hackathon/Demux/CLOSIQ/src/components/ui/IconButton.tsx)
-  * [src/components/ui/SectionHeader.tsx](file:///Users/pranav07vudiga/Desktop/Projects/Hackathon/Demux/CLOSIQ/src/components/ui/SectionHeader.tsx)
-  * [src/components/ui/CategoryChip.tsx](file:///Users/pranav07vudiga/Desktop/Projects/Hackathon/Demux/CLOSIQ/src/components/ui/CategoryChip.tsx)
-  * [src/components/ui/ClothingCard.tsx](file:///Users/pranav07vudiga/Desktop/Projects/Hackathon/Demux/CLOSIQ/src/components/ui/ClothingCard.tsx)
-  * [src/components/ui/OutfitCard.tsx](file:///Users/pranav07vudiga/Desktop/Projects/Hackathon/Demux/CLOSIQ/src/components/ui/OutfitCard.tsx)
-  * [src/components/ui/AIRecommendationCard.tsx](file:///Users/pranav07vudiga/Desktop/Projects/Hackathon/Demux/CLOSIQ/src/components/ui/AIRecommendationCard.tsx)
-  * [src/components/ui/EmptyState.tsx](file:///Users/pranav07vudiga/Desktop/Projects/Hackathon/Demux/CLOSIQ/src/components/ui/EmptyState.tsx)
-  * [src/components/ui/GarmentImage.tsx](file:///Users/pranav07vudiga/Desktop/Projects/Hackathon/Demux/CLOSIQ/src/components/ui/GarmentImage.tsx)
-  * [src/components/ui/ClosiqLogo.tsx](file:///Users/pranav07vudiga/Desktop/Projects/Hackathon/Demux/CLOSIQ/src/components/ui/ClosiqLogo.tsx)
-  * [src/components/ui/SplashScreen.tsx](file:///Users/pranav07vudiga/Desktop/Projects/Hackathon/Demux/CLOSIQ/src/components/ui/SplashScreen.tsx)
-  * [src/components/ui/SegmentedControl.tsx](file:///Users/pranav07vudiga/Desktop/Projects/Hackathon/Demux/CLOSIQ/src/components/ui/SegmentedControl.tsx)
+  * [src/components/ui/AppHeader.tsx](src/components/ui/AppHeader.tsx)
+  * [src/components/ui/BottomNavigation.tsx](src/components/ui/BottomNavigation.tsx)
+  * [src/components/ui/PrimaryButton.tsx](src/components/ui/PrimaryButton.tsx)
+  * [src/components/ui/SecondaryButton.tsx](src/components/ui/SecondaryButton.tsx)
+  * [src/components/ui/IconButton.tsx](src/components/ui/IconButton.tsx)
+  * [src/components/ui/SectionHeader.tsx](src/components/ui/SectionHeader.tsx)
+  * [src/components/ui/CategoryChip.tsx](src/components/ui/CategoryChip.tsx)
+  * [src/components/ui/ClothingCard.tsx](src/components/ui/ClothingCard.tsx)
+  * [src/components/ui/OutfitCard.tsx](src/components/ui/OutfitCard.tsx)
+  * [src/components/ui/AIRecommendationCard.tsx](src/components/ui/AIRecommendationCard.tsx)
+  * [src/components/ui/EmptyState.tsx](src/components/ui/EmptyState.tsx)
+  * [src/components/ui/GarmentImage.tsx](src/components/ui/GarmentImage.tsx)
+  * [src/components/ui/HeyHangerLogo.tsx](src/components/ui/HeyHangerLogo.tsx)
+  * [src/components/ui/SplashScreen.tsx](src/components/ui/SplashScreen.tsx)
+  * [src/components/ui/SegmentedControl.tsx](src/components/ui/SegmentedControl.tsx)
 * **Modal Dialogs**:
-  * [src/components/modals/AddItemModal.tsx](file:///Users/pranav07vudiga/Desktop/Projects/Hackathon/Demux/CLOSIQ/src/components/modals/AddItemModal.tsx)
-  * [src/components/modals/ClothingDetailModal.tsx](file:///Users/pranav07vudiga/Desktop/Projects/Hackathon/Demux/CLOSIQ/src/components/modals/ClothingDetailModal.tsx)
+  * [src/components/modals/AddItemModal.tsx](src/components/modals/AddItemModal.tsx)
+  * [src/components/modals/ClothingDetailModal.tsx](src/components/modals/ClothingDetailModal.tsx)
   * [src/components/modals/ShopCheckModal.tsx](src/components/modals/ShopCheckModal.tsx) / [src/components/modals/WardrobeFilterSheet.tsx](src/components/modals/WardrobeFilterSheet.tsx)
 * **Services**:
-  * [src/services/aiStylist.ts](file:///Users/pranav07vudiga/Desktop/Projects/Hackathon/Demux/CLOSIQ/src/services/aiStylist.ts)
-  * [src/services/aiVisionScanner.ts](file:///Users/pranav07vudiga/Desktop/Projects/Hackathon/Demux/CLOSIQ/src/services/aiVisionScanner.ts)
+  * [src/services/aiStylist.ts](src/services/aiStylist.ts)
+  * [src/services/aiVisionScanner.ts](src/services/aiVisionScanner.ts)
   * Shared web/mobile, on-device: [src/services/shopCheck.ts](src/services/shopCheck.ts) (Shop Check), [src/services/wardrobeSearch.ts](src/services/wardrobeSearch.ts) + [src/services/wardrobeFilters.ts](src/services/wardrobeFilters.ts) (Wardrobe search/filters), [src/services/pairingSuggestions.ts](src/services/pairingSuggestions.ts) (Pairs well with).
-  * [src/services/ai/geminiClient.ts](file:///Users/pranav07vudiga/Desktop/Projects/Hackathon/Demux/CLOSIQ/src/services/ai/geminiClient.ts) / `wardrobeVision.ts` / `outfitStylist.ts` / `validator.ts` — client-side proxies to `/api/ai/*`, never hold the API key.
+  * [src/services/ai/geminiClient.ts](src/services/ai/geminiClient.ts) / `wardrobeVision.ts` / `outfitStylist.ts` / `validator.ts` — client-side proxies to `/api/ai/*`, never hold the API key.
 * **Server** (Sprint 19 — `GEMINI_API_KEY` is read here ONLY, never sent to the browser):
-  * [server/geminiServer.js](file:///Users/pranav07vudiga/Desktop/Projects/Hackathon/Demux/CLOSIQ/server/geminiServer.js) — single source of truth for Gemini prompts/schemas (converted from `.ts` to plain `.js` in Sprint 19 so it's runnable by plain Node in production, not just Vite/esbuild — the old `.ts` file no longer exists).
-  * [server/apiRouter.js](file:///Users/pranav07vudiga/Desktop/Projects/Hackathon/Demux/CLOSIQ/server/apiRouter.js) — shared `/api/ai/*` request parsing + routing (`handleApiRequest(req, res)`), used identically by both dev and production.
-  * [server/index.js](file:///Users/pranav07vudiga/Desktop/Projects/Hackathon/Demux/CLOSIQ/server/index.js) — production entry point (`npm run start`): plain Node `http`, serves built `dist/` with SPA fallback, exposes `/api/ai/*` via `apiRouter.js`. No framework.
+  * [server/geminiServer.js](server/geminiServer.js) — single source of truth for Gemini prompts/schemas (converted from `.ts` to plain `.js` in Sprint 19 so it's runnable by plain Node in production, not just Vite/esbuild — the old `.ts` file no longer exists).
+  * [server/apiRouter.js](server/apiRouter.js) — shared `/api/ai/*` request parsing + routing (`handleApiRequest(req, res)`), used identically by both dev and production.
+  * [server/index.js](server/index.js) — production entry point (`npm run start`): plain Node `http`, serves built `dist/` with SPA fallback, exposes `/api/ai/*` via `apiRouter.js`. No framework.
   * `vite.config.js`'s `geminiApiPlugin()` — dev-only equivalent (`npm run dev`), delegates to the same `apiRouter.js`. Also calls `loadEnv()` and merges into `process.env` so `.env` reaches server code in dev (Vite does not do this automatically).
   * [server/studioPhoto.js](server/studioPhoto.js) — `POST /api/ai/studio-photo`: free white-background "studio" cut-out (U²-Net `server/models/u2netp.onnx` via onnxruntime-node + sharp; original pixels, no Gemini). Clients always let the user choose original vs studio.
   * **Hosting (2026-10-13): Vercel** — `api/ai/[route].js` wraps the same `apiRouter.js` (which accepts Vercel's pre-parsed `req.body`), `api/healthz.js`, `api/keepalive.js` (daily cron so the free Supabase project never pauses). `vercel.json` ships only linux-x64 onnxruntime binaries. Live at https://closiq-liard.vercel.app. `server/index.js` remains for plain-Node hosting.
@@ -242,13 +242,14 @@ The AI engine must use stable garment IDs from the active wardrobe.
 * **Wardrobe intelligence (2026-11-11)**: `src/services/intelligence/outfitEngine.ts` (shared) is the explainable rule-based engine — it builds the local/fallback outfits AND scores every outfit (AI or local) into `ruleScore` + `scoreBreakdown`; `garmentTraits.ts` is the ONE definition of formality/colour/ethnic/one-piece rules. Every recommender must skip pieces where `isGarmentAvailable()` is false (laundry/unavailable). Never show an invented number: `styleScore` is only the AI's own %, 0 for rule-based picks and after swaps; label via `matchLabel()`; `temperature` only from real weather. Weather: `src/services/weather/weatherCore.ts` (shared Open-Meteo parsing), web `webWeather.ts`, mobile `weatherService.ts`. Web planner has dated events in the shared `planner_events` table + `.ics` export (`src/services/calendarExport.ts`). Analytics: `wardrobeAnalytics.ts`. Account deletion/export + AI-photo consent on both platforms. Details: `docs/ARCHITECTURE.md`.
 * **Schema rollout rule**: migrations live in `supabase/migrations/` (timestamped). Client code must keep working when a newer additive migration is not applied yet (`src/services/cloud/schemaErrors.ts` fallbacks). Never apply migrations to production without the owner's go-ahead.
 * **Garment details**: `storageLocation` ("where is it kept", Indian household presets + custom — `src/data/storageLocations.ts`) and `size` (`src/data/garmentSizes.ts`) are shared web/mobile fields backed by `garments.storage_location` / `garments.size`.
-* **Git workflow (user instruction, 2026-10-13)**: commit and push directly to `main` — no PRs — and keep the local CLOSIQ folder in sync (`git pull`). Never commit `.env` files; the repo is public.
+* **Git workflow (user instruction, 2026-10-13)**: commit and push directly to `main` — no PRs — and keep the local HeyHanger folder in sync (`git pull`). Never commit `.env` files; the repo is public.
+* **Retained CLOSIQ identifiers (deliberate, 2026-11-20 rebrand)**: Android/iOS ID `com.closiq.app` (already installed on users' phones; changing it would break in-place updates and orphan wardrobes), Expo `slug`/`scheme` `closiq` + EAS project/OTA URL, every `@closiq_*` (mobile AsyncStorage) and `closiq_*` (web localStorage) key, the calendar UID domain `@closiq.app`, applied `supabase/migrations/*closiq*` files, the Vercel URL `closiq-liard.vercel.app`, the Vercel project `closiq`, the Supabase project name "Closiq" and the GitHub repo `vudigapranav/CLOSIQ`. None is shown to users. The workspace folder is still `.../Demux/CLOSIQ` until the owner moves it (procedure in astra.md). Do not "finish" the rename of these without a migration plan.
 * **Data & Types**:
-  * [src/types/wardrobe.ts](file:///Users/pranav07vudiga/Desktop/Projects/Hackathon/Demux/CLOSIQ/src/types/wardrobe.ts)
-  * [src/data/garmentCatalog.ts](file:///Users/pranav07vudiga/Desktop/Projects/Hackathon/Demux/CLOSIQ/src/data/garmentCatalog.ts)
+  * [src/types/wardrobe.ts](src/types/wardrobe.ts)
+  * [src/data/garmentCatalog.ts](src/data/garmentCatalog.ts)
   * [src/data/styleDna.ts](src/data/styleDna.ts) — shared Style DNA: scores are the share of the user's own wardrobe (0 for a new account); style options asked at onboarding (`profiles.style_preferences`).
 * **Styling**:
-  * [src/index.css](file:///Users/pranav07vudiga/Desktop/Projects/Hackathon/Demux/CLOSIQ/src/index.css)
+  * [src/index.css](src/index.css)
 * **Mobile app** (`mobile/`, React Native): runs on **Expo SDK 57** — upgraded from SDK 54 on 2026-09-12 at the user's explicit request, superseding the earlier "stay on SDK 54" rule. Requires Node >= 22.13. New Architecture and Android edge-to-edge are mandatory at this SDK; see `mobile/AGENTS.md` for the constraints that follow from that. `mobile/metro.config.js` widens Metro's `watchFolders` to the repo root so the mobile app can reuse this project's shared `src/types` and `src/data` — that shared-root arrangement is deliberate and must be preserved.
 
 ---

@@ -4,9 +4,12 @@ This document tracks the live implementation status of **CLOSIQ**. It is updated
 
 ---
 
+> **Renamed to HeyHanger on 2026-11-20.** The product, assistant (HeyHanger.ai) and logo (HH monogram) changed; the entries below are history and keep the CLOSIQ name. Current names, retained identifiers and asset paths: [docs/BRANDING.md](docs/BRANDING.md); handoff: [astra.md](astra.md).
+
 ## Current Phase
 
-* **Now (2026-11-11)**: Wardrobe intelligence sprint — explainable outfit engine, real web weather, laundry/availability, full garment editing, web events + .ics, analytics, account deletion/export/AI-photo consent, API hardening. Built + tested locally, pushed to `main`; **migrations APPLIED to production Supabase**; **website DEPLOYED (Vercel) + OTA v1.4 PUBLISHED**; NOT device-verified. See "SPRINT: WARDROBE INTELLIGENCE" below.
+* **Now (2026-11-20)**: HeyHanger rebrand (name, assistant HeyHanger.ai, HH logo, icons, docs) in both checkouts; V2 is the product. Signed EAS update APK 2.0.0 (versionCode 2, same keystore as V1) built and verified installing over V1 on the emulator — see astra.md "HeyHanger rebrand". Physical phone not tested; nothing committed or pushed.
+* **Before (2026-11-11)**: Wardrobe intelligence sprint — explainable outfit engine, real web weather, laundry/availability, full garment editing, web events + .ics, analytics, account deletion/export/AI-photo consent, API hardening. Built + tested locally, pushed to `main`; **migrations APPLIED to production Supabase**; **website DEPLOYED (Vercel) + OTA v1.4 PUBLISHED**; NOT device-verified. See "SPRINT: WARDROBE INTELLIGENCE" below.
 * **Previous (2026-11-01)**: Shop Check + new nav + brain-Q icon — deployed (Vercel), OTA v1.3 published, new APK `47bad076` built. See the LIVE PROGRESS table below.
 * **Latest (2026-10-24)**: Wardrobe smart search + stylist filters on web and mobile — see "WARDROBE SEARCH + FILTERS" below.
 * **Phase**: Live deployment + new wardrobe features (2026-10-13) — **WEBSITE LIVE ON VERCEL; ANDROID APK BUILT; NOT DEVICE-VERIFIED**

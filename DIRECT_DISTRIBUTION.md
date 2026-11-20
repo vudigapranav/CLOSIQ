@@ -1,4 +1,4 @@
-# CLOSIQ — standalone installation without public store listings
+# HeyHanger — standalone installation without public store listings
 
 Prepared 2026-09-12. This is a delivery plan, not evidence that builds or deployment are complete.
 
@@ -6,7 +6,7 @@ Prepared 2026-09-12. This is a delivery plan, not evidence that builds or deploy
 
 The configured Supabase hostname initially did not resolve from the Mac outside the sandbox, while supabase.com resolved. After the user completed dashboard authentication/restoration, the dashboard progressed from Coming up to Healthy. During startup the auth service briefly returned 502/500; after recovery the existing demo login returned HTTP 200, with 58 garment rows and one profile readable through the authenticated public API. No replacement database or account was created. This is LIVE VERIFIED from the Mac, not a physical-device pass.
 
-Authentication goes directly to Supabase. AI and catalog images use the separate CLOSIQ Node backend. Fixing one endpoint does not make the other available. The current mobile API URL is a private LAN address and is unsuitable for standalone distribution.
+Authentication goes directly to Supabase. AI and catalog images use the separate HeyHanger Node backend. Fixing one endpoint does not make the other available. The current mobile API URL is a private LAN address and is unsuitable for standalone distribution.
 
 ## Android
 

@@ -1,15 +1,19 @@
-# CLOSIQ
+# HeyHanger
 
-## V2 Android development branch
+<img src="public/brand/heyhanger-lockup.svg" alt="HeyHanger" width="320" />
 
-This checkout adds a guest wardrobe, SQLite, app-owned photographs and local SmolVLM2 integration for Android device testing. The base model is an optional download. Android prebuild and JavaScript export have passed. Native APK compilation, phone inference and custom model training are pending. The V1 architecture and demo below describe the existing web and legacy flows.
+HeyHanger (formerly CLOSIQ) is the friend you ask, "What goes with this shirt?" Its assistant is HeyHanger.ai. Brand files and rules: [docs/BRANDING.md](docs/BRANDING.md).
+
+## HeyHanger 2.0 (Android)
+
+Version 2.0.0 is the current Android app. It is an update of 1.x: same package (`com.closiq.app`), same accounts and data. On the phone, **HeyHanger.ai** reads garment photos, pairs pieces and styles outfits with the published SmolVLM2-500M model (a one-time 363 MB download). It does not use Gemini or an API key. The website still uses the server's Gemini routes.
 
 [Android build and test instructions](docs/v2/MOBILE_DEPLOYMENT.md) · [V2 architecture](docs/v2/ARCHITECTURE.md) · [Current limitations](docs/v2/KNOWN_LIMITATIONS.md) · [Claude handoff](astra.md)
 
 
 **An AI stylist for the clothes you already own.**
 
-CLOSIQ is a mobile app that turns a photo of a garment into a structured wardrobe entry, then builds outfits from *your actual clothes* for a given occasion — and explains why each look works.
+HeyHanger is a mobile app that turns a photo of a garment into a structured wardrobe entry, then builds outfits from *your actual clothes* for a given occasion — and explains why each look works.
 
 > **Status: working prototype.** Not production-ready and not deployed. See [Current limitations](#current-limitations) before assuming any flow is production-grade.
 
@@ -19,7 +23,7 @@ CLOSIQ is a mobile app that turns a photo of a garment into a structured wardrob
 
 Most people own enough clothes and still stall in front of the wardrobe every morning. The apps that exist for this mostly want to sell you something new — they recommend products from a catalog, not from your closet.
 
-CLOSIQ inverts that. Nothing in it is for sale. It catalogs what you own, understands each garment's colour, fabric, fit and formality, and then answers a single question: *what should I wear for this, from what I already have?*
+HeyHanger inverts that. Nothing in it is for sale. It catalogs what you own, understands each garment's colour, fabric, fit and formality, and then answers a single question: *what should I wear for this, from what I already have?*
 
 ---
 
@@ -229,6 +233,6 @@ Development status, stated plainly:
 
 ## License
 
-CLOSIQ is released under the [MIT License](LICENSE). Copyright (c) 2026 vudigapranav.
+HeyHanger is released under the [MIT License](LICENSE). Copyright (c) 2026 vudigapranav.
 
 Third-party components keep their own licenses: the U²-Net background-removal model in `server/models/` is Apache License 2.0 (see `server/models/README.md`), and `mobile/LICENSE` is the MIT notice from Expo's project template.

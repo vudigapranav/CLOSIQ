@@ -1,4 +1,4 @@
-# CLOSIQ — Deployment Runbook (prepared 2026-09-11; NOT yet executed)
+# HeyHanger — Deployment Runbook (prepared 2026-09-11; NOT yet executed)
 
 Scope: the existing Node backend (`server/`), the existing Supabase project (`wibinjtekmadwtbxygrd`, "Closiq"), and the existing EAS configuration (`mobile/eas.json`), on **Expo SDK 57**. Nothing here has been deployed, built on EAS, or submitted. **No public store release is part of this runbook.** Every phase ends at a gate; don't start the next phase until its gate passes.
 

@@ -1,6 +1,121 @@
-# CLOSIQ handoff for Claude
+# HeyHanger handoff for Claude (formerly CLOSIQ)
 
 Codex records its changes here, newest first.
+
+## 2026-11-20 — HeyHanger rebrand (Claude): CLOSIQ → HeyHanger, assistant HeyHanger.ai, HH logo; V2 is the release
+
+**Checkout:** nested `…/CLOSIQ/CLOSIQ-v2` (V2, branch `feature/closiq-v2-local-ai`). The outer V1 checkout got the same rebrand; its astra.md has the same entry.
+
+### Names (owner-approved)
+| Use | Name |
+| --- | --- |
+| Product / project / Android launcher | **HeyHanger** |
+| Assistant | **HeyHanger.ai** (owner changed it from "HeyHanger AI" mid-session; a display name only, no heyhanger.ai domain is used) |
+| Custom model family | **HeyHanger-VLM**, planned checkpoint **HeyHanger-VLM-500M** (reserved: no weights exist; upstream base `HuggingFaceTB/SmolVLM2-500M-Video-Instruct` / mobile `litert-community/SmolVLM2-500M` keep their own names, licences and credits) |
+| Identifiers | `heyhanger`, assistant slug `heyhanger-ai` |
+
+Owner direction (2026-11-20, mid-session): **V2 with the new brand and HeyHanger.ai is the working product**, released as an APK, delivered to existing customers as an update with no data loss.
+
+### Logo
+Original **HH monogram**: two separate capital Hs, rounded corners, and one small hanger hook rising from the gap between them. A monoline rounded "HeyHanger" wordmark is drawn from strokes and arcs, with no font file. App icon: olive-brown `#6B5A3D` tile with ivory `#F7F2E9` mark. Shared-upright and joined-crossbar versions were tried and rejected: they read as a single H or a fence at 48 px.
+- Masters (edit only these): `public/brand/heyhanger-mark.svg`, `public/brand/heyhanger-wordmark.svg`.
+- Regenerate every export: `node scripts/generate-app-icons.mjs`. It writes the lockups, the single-colour and reversed variants, the app icon tile, the Android adaptive foreground and monochrome layers, the favicon, the apple-touch icon, `mobile/assets/heyhanger-logo.png` (splash, sign-in, Home, intro), the social images and `docs/brand/heyhanger-preview.png` (16/32/48 px, circle and rounded-square masks, themed icon). Output is byte-identical in both checkouts.
+- Reference: `docs/BRANDING.md`. `mobile/app.json` `android.adaptiveIcon.backgroundColor` is now `#6B5A3D`.
+
+### Renamed paths (both checkouts, `git mv` where a file maps)
+| Old | New |
+| --- | --- |
+| `src/components/ui/ClosiqLogo.tsx` | `src/components/ui/HeyHangerLogo.tsx` (now shows `public/brand/heyhanger-lockup.svg` on an ivory plate) |
+| `mobile/assets/closiq-logo.png` | `mobile/assets/heyhanger-logo.png` |
+| `public/brand/closiq-app-icon-512.png` | `public/brand/heyhanger-app-icon-512.png` |
+| `public/brand/closiq-linkedin-square.png` / `-3x4.png` | `public/brand/heyhanger-linkedin-square.png` / `-3x4.png` |
+| `public/brand/closiq-logo.png`, `public/brand/closiq-symbol.svg` | removed (old artwork; in git history), replaced by the two masters |
+| `mobile/modules/closiq-vision/` | `mobile/modules/heyhanger-vision/` (V2 only; unpublished native module, so renamed fully) |
+| `…/android/src/main/java/app/closiq/vision/ClosiqVisionModule.kt` | `…/android/src/main/java/app/heyhanger/vision/HeyHangerVisionModule.kt` (package `app.heyhanger.vision`, native name `HeyHangerVision`) |
+| `…/ios/ClosiqVision.podspec`, `…/ios/ClosiqVisionModule.swift` | `…/ios/HeyHangerVision.podspec`, `…/ios/HeyHangerVisionModule.swift` |
+New: `docs/BRANDING.md`, `docs/brand/heyhanger-preview.png`, `public/brand/heyhanger-*.svg` (masters + 7 derived), `mobile/tests/rebrandStorageCompat.test.ts`.
+
+### Other changes
+- All user-facing copy: app name, permission prompts, onboarding, sign-in, errors, Shop Check, Planner, Profile, share/export titles, email-confirmed page, `index.html` title and description, and server log prefixes. Assistant surfaces read "Ask HeyHanger.ai" (Stylist title, Home card) and "HeyHanger.ai is styling…".
+- The Gemini system prompt (`server/geminiServer.js`) now identifies as "HeyHanger.ai, the friendly personal stylist inside the HeyHanger wardrobe app" (web/V1 server only).
+- Downloads: `heyhanger-my-data-YYYY-MM-DD.json`, `heyhanger-event.ics`, ICS `PRODID:-//HeyHanger//Planner//EN`.
+- `package.json` / lockfile root name `heyhanger` (no dependency changed), `.claude/launch.json` `heyhanger-dev`, test fixtures `api.heyhanger.test` (reserved TLD), sentinel `heyhanger-backend-not-yet-deployed.invalid`, sample catalog brand "HeyHanger Wardrobe" (garments already saved from the catalog keep whatever brand text they stored).
+- CLAUDE.md: new brand section, a retained-identifiers rule, and relative links instead of absolute `file:///…/CLOSIQ/…` links. AGENTS.md names HeyHanger and points to the rules. README gets the lockup and a "formerly CLOSIQ" line. STATE.md gets a top note.
+
+### Docs that kept historical wording (and why)
+`STATE.md` body (dated log; a rename note was added on top), earlier `astra.md` entries, `docs/showcase/README.previous.md` (archived README), `docs/v2/ARCHITECTURE_AUDIT.md` (dated audit) and `supabase/migrations/*` (applied to production; never edit). `DEPLOYMENT.md` and `RELEASE_CHECKLIST.md` (2026-09 runbooks) got the new name, but their old status tables were left as written.
+
+### Retained old identifiers (compatibility, not shown to users)
+| Identifier | Where | Why |
+| --- | --- | --- |
+| `com.closiq.app` | `mobile/app.json` (android.package, ios.bundleIdentifier), generated `namespace` | Installed on customers' phones. A new ID would install a separate app instead of updating, and would lose the signed-in session and local caches. |
+| `"slug": "closiq"`, `"scheme": "closiq"`, EAS project `859d629b-…`, `https://u.expo.dev/859d629b-…` | `mobile/app.json` | EAS refuses a slug that doesn't match the project. The scheme is kept for links already sent. |
+| `@closiq_*` (AsyncStorage) / `closiq_*` (localStorage) | `mobile/src/services/*Storage.ts`, `IntroSplash.tsx`, `accountService.ts`, `src/App.tsx`, `webWeather.ts`, `cloud/account.ts`, `SplashScreen.tsx` | Existing wardrobes, settings and consent must load after the update. Proven by `mobile/tests/rebrandStorageCompat.test.ts`: it seeds a pre-rebrand cache and reads it offline. A mutation run that renames the key makes it fail. There is no migration, so nothing can run twice. |
+| `@closiq.app` | `src/services/calendarExport.ts` | Stable ICS event UIDs, so re-imported events don't duplicate. |
+| `supabase/migrations/*closiq*` | migrations | Already applied to production. |
+| `closiq-liard.vercel.app`, Vercel project `closiq`, Supabase project "Closiq", `github.com/vudigapranav/CLOSIQ`, branch `feature/closiq-v2-local-ai` | docs, `.env` examples, bundle | Live external resources. No replacement exists. |
+| Folder names `…/Demux/CLOSIQ` and `…/CLOSIQ/CLOSIQ-v2` | filesystem | Moved after the session (procedure below). |
+
+### Commands run and results
+| Check | Main (V1, `main`) | V2 (`feature/closiq-v2-local-ai`) |
+| --- | --- | --- |
+| `npm run typecheck` | pass | pass |
+| `npx oxlint` (`npm run lint`) | exit 0 | exit 0 |
+| `npm run build` | pass (existing chunk-size warning) | pass |
+| `npm run test:server` | 16/16 | 16/16 |
+| `npm test` (mobile + shared) | 167/167 (165 + 2 new) | 179/179 (177 + 2 new) |
+| `cd mobile && npx tsc --noEmit` | pass | pass |
+| `node scripts/generate-app-icons.mjs` | pass | pass (identical bytes) |
+| `npx expo export -p android` | pass. The Hermes bundle has 0 "CLOSIQ" strings and contains "Ask HeyHanger…". | (see Gradle APK) |
+| Local link/asset check (Markdown links, `require()` assets, `/brand/*`, `app.json` assets) | 0 broken, apart from 5 README screenshot placeholders that existed before the rebrand (`docs/showcase/screenshots/0*.png`; screenshots were never captured; needs the app + a demo account, see `CAPTURE_CHECKLIST.md`) | same |
+| Final case-insensitive `closiq` sweep (paths + contents) | every hit is in the retained table above, historical text, or a rebrand note; 0 unexplained | same |
+
+### V2 Android: release build and device coverage
+- **The release, for existing customers (update in place, data kept):** EAS build `ceefae3a-f7e3-4f09-af4a-21f9dee4e405` (`eas build -p android --profile preview`, run from `CLOSIQ-v2/mobile` as `vudigapranav`; source = V2 working tree on top of `9a84fb6`, uncommitted rebrand included). The build was FINISHED, with app **2.0.0** and versionCode **2**; V1 EAS builds are 1.0.0 and versionCode 1. The `preview` profile now has `autoIncrement: true`.
+  - Download: https://expo.dev/artifacts/eas/gbkOU1AUbwaM31TP9HHu1KVY95JT9u0TJh7E7UynGWs.apk · logs: https://expo.dev/accounts/vudigapranav/projects/closiq/builds/ceefae3a-f7e3-4f09-af4a-21f9dee4e405
+  - Local copy: `CLOSIQ-v2/builds/HeyHanger-2.0.0-update-eas-preview-vc2.apk`, 133,647,074 bytes, SHA-256 `bd527f90646641646775e66bbf0e9aef4c46dc47557d9f5751917208d5e39ee5`.
+  - `apksigner`: signer SHA-256 `f55f7fbe809947009d6f8641c4b9da393d0a47d2c6cb62a338f077caa1fa9844`. That is the same EAS keystore as V1, so phones accept it as an update. `aapt2`: package `com.closiq.app`, label **HeyHanger**.
+  - EAS `preview` environment has `EXPO_PUBLIC_API_URL`, `EXPO_PUBLIC_SUPABASE_URL` and `EXPO_PUBLIC_SUPABASE_ANON_KEY` (names checked, values not printed) and no demo flag. `.easignore` now also excludes `builds/`, APK/AAB files, `ai/.venv` and model/data folders. Upload was 538 files, 10.2 MB, no secrets (`node scripts/check-easignore.mjs`).
+  - runtimeVersion is the app version (2.0.0), so V1's 1.0.0 OTA updates never land on V2.
+- **Local Gradle check build** (debug-signed, throwaway ID `com.closiq.app.rebrandcheck`, not for customers): `expo prebuild --clean` generated `app_name` HeyHanger, `iconBackground` `#6B5A3D` and `splashscreen_background` `#F7F2E9`. HH mipmaps (launcher, round, adaptive foreground, monochrome) and the splash lockup were rendered and inspected. `:app:assembleRelease` passed. Bundle strings: "HeyHanger.ai", "Ask HeyHanger.ai", native module `HeyHangerVision`. No "CLOSIQ", no "ClosiqVision" and no `/api/ai/analyze-garment`. The only `closiq` strings left are the retained storage keys, the ICS UID and the Vercel URL. Copy: `CLOSIQ-v2/builds/HeyHanger-V2-2.0.0-rebrandcheck-20261120-arm64.apk` (SHA-256 `449c211f29631d85731661344f9e81db2d44816541322d8cadaa3cfd26d489db`).
+- **Android emulator** (Medium_Phone_API_36.1, Android 16, arm64; no physical phone was connected):
+  - Check build: the launcher showed "HeyHanger" with the HH icon under a circle mask. Cold start took 489 ms to first frame, then the intro with the HH lockup, then sign-in with the lockup. No crash. The check build was uninstalled afterwards.
+  - **EAS release over the emulator's existing EAS-signed V1 1.0.0 (installed 2026-11-01):** `adb install -r` → Success. Now versionCode 2 / 2.0.0; `firstInstallTime` unchanged (2026-11-01 20:44:46), `lastUpdateTime` 2026-11-20 22:36. This was an update, not a reinstall, so the app data directory is kept. The launcher's "CLOSIQ" entry became "HeyHanger" with the HH icon. Cold start was 715 ms with no crash: HeyHanger intro, then sign-in. That V1 had never signed in, so carrying over a signed-in account session was **not** exercised. Screenshots: `docs/brand/android-emulator-launcher.png`, `android-emulator-cold-start.png`, `android-emulator-update-over-v1.png`. The emulator now runs HeyHanger 2.0.0 instead of V1.
+  - Not run on a device: onboarding, signed-in Home, the HeyHanger.ai model download, scan and chat. They need an account password, and the owner's standing rule is no click-through. Assistant naming was verified from source, tests (`/Turn on HeyHanger.ai/`) and bundle strings.
+- Dataset: renamed seed (`"source": "HeyHanger authored styling seed"`, `"attribution": "HeyHanger project"`) → `prepare_dataset.py` / `split_dataset.py` / `validate_dataset.py` into a scratch folder: 20 examples, 14/4/2, the same IDs per split as before. The existing ignored `ai/data/splits/` was left untouched; it still has the old provenance text. `py_compile` passed for `ai/`.
+- V2-only identifier renames: `EXPO_PUBLIC_CLOSIQ_AI_DEMO` → `EXPO_PUBLIC_HEYHANGER_AI_DEMO`; `CLOSIQ_NDK_VERSION`/`CLOSIQ_BUILD_TOOLS_VERSION` → `HEYHANGER_*`; the build-plugin marker is `// heyhanger:android-build-compat`, and the old marker is still recognised, so a prebuild without `--clean` doesn't duplicate the block. Engine crash marker `closiq-engine-loading` → `heyhanger-engine-loading`, staging file `closiq-model.partial` → `heyhanger-model.partial`. The installed model file name (`<revision>.litertlm`) is unchanged, so nobody re-downloads the 363 MB. iOS model dir → `HeyHangerModels`; bench `com.heyhanger.photobench`; `ai/configs/fashion-lora.yaml` `model_name` → `HeyHanger-VLM-500M`. Existing `builds/CLOSIQ-V2-*.apk` files keep their names because earlier entries reference them.
+
+### Phone smoke test (owner, Android)
+1. On the phone that has the old CLOSIQ app, **do not uninstall it**. Open the download link above, or run `adb install -r CLOSIQ-v2/builds/HeyHanger-2.0.0-update-eas-preview-vc2.apk`, and accept **Update**.
+2. The launcher shows **HeyHanger** with the olive HH icon.
+3. Open it: the intro shows the HH lockup and you should land signed in on Home with the same wardrobe, saved looks and planner (all stored in the account; local caches use the unchanged `@closiq_*` keys).
+4. Home → "Ask HeyHanger.ai" card; Profile → HeyHanger.ai → Turn on (one-time 363 MB download on Wi-Fi), then scan a garment and ask for an outfit.
+5. Report anything still showing "CLOSIQ".
+
+### After-session folder move (owner, when no Claude/Codex/DeepSeek session is open in the folder)
+Old paths: `/Users/pranav07vudiga/Desktop/Projects/Hackathon/Demux/CLOSIQ` and the nested `/Users/pranav07vudiga/Desktop/Projects/Hackathon/Demux/CLOSIQ/CLOSIQ-v2`. Planned new paths: `/Users/pranav07vudiga/Desktop/Projects/Hackathon/Demux/HeyHanger` and `.../HeyHanger/HeyHanger-v2`. Not moved now because this session runs inside the folder and the outer repo has four linked worktrees under `.claude/worktrees`.
+
+Procedure (rehearsed here on a throwaway repo with a dirty linked worktree and a nested clone with a `../node_modules` symlink: links restored and uncommitted files kept):
+
+```bash
+cd /Users/pranav07vudiga/Desktop/Projects/Hackathon/Demux
+mv CLOSIQ HeyHanger
+cd HeyHanger
+git worktree repair .claude/worktrees/*/
+git worktree list
+mv CLOSIQ-v2 HeyHanger-v2
+cp -R ~/.claude/projects/-Users-pranav07vudiga-Desktop-Projects-Hackathon-Demux-CLOSIQ ~/.claude/projects/-Users-pranav07vudiga-Desktop-Projects-Hackathon-Demux-HeyHanger
+```
+
+A bare `git worktree repair` is **not** enough when the main repo and its worktrees move together; pass the worktree paths. The nested V2 is an independent clone (own `.git`), so `mv` keeps it intact. Its `node_modules` symlink is relative. Then replace absolute paths in `docs/v2/MOBILE_DEPLOYMENT.md` and the continuation prompts (`grep -rn "Demux/CLOSIQ" --include=*.md .`). Re-run `npx expo prebuild --clean` before the next local Gradle build (`mobile/android` stores absolute paths).
+
+### Owner actions outside this repo
+1. **GitHub** (optional): rename `vudigapranav/CLOSIQ` → `vudigapranav/HeyHanger` under Settings → General. GitHub redirects the old URL. Then run `git remote set-url origin https://github.com/vudigapranav/HeyHanger.git` in both checkouts and update `DEPLOYMENT.md`, `docs/showcase/*` and `mobile/modules/heyhanger-vision/ios/HeyHangerVision.podspec`.
+2. **Vercel** (optional): renaming the project `closiq` doesn't change `closiq-liard.vercel.app`. A new domain would also need the Supabase Site URL/redirects and `EXPO_PUBLIC_API_URL` in the EAS environments updated first.
+3. **Supabase**: the display name "Closiq" can be renamed in the dashboard, which is harmless. Still open from earlier: set Auth Site URL and redirect URLs to `https://closiq-liard.vercel.app`.
+4. **Web deploy**: the rebranded website is not deployed (Vercel deploys from the CLI, not on push). Deploy only when you're ready.
+5. **Nothing was committed or pushed.** Your standing rule is commit per folder and push to `main`. The V2 feature branch also needs merging into `main` once you accept V2 as the product.
+
 
 ## 2026-11-20 — V2 redesigned as an update of V1: accounts kept, CLOSIQ AI instead of Gemini; emulator demo
 

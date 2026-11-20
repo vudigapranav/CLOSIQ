@@ -1,4 +1,4 @@
-# CLOSIQ — Release Checklist (prepared in Sprint M20, 2026-09-11)
+# HeyHanger — Release Checklist (prepared in Sprint M20, 2026-09-11)
 
 Status key: **BLOCKER** = store submission will be rejected, or the shipped app won't work · **REQUIRED** = must be done before release · **VERIFY** = check on a real build · ✅ = already satisfied (with evidence).
 
@@ -10,7 +10,7 @@ Nothing on this list has been built, submitted or deployed. Every "✅" is SOURC
 
 | # | Blocker | Why |
 |---|---|---|
-| B1 | **No in-app account deletion** | Apple 5.1.1(v); Google Play also needs an in-app path **and** a web deletion link. CLOSIQ has sign-up but no deletion anywhere. |
+| B1 | **No in-app account deletion** | Apple 5.1.1(v); Google Play also needs an in-app path **and** a web deletion link. HeyHanger has sign-up but no deletion anywhere. |
 | B2 | **No privacy policy** (in-app link + store listing) | Apple 5.1.1(i); Google Play requires one for any app handling personal data. |
 | B3 | **No consent before sending photos/wardrobe to Google Gemini** | Apple 5.1.2(i) now explicitly requires disclosure **and explicit permission** before sharing personal data "with third-party AI". |
 | B4 | **No store-compliant app icon** | `app.json` `icon` is the 984×274 transparent wordmark; `assets/icon.png` and `android-icon-foreground.png` are unmodified Expo template placeholders. Needs a real 1024×1024 opaque square mark from the official brand (CLAUDE.md forbids fabricating one). |
@@ -75,7 +75,7 @@ Nothing on this list has been built, submitted or deployed. Every "✅" is SOURC
 
 ## 6. Icons, splash, store assets
 
-- [ ] **BLOCKER B4** — A 1024×1024 **opaque** iOS icon and an Android adaptive icon (foreground inside the safe zone, plus a background colour; monochrome layer optional for themed icons), derived from the official CLOSIQ brand. The only official asset, `public/brand/closiq-logo.png` (`mobile/assets/closiq-logo.png`), is a wide wordmark and doesn't work as a square icon.
+- [ ] **BLOCKER B4** — A 1024×1024 **opaque** iOS icon and an Android adaptive icon (foreground inside the safe zone, plus a background colour; monochrome layer optional for themed icons), derived from the official HeyHanger brand. The only official asset, `public/brand/heyhanger-logo.png` (`mobile/assets/heyhanger-logo.png`), is a wide wordmark and doesn't work as a square icon.
 - ✅ Splash: wordmark on `#F7F2E9` with `resizeMode: contain`.
 - [ ] Screenshots for the required device sizes, plus store descriptions. **No ecommerce claims** (CLAUDE.md).
 
