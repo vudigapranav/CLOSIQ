@@ -295,3 +295,20 @@ test('an unusable config is refused BEFORE any network call is attempted', async
     setSupabaseConfigCheck({ ok: true });
   }
 });
+
+// ------------------------------- sign-up for an email that already exists
+// 2026-11-19: Supabase answers it with success, no session, an empty
+// identities list and NO email. The app used to say "check your email".
+
+test('signing up with an email that already has an account says so instead of "check your email"', async () => {
+  const fake = { data: { session: null, user: { id: 'x', identities: [] } }, error: null };
+  setSupabase(authDouble({ signUp: () => fake }).client);
+  const repeated = await signUp('a@b.com', 'password1');
+  assert.equal(repeated.ok, true);
+  assert.match(repeated.message ?? '', /already has a CLOSIQ account/);
+  assert.doesNotMatch(repeated.message ?? '', /check your email/i);
+
+  const created = { data: { session: null, user: { id: 'y', identities: [{ id: 'i' }] } }, error: null };
+  setSupabase(authDouble({ signUp: () => created }).client);
+  assert.match((await signUp('new@b.com', 'password1')).message ?? '', /check your email/i);
+});

@@ -4,11 +4,8 @@
 import { appStateListeners, installNativeMocks, setNativeVision } from './helpers/nativeV2Mocks';
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import fs from 'node:fs';
-import os from 'node:os';
-import path from 'node:path';
 
-installNativeMocks(fs.mkdtempSync(path.join(os.tmpdir(), 'closiq-v2-model-')));
+installNativeMocks();
 
 type Pending = { resolve: (v: string) => void };
 const calls: string[] = [];
