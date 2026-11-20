@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import {
+  Platform,
   StyleSheet,
   View,
   Text,
@@ -15,6 +16,7 @@ import { WardrobeProfile, LayeringPreference, Outfit, GarmentItem, SavedLookStat
 import { OutfitFeedback, buildOutfitBrain, tasteGarments } from '../../../src/services/outfitBrain';
 import { loadOutfitFeedback } from '../services/outfitFeedbackStorage';
 import { AccountPrivacySection } from '../components/AccountPrivacySection';
+import { LocalModelSection } from '../components/LocalModelSection';
 import { SavedLookDetailModal } from '../components/SavedLookDetailModal';
 import { BodyTypeOptionCard } from '../components/BodyTypeOptionCard';
 import { GarmentImage } from '../components/GarmentImage';
@@ -336,7 +338,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                 <Text style={styles.savedOutfitOccasion}>{outfit.occasion}{outfit.vibe ? ` • ${outfit.vibe}` : ''}</Text>
 
                 <View style={styles.savedFooter}>
-                  <Text style={styles.savedScore}>{outfit.styleScore > 0 ? `${outfit.styleScore}% Match` : 'Local pick'}</Text>
+                  <Text style={styles.savedScore}>{outfit.styleScore > 0 ? `${outfit.styleScore}% Match` : 'CLOSIQ pick'}</Text>
                   <Text style={styles.savedWearAction}>Open Look →</Text>
                 </View>
               </TouchableOpacity>
@@ -408,6 +410,8 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
           <Text style={styles.logoutBtnText}>Log Out</Text>
         </TouchableOpacity>
       </View>
+
+      {Platform.OS !== 'web' && <LocalModelSection />}
 
       <AccountPrivacySection />
 

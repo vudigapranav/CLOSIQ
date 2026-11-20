@@ -2,7 +2,8 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Button, Text, TextInput, View, StyleSheet } from 'react-native';
 import type { GarmentItem } from '../../../src/types/wardrobe';
 import { isGarmentAvailable } from '../../../src/types/wardrobe';
-import { cancelGeneration, infer } from '../local/model';
+import { cancelGeneration } from '../local/model';
+import { answerWardrobeQuestion } from '../services/outfitStylist.native';
 import { COLORS } from '../theme';
 
 type Turn = { question: string; answer: string };
@@ -28,17 +29,7 @@ export function StylingChat({ items }: { items: GarmentItem[] }) {
     setPending(true);
     setError('');
     try {
-      const inventory = pieces
-        .slice(0, 10)
-        .map((p) => [p.name.slice(0, 40), p.color.slice(0, 20), p.category]);
-      const request =
-        'Answer the styling question in two sentences using only clothes from the supplied wardrobe. Say if something is missing. Do not assign IDs. Wardrobe: ' +
-        JSON.stringify(inventory) +
-        '\nPrior exchange: ' +
-        JSON.stringify(turns.slice(-1).map((t) => [t.question.slice(0, 120), t.answer.slice(0, 220)])) +
-        '\nQuestion: ' +
-        q.slice(0, 260);
-      const answer = (await infer(request)).trim();
+      const answer = await answerWardrobeQuestion(q, pieces);
       if (!answer) throw new Error('The model returned an empty answer.');
       if (attempt === generation.current) {
         setTurns((prev) => [...prev.slice(-5), { question: q, answer }]);
@@ -69,7 +60,7 @@ export function StylingChat({ items }: { items: GarmentItem[] }) {
         onChangeText={setQuestion}
       />
       <Button
-        title={pending ? 'Thinking on this device…' : 'Ask local stylist'}
+        title={pending ? 'Thinking…' : 'Ask CLOSIQ AI'}
         disabled={pending || !question.trim()}
         onPress={() => void ask()}
       />

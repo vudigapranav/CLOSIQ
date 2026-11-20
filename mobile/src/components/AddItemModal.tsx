@@ -167,7 +167,7 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({
         // below), so the source buttons stay disabled through this step too.
         const optimized = await optimizeGarmentImage(asset.uri);
         setImageUri(optimized.uri);
-        setBase64Data(Platform.OS !== 'web' ? optimized.uri : optimized.base64 || null);
+        setBase64Data(optimized.base64 || null);
         setStep('preview');
       }
     } catch (err) {
@@ -198,7 +198,7 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({
     }
 
     setStep('analyzing');
-    if (Platform.OS === 'web' && studioStatus !== 'ready') {
+    if (studioStatus !== 'ready') {
       const run = ++studioRunRef.current;
       setStudioStatus('loading');
       makeStudioPhotoMobile(base64Data).then((uri) => {
@@ -207,7 +207,10 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({
         setStudioStatus(uri ? 'ready' : 'failed');
       });
     }
-    const result = await analyzeGarmentImageMobile(base64Data, 'image/jpeg', selectedCategory);
+    // On the phone the scan runs on-device on the saved photo file (no API
+    // key, nothing uploaded); the web build still sends base64 to the server.
+    const scanInput = Platform.OS !== 'web' && imageUri ? imageUri : base64Data;
+    const result = await analyzeGarmentImageMobile(scanInput, 'image/jpeg', selectedCategory);
     if (attempt !== scanAttempt.current) return;
     if (!result.ok) {
       setAnalysisResult(null);

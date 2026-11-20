@@ -9,4 +9,10 @@ import App from './App';
 // registerRootComponent calls AppRegistry.registerComponent('main', () => App);
 // It also ensures that whether you load the app in Expo Go or in a native build,
 // the environment is set up appropriately
-registerRootComponent(App);
+// CLOSIQ V2 demo builds (EXPO_PUBLIC_CLOSIQ_AI_DEMO=1) open straight into the
+// on-device AI demo with no sign-in; every other build is the normal app.
+const Root =
+  process.env.EXPO_PUBLIC_CLOSIQ_AI_DEMO === '1'
+    ? (require('./src/demo/AiDemoApp') as typeof import('./src/demo/AiDemoApp')).AiDemoApp
+    : App;
+registerRootComponent(Root);

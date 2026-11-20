@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import {
+  Platform,
   StyleSheet,
   View,
   Text,
@@ -87,7 +88,9 @@ export const AccountPrivacySection: React.FC = () => {
           <View style={styles.rowText}>
             <Text style={styles.label}>Use AI photo analysis</Text>
             <Text style={styles.help}>
-              Photos are sent to the AI provider only to scan a garment. Turn off to add pieces by hand.
+              {Platform.OS === 'web'
+                ? 'Photos are sent to the AI provider only to scan a garment. Turn off to add pieces by hand.'
+                : 'CLOSIQ AI reads your photo to fill in the garment details. Turn off to add pieces by hand.'}
             </Text>
           </View>
           <Switch

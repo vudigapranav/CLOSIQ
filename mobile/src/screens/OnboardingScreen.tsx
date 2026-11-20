@@ -322,7 +322,7 @@ export const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onComplete }
             <MapPin size={28} color={COLORS.primary} style={{ marginBottom: 12 }} />
             <Text style={styles.question}>Let CLOSIQ use your location?</Text>
             <Text style={styles.subtext}>
-              Used to provide local weather and improve outfit recommendations. You can continue either way.
+              Used to show the weather where you are and improve outfit recommendations. You can continue either way.
             </Text>
             {locationPermissionStatus === 'not_asked' ? (
               <View style={{ gap: 10, marginTop: 8 }}>

@@ -24,6 +24,7 @@ import { OutfitResultCard } from '../components/OutfitResultCard';
 import { TemperatureUnit, UserProfileData } from '../types/onboarding';
 import { WeatherData, WeatherFetchStatus } from '../types/weather';
 import { fetchCurrentWeather, celsiusToFahrenheit } from '../services/weatherService';
+import { LocalModelBanner } from '../components/LocalModelSection';
 import { buildUserStyleContext, buildWeatherContext, buildRecentOutfitContext } from '../services/personalizationContext';
 
 const { width } = Dimensions.get('window');
@@ -384,6 +385,7 @@ export const TodayScreen: React.FC<TodayScreenProps> = ({
       contentContainerStyle={styles.scrollContent}
       showsVerticalScrollIndicator={false}
     >
+      <LocalModelBanner />
       {/* Header Bar */}
       <View style={styles.header}>
         <Image
@@ -414,7 +416,7 @@ export const TodayScreen: React.FC<TodayScreenProps> = ({
         {weatherStatus === 'loading' ? (
           <>
             <ActivityIndicator size="small" color={COLORS.primary} />
-            <Text style={styles.weatherText}>Getting local weather…</Text>
+            <Text style={styles.weatherText}>Getting today's weather…</Text>
           </>
         ) : weather ? (
           <>
@@ -435,7 +437,7 @@ export const TodayScreen: React.FC<TodayScreenProps> = ({
             <View style={{ flex: 1 }}>
               <Text style={styles.weatherText}>Weather unavailable</Text>
               {weatherStatus === 'permission-denied' && (
-                <Text style={styles.weatherSubtext}>Enable location to get local weather.</Text>
+                <Text style={styles.weatherSubtext}>Enable location to get weather for where you are.</Text>
               )}
             </View>
           </>
