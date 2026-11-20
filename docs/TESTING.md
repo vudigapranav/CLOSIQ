@@ -1,4 +1,4 @@
-# CLOSIQ — Testing
+# HeyHanger — Testing
 
 Last updated: 2026-11-11.
 
@@ -12,7 +12,7 @@ Last updated: 2026-11-11.
 | Mobile type check | `cd mobile && npx tsc --noEmit -p tsconfig.json` | app sources (strict) |
 | Lint | `npm run lint` | oxlint over the repo |
 | Web production build | `npm run build` | Vite build to `dist/` |
-| Android JS bundle | `cd mobile && npx expo export --platform android --output-dir /tmp/closiq-export` | proves the RN bundle resolves and compiles (not that the APK runs) |
+| Android JS bundle | `cd mobile && npx expo export --platform android --output-dir /tmp/heyhanger-export` | proves the RN bundle resolves and compiles (not that the APK runs) |
 | Release env gate | `cd mobile && npm run check:release-env` | https API host, no LAN/placeholder host, no service-role key |
 
 Running tests in parallel (several agents/terminals): compile to a private folder so runs don't delete each other's output:

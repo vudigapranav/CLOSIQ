@@ -1,4 +1,4 @@
-# CLOSIQ — Architecture
+# HeyHanger — Architecture
 
 Last updated: 2026-11-11. This describes the code as it is, verified against the source. Product rules live in `CLAUDE.md`; live status lives in `STATE.md`.
 
@@ -14,7 +14,7 @@ Last updated: 2026-11-11. This describes the code as it is, verified against the
            │
            ├──────────── Supabase (Auth, Postgres + RLS, Storage) ── direct from clients, anon key + user JWT
            ├──────────── Open-Meteo (weather + geocoding) ────────── direct from clients, no key
-           └──────────── CLOSIQ API  /api/ai/*  ───────────────────── Vercel functions (api/) or plain Node (server/index.js)
+           └──────────── HeyHanger API  /api/ai/*  ───────────────────── Vercel functions (api/) or plain Node (server/index.js)
                               │  server/apiRouter.js: auth → rate limit → body cap → route
                               ├─ server/geminiServer.js  (garment scan, outfit, swap — Gemini, key server-side only)
                               └─ server/studioPhoto.js   (U²-Net cut-out, onnxruntime + sharp, no AI provider)

@@ -1,4 +1,4 @@
-# CLOSIQ — Product Roadmap
+# HeyHanger — Product Roadmap
 
 Vision: **your personal wardrobe intelligence system** — style what you already own. Not a store, not a feed.
 

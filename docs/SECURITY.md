@@ -1,4 +1,4 @@
-# CLOSIQ — Security & Performance Report
+# HeyHanger — Security & Performance Report
 
 Audit date: 2026-11-11 (read-only audit by a security subagent, findings verified against code; fixes applied the same day).
 

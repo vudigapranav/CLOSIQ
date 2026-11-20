@@ -1,4 +1,4 @@
-# LinkedIn post — CLOSIQ (final, ready to post)
+# LinkedIn post — HeyHanger (final, ready to post)
 
 **Repo URL:** `https://github.com/vudigapranav/CLOSIQ` — verified as the configured `origin` remote and reachable. Confirm it is public before posting; a link to a private repo is worse than no link.
 
@@ -12,7 +12,7 @@ I own 36 pieces of clothing and still spent every morning staring at my wardrobe
 
 Every app I found wanted to fix that by selling me something new. None of them knew what was already in my cupboard.
 
-So I built CLOSIQ — an AI stylist for the clothes you already own.
+So I built HeyHanger — an AI stylist for the clothes you already own.
 
 Here's the whole loop:
 
@@ -56,7 +56,7 @@ Post them in this order — it matches the numbered loop in the post, so the ima
 
 | # | Screen | Alt text / caption |
 | --- | --- | --- |
-| 1 | Wardrobe | CLOSIQ wardrobe — 36 catalogued garments with colour, category and formality read from photos by AI |
+| 1 | Wardrobe | HeyHanger wardrobe — 36 catalogued garments with colour, category and formality read from photos by AI |
 | 2 | Occasion selection | Choosing an occasion, or describing the need in your own words |
 | 3 | Outfit result | A generated outfit built from the user's own garments, with the "why it works" rationale |
 | 4 | Saved outfits | Saved looks kept for reuse |

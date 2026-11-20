@@ -1,4 +1,4 @@
-# CLOSIQ — Devpost Project Details
+# HeyHanger — Devpost Project Details
 
 ---
 
@@ -12,10 +12,10 @@ We wanted the opposite: a stylist that never sells anything. It learns the cloth
 
 ## What it does
 
-**CLOSIQ** is an AI stylist for the clothes you already own.
+**HeyHanger** is an AI stylist for the clothes you already own.
 
 - **Snap a garment**: take a photo from your camera or gallery, even a messy one on a bed or floor. Gemini vision picks out the name, category, colour (with hex), fabric, fit, formality and layering role, then adds it to your digital **Collection**.
-- **Ask the Stylist**: pick an occasion (interview, hackathon, date, casual day) or describe what you need. CLOSIQ builds an **Ensemble** using only your own garments and explains *why it works*: colour harmony, occasion fit and an overall style score.
+- **Ask the Stylist**: pick an occasion (interview, hackathon, date, casual day) or describe what you need. HeyHanger builds an **Ensemble** using only your own garments and explains *why it works*: colour harmony, occasion fit and an overall style score.
 - **Swap one piece**: don't like the shoes? Replace a single garment without regenerating the whole outfit.
 - **Today**: a weather-aware daily look based on your location, with occasion shortcuts and recently added garments.
 - **Planner**: put outfits on upcoming events, and use that context to personalise future suggestions.
@@ -23,7 +23,7 @@ We wanted the opposite: a stylist that never sells anything. It learns the cloth
 
 ## How we built it
 
-CLOSIQ is written entirely in **JavaScript and TypeScript**, from the phone to the server.
+HeyHanger is written entirely in **JavaScript and TypeScript**, from the phone to the server.
 
 - **Mobile app**: Expo (SDK 57) + React Native + React 19 + TypeScript. We used `expo-image-picker` and `expo-image-manipulator` to capture and compress photos before upload, `expo-location` for weather, and AsyncStorage as an offline cache.
 - **Backend**: a plain **Node.js** `http` server with no framework. It exposes three AI endpoints: `analyze-garment`, `generate-outfit` and `swap-garment`.
@@ -63,7 +63,7 @@ Occasion → Node server → Gemini reasons over *your* garment IDs → Ensemble
 - Row-level security in Postgres, signed storage URLs, and designing an offline cache that never overrides the cloud.
 - How to get *structured* output from a vision model and make an LLM reason over a fixed set of IDs instead of inventing items.
 
-## What's next for CLOSIQ
+## What's next for HeyHanger
 
 - Deploy the backend publicly so the app works away from our local network
 - Test every flow end to end on physical iOS and Android devices

@@ -1,4 +1,4 @@
-# CLOSIQ — Environment Setup & Deployment
+# HeyHanger — Environment Setup & Deployment
 
 Names only — never commit values. `.env`, `.env.local` and `*.local` are gitignored.
 
@@ -16,7 +16,7 @@ Names only — never commit values. `.env`, `.env.local` and `*.local` are gitig
 | root `.env` / Vercel | `GEMINI_MODELS` (optional) | no | model fallback order |
 | root `.env` / Vercel | `GEMINI_TIMEOUT_MS` (optional) | no | total AI budget (default 36000) |
 | Vercel | `CRON_SECRET` (recommended) | yes | protects `/api/keepalive` |
-| `mobile/.env.local` / EAS env | `EXPO_PUBLIC_API_URL` | no | CLOSIQ API host (https in release builds) |
+| `mobile/.env.local` / EAS env | `EXPO_PUBLIC_API_URL` | no | HeyHanger API host (https in release builds) |
 | `mobile/.env.local` / EAS env | `EXPO_PUBLIC_SUPABASE_URL`, `EXPO_PUBLIC_SUPABASE_ANON_KEY` | no | mobile Supabase client |
 
 Never put a `service_role` / `sb_secret_` key anywhere in this project — the web build and the mobile release gate both refuse it.

@@ -1,4 +1,4 @@
-# CLOSIQ — Known Issues & Limitations
+# HeyHanger — Known Issues & Limitations
 
 Last updated: 2026-11-11. Ordered by impact.
 

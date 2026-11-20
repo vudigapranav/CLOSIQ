@@ -1,6 +1,6 @@
-# Ship CLOSIQ V2 to Android
+# Ship HeyHanger V2 to Android
 
-V2 is an **update of the V1 app** (`com.closiq.app`, version 2.0.0): same accounts, same cloud data, CLOSIQ AI instead of Gemini on the phone. See [ARCHITECTURE.md](ARCHITECTURE.md).
+V2 is an **update of the V1 app** (`com.closiq.app`, version 2.0.0): same accounts, same cloud data, HeyHanger.ai instead of Gemini on the phone. See [ARCHITECTURE.md](ARCHITECTURE.md).
 
 ## 1. The update for existing users (your brother's phone)
 
@@ -12,10 +12,10 @@ npx eas-cli login                       # your Expo account (vudigapranav)
 npx eas-cli build -p android --profile preview
 ```
 
-- `preview` produces an installable APK with the same keystore; `appVersionSource: remote` assigns a versionCode above V1's. Install it over V1 (open the APK link on the phone, or `adb install -r`). **Do not uninstall V1 first.** Data lives in the account anyway, but an in-place update also keeps the session.
-- EAS reads `EXPO_PUBLIC_SUPABASE_URL`, `EXPO_PUBLIC_SUPABASE_ANON_KEY` and `EXPO_PUBLIC_API_URL` from the EAS `preview` environment, as for V1. Do **not** set `EXPO_PUBLIC_CLOSIQ_AI_DEMO` there.
+- `preview` produces an installable APK with the same keystore; `appVersionSource: remote` plus `autoIncrement: true` on the `preview` profile (added 2026-11-20) raises the versionCode above V1's (V1 EAS builds were versionCode 1). Install it over V1 (open the APK link on the phone, or `adb install -r`). **Do not uninstall V1 first.** Data lives in the account anyway, but an in-place update also keeps the session.
+- EAS reads `EXPO_PUBLIC_SUPABASE_URL`, `EXPO_PUBLIC_SUPABASE_ANON_KEY` and `EXPO_PUBLIC_API_URL` from the EAS `preview` environment, as for V1. Do **not** set `EXPO_PUBLIC_HEYHANGER_AI_DEMO` there.
 - The config plugin's NDK/Build Tools pins only apply where those versions are missing; on EAS they are present, so nothing is pinned.
-- After updating, the user opens **Profile → CLOSIQ AI → Turn on CLOSIQ AI** (or the Home card): one 363 MB download over Wi-Fi. Until then scans fall back to manual entry and outfits to CLOSIQ's wardrobe rules.
+- After updating, the user opens **Profile → HeyHanger.ai → Turn on HeyHanger.ai** (or the Home card): one 363 MB download over Wi-Fi. Until then scans fall back to manual entry and outfits to HeyHanger's wardrobe rules.
 
 ## 2. Build on this Mac (local checks, debug-signed)
 
@@ -34,7 +34,7 @@ Use `-Xmx3g` while an emulator is running: with `-Xmx6g` plus a 4 GB emulator th
 
 ## 3. Demo build (no sign-in, nothing saved)
 
-Same as 2, but bundle with `EXPO_PUBLIC_CLOSIQ_AI_DEMO=1` and, to install next to V1, change `applicationId` in the generated `android/app/build.gradle` to `com.closiq.app.demo`. The app opens straight into the CLOSIQ AI demo (download, photo scan, outfit pick, swap, chat on a 36-piece sample wardrobe) with timings and the model's raw answers.
+Same as 2, but bundle with `EXPO_PUBLIC_HEYHANGER_AI_DEMO=1` and, to install next to V1, change `applicationId` in the generated `android/app/build.gradle` to `com.closiq.app.demo`. The app opens straight into the HeyHanger.ai demo (download, photo scan, outfit pick, swap, chat on a 36-piece sample wardrobe) with timings and the model's raw answers.
 
 ## 4. Android emulator on an Apple M4 Mac
 

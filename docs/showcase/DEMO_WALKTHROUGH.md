@@ -1,4 +1,4 @@
-# CLOSIQ — 45–60 second demo walkthrough
+# HeyHanger — 45–60 second demo walkthrough
 
 **Status: script only. No video has been recorded.** This document is the plan for a recording you run yourself on your iPhone.
 
@@ -37,7 +37,7 @@ Everything in [`screenshots/CAPTURE_CHECKLIST.md`](screenshots/CAPTURE_CHECKLIST
 
 Written to be read at an unhurried pace. Roughly 110 words — comfortable for 55 seconds with natural pauses.
 
-> **(0:00)** "This is CLOSIQ. Every item here is something I actually own — photographed, and read by AI into colour, fabric, fit and formality."
+> **(0:00)** "This is HeyHanger. Every item here is something I actually own — photographed, and read by AI into colour, fabric, fit and formality."
 >
 > **(0:09)** "So instead of asking an app what to buy, I ask it what to wear. I pick the occasion — smart presentation."
 >
@@ -45,7 +45,7 @@ Written to be read at an unhurried pace. Roughly 110 words — comfortable for 5
 >
 > **(0:36)** "I save the look…"
 >
-> **(0:45)** "…and drop it onto the day I need it. That's CLOSIQ."
+> **(0:45)** "…and drop it onto the day I need it. That's HeyHanger."
 
 If recording without voiceover, the captions below carry the whole story on their own.
 
@@ -64,7 +64,7 @@ Keep them short, high-contrast, and positioned in the upper third so they never 
 | 0:30 | …and it explains why it works |
 | 0:38 | Save the look |
 | 0:47 | Plan it into your week |
-| 0:53 | CLOSIQ — working prototype |
+| 0:53 | HeyHanger — working prototype |
 
 That last caption matters. The post describes this as a prototype; the video should not quietly imply otherwise.
 

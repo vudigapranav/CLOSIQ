@@ -1,6 +1,6 @@
 # iPhone screenshot capture checklist
 
-No genuine CLOSIQ app screenshots exist in this repository yet. This file lists exactly what to capture and how, so the README's screenshot block can be filled with real captures rather than mockups or web renders.
+No genuine HeyHanger app screenshots exist in this repository yet. This file lists exactly what to capture and how, so the README's screenshot block can be filled with real captures rather than mockups or web renders.
 
 **Rules for these captures**
 - Native iPhone screenshots only. A screenshot of the Vite web app is a different surface — if one is ever used, it must be labeled "web prototype" in its caption and filename, never presented as the mobile app.
