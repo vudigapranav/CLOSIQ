@@ -2,10 +2,6 @@ import React, { useState, useEffect } from 'react';
 import {
   Alert,
   BackHandler,
-  Platform,
-  Text,
-  Button,
-  DeviceEventEmitter,
   StyleSheet,
   View,
   StatusBar
@@ -27,7 +23,7 @@ import { StylistScreen } from './src/screens/StylistScreen';
 import { PlannerScreen } from './src/screens/PlannerScreen';
 import { ProfileScreen } from './src/screens/ProfileScreen';
 import { OnboardingScreen, OnboardingResult } from './src/screens/OnboardingScreen';
-
+import { LoginScreen } from './src/screens/LoginScreen';
 import { WardrobeProfile, LayeringPreference, Outfit, GarmentItem, GarmentDetailsPatch } from '../src/types/wardrobe';
 import { loadProfileSettings, saveProfileSettings } from './src/services/profileSettingsStorage';
 import { recordRecentOutfit } from './src/services/outfitHistoryStorage';
@@ -40,13 +36,11 @@ import {
   recordGarmentsWorn
 } from './src/services/wardrobeStorage';
 import { loadSavedOutfits, saveOutfitToStorage, removeSavedOutfitFromStorage } from './src/services/savedOutfitsStorage';
-import { restoreSession, onAuthStateChange, signOut } from './src/services/sessionLifecycle';
+import { restoreSession, onAuthStateChange, signOut } from './src/services/authService';
 import { setCurrentUserId, captureSession, isSessionCurrent } from './src/services/authSession';
 import { UserProfileData } from './src/types/onboarding';
 
 function AppContent() {
-  const [storageError, setStorageError] = useState('');
-  const [loadAttempt, setLoadAttempt] = useState(0);
   const [showSplash, setShowSplash] = useState(true);
   const [activeTab, setActiveTab] = useState<NavTab>('today');
   // The raised camera button in the middle of the nav (2026-11-01).
@@ -62,7 +56,7 @@ function AppContent() {
   // (guards against a flash of Login before we know a session already
   // exists); null = no session (show Login); a string = the authenticated
   // user's Supabase ID, which every per-user storage read below keys off.
-  const [userId, setUserId] = useState<string | null | 'loading'>(Platform.OS !== 'web' ? 'local-device' : 'loading');
+  const [userId, setUserId] = useState<string | null | 'loading'>('loading');
   const [userEmail, setUserEmail] = useState<string | null>(null);
   // Set when a stored session couldn't be refreshed at startup (offline
   // with an expired access token) — distinct from being signed out.
@@ -95,15 +89,7 @@ function AppContent() {
   // data isolation actually hold.
   // Run a freshly published OTA update on this launch, not the next one.
   useEffect(() => {
-    if (Platform.OS === 'web') applyUpdateOnLaunch();
-  }, []);
-
-  useEffect(() => {
-    const sub = DeviceEventEmitter.addListener('closiqDataImported', () => {
-      setLoadAttempt(n => n + 1);
-      setWardrobeRefreshKey(n => n + 1);
-    });
-    return () => sub.remove();
+    applyUpdateOnLaunch();
   }, []);
 
   // The AI Stylist is opened from Today (it has no tab), so Android's back
@@ -118,10 +104,6 @@ function AppContent() {
   }, [activeTab]);
 
   useEffect(() => {
-    if (Platform.OS !== 'web') {
-      setCurrentUserId('local-device');
-      return;
-    }
     let mounted = true;
 
     function applySession(session: Session | null) {
@@ -174,22 +156,21 @@ function AppContent() {
     // resolves after this effect has re-run for user B must never reach
     // React state. React does not cancel in-flight promises for us.
     let active = true;
-    const failed = (error: unknown) => { if (active) setStorageError(String(error)); };
     loadProfileSettings().then((settings) => {
       if (!active) return;
       setProfile(settings.profile);
       setLayeringPreference(settings.layeringPreference);
-    }).catch(failed);
+    });
     loadUserProfile().then((p) => {
       if (active) setUserProfile(p);
-    }).catch(failed);
+    });
     loadSavedOutfits().then((o) => {
       if (active) setSavedOutfits(o);
-    }).catch(failed);
+    });
     return () => {
       active = false;
     };
-  }, [userId, loadAttempt]);
+  }, [userId]);
 
   // Wardrobe depends on BOTH the authenticated user and the active
   // Men/Women profile (separate @closiq_user_wardrobe_<userId>_men/_women
@@ -202,7 +183,7 @@ function AppContent() {
     let active = true;
     loadUserWardrobe(profile).then((w) => {
       if (active) setWardrobe(w);
-    }).catch(error => { if (active) setStorageError(String(error)); });
+    });
     return () => {
       active = false;
     };
@@ -329,8 +310,6 @@ function AppContent() {
 
   // Still checking for a restorable session — render nothing but the frame
   // rather than flashing Login before we actually know one doesn't exist.
-  if (storageError) return <SafeAreaView style={styles.container}><Text>Couldn’t open the wardrobe. {storageError}</Text>
-    <Button title="Retry" onPress={() => { setStorageError(''); setLoadAttempt(n => n + 1); setWardrobeRefreshKey(n => n + 1); }} /></SafeAreaView>;
   if (userId === 'loading') {
     return (
       <SafeAreaView style={styles.container}>
@@ -340,7 +319,6 @@ function AppContent() {
   }
 
   if (!userId) {
-    const { LoginScreen } = require('./src/screens/LoginScreen') as typeof import('./src/screens/LoginScreen');
     return (
       <SafeAreaView style={styles.container}>
         <StatusBar barStyle="dark-content" />

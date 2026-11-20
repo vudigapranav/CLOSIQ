@@ -1,4 +1,3 @@
-import { Platform } from 'react-native';
 import * as Location from 'expo-location';
 import { buildForecastUrl, parseForecast, DailyForecast, WeatherSnapshot } from '../../../src/services/weather/weatherCore';
 import { WeatherData, WeatherFetchResult, WeatherFetchStatus } from '../types/weather';
@@ -142,13 +141,9 @@ function withCachedFallback(cached: WeatherData | null, status: WeatherFetchStat
 export async function fetchCurrentWeather(forceRefresh = false): Promise<WeatherFetchResult> {
   const cached = await loadCachedWeather();
 
-  if (Platform.OS !== 'web' && !forceRefresh) {
-    return { status: cached ? 'success' : 'location-unavailable', weather: cached ? {...cached, source:'cached'} : null };
-  }
   if (!forceRefresh && cached && isFresh(cached)) {
     return { status: 'success', weather: cached };
   }
-
 
   const permission = await resolvePermission();
   if (permission !== 'granted') {

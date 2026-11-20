@@ -4,7 +4,6 @@ import {
   View,
   Text,
   ScrollView,
-  Platform,
   TouchableOpacity,
   TextInput,
   Modal,
@@ -138,7 +137,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
 
         <View style={{ flex: 1 }}>
           <Text style={styles.userName}>{userProfile.name || 'CLOSIQ Member'}</Text>
-          <Text style={styles.userRole} numberOfLines={1}>{userEmail || (Platform.OS !== 'web' ? 'On-device wardrobe' : 'CLOSIQ Wardrobe Member')}</Text>
+          <Text style={styles.userRole} numberOfLines={1}>{userEmail || 'CLOSIQ Wardrobe Member'}</Text>
         </View>
 
         <TouchableOpacity
@@ -393,7 +392,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
       </View>
 
       {/* ACCOUNT */}
-      {Platform.OS === 'web' && <View style={styles.section}>
+      <View style={styles.section}>
         <View style={styles.sectionHeaderRow}>
           <Mail size={16} color={COLORS.primary} />
           <Text style={styles.sectionTitle}>Account</Text>
@@ -408,7 +407,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
           <LogOut size={15} color={COLORS.danger} style={{ marginRight: 8 }} />
           <Text style={styles.logoutBtnText}>Log Out</Text>
         </TouchableOpacity>
-      </View>}
+      </View>
 
       <AccountPrivacySection />
 

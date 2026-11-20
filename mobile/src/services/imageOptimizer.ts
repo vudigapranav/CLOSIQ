@@ -1,4 +1,3 @@
-import { Platform } from 'react-native';
 import { Image } from 'react-native';
 import { ImageManipulator, SaveFormat } from 'expo-image-manipulator';
 
@@ -41,11 +40,11 @@ export async function optimizeGarmentImage(uri: string): Promise<OptimizedImage>
   const { width, height } = await getImageSize(uri);
   const context = ImageManipulator.manipulate(uri);
   const needsResize = Math.max(width, height) > MAX_DIMENSION;
-  const rendered = await (needsResize ? context.resize(width >= height ? { width: MAX_DIMENSION } : { height: MAX_DIMENSION }) : context).renderAsync();
+  const rendered = await (needsResize ? context.resize({ width: MAX_DIMENSION }) : context).renderAsync();
   const result = await rendered.saveAsync({
     compress: JPEG_QUALITY,
     format: SaveFormat.JPEG,
-    base64: Platform.OS === 'web'
+    base64: true
   });
 
   return {

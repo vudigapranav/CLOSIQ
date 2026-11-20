@@ -1,4 +1,3 @@
-import { Platform } from 'react-native';
 import React, { useEffect, useState } from 'react';
 import { StyleSheet, View, Text, ScrollView, TouchableOpacity, TextInput, Alert } from 'react-native';
 import * as Location from 'expo-location';
@@ -99,14 +98,14 @@ export const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onComplete }
   const outerwearCount = syncedWardrobe.filter((i) => i.category === 'outerwear').length;
   const shoesCount = syncedWardrobe.filter((i) => i.category === 'shoes').length;
   const accessoriesCount = syncedWardrobe.filter((i) => i.category === 'accessories').length;
-  const canCompleteWardrobe = Platform.OS !== 'web' || topsCount >= MIN_TOPS && bottomsCount >= MIN_BOTTOMS;
+  const canCompleteWardrobe = topsCount >= MIN_TOPS && bottomsCount >= MIN_BOTTOMS;
 
   const handleGarmentAdded = async (garment: GarmentItem) => {
     if (!selectedProfile) return;
     const result = await saveUserGarment(garment, selectedProfile);
     setWardrobe(result.items);
     setUnsyncedIds((prev) => {
-      if (result.cloudSynced || ('localSaved' in result && result.localSaved)) return prev.filter((id) => id !== garment.id);
+      if (result.cloudSynced) return prev.filter((id) => id !== garment.id);
       return prev.includes(garment.id) ? prev : [...prev, garment.id];
     });
   };
@@ -346,7 +345,8 @@ export const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onComplete }
           <View style={styles.stepBlock}>
             <Text style={styles.question}>Initial Wardrobe</Text>
             <Text style={styles.subtext}>
-              {Platform.OS === 'web' ? `Add at least ${MIN_TOPS} tops and ${MIN_BOTTOMS} bottoms to finish setup.` : 'Add a piece now or finish setup and build your wardrobe later.'}
+              Add at least {MIN_TOPS} tops and {MIN_BOTTOMS} bottoms to start styling. Outerwear, footwear, and
+              accessories are optional.
             </Text>
 
             <View style={styles.wardrobeCounts}>
