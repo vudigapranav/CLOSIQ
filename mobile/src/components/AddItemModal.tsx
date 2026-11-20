@@ -129,13 +129,13 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({
       if (useCamera) {
         const { status } = await ImagePicker.requestCameraPermissionsAsync();
         if (status !== 'granted') {
-          Alert.alert('Camera Access Required', 'CLOSIQ requires camera permissions to capture clothing photos.');
+          Alert.alert('Camera Access Required', 'HeyHanger requires camera permissions to capture clothing photos.');
           return;
         }
       } else {
         const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
         if (status !== 'granted') {
-          Alert.alert('Gallery Access Required', 'CLOSIQ requires photo library permissions to select clothing photos.');
+          Alert.alert('Gallery Access Required', 'HeyHanger requires photo library permissions to select clothing photos.');
           return;
         }
       }
@@ -143,7 +143,7 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({
       // base64: false here deliberately — the picker would otherwise encode
       // the FULL-RESOLUTION original (often several MB on a modern phone
       // camera) purely to be thrown away. optimizeGarmentImage() below does
-      // one resize+compress pass and produces the base64 CLOSIQ actually
+      // one resize+compress pass and produces the base64 HeyHanger actually
       // needs, from a file that's already the right size.
       const result = useCamera
         ? await ImagePicker.launchCameraAsync({
@@ -428,7 +428,7 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({
 
                 <TouchableOpacity style={styles.heroAnalyzeBtn} onPress={handleStartAnalysis}>
                   <Sparkles size={16} color="#FFFFFF" style={{ marginRight: 6 }} />
-                  <Text style={styles.heroAnalyzeBtnText}>Analyze with CLOSIQ</Text>
+                  <Text style={styles.heroAnalyzeBtnText}>Analyze with HeyHanger</Text>
                 </TouchableOpacity>
               </View>
             </View>

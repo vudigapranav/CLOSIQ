@@ -90,7 +90,7 @@ export const AccountPrivacySection: React.FC = () => {
             <Text style={styles.help}>
               {Platform.OS === 'web'
                 ? 'Photos are sent to the AI provider only to scan a garment. Turn off to add pieces by hand.'
-                : 'CLOSIQ AI reads your photo to fill in the garment details. Turn off to add pieces by hand.'}
+                : 'HeyHanger.ai reads your photo to fill in the garment details. Turn off to add pieces by hand.'}
             </Text>
           </View>
           <Switch

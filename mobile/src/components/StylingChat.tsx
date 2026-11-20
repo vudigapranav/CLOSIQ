@@ -60,7 +60,7 @@ export function StylingChat({ items }: { items: GarmentItem[] }) {
         onChangeText={setQuestion}
       />
       <Button
-        title={pending ? 'Thinking…' : 'Ask CLOSIQ AI'}
+        title={pending ? 'Thinking…' : 'Ask HeyHanger.ai'}
         disabled={pending || !question.trim()}
         onPress={() => void ask()}
       />

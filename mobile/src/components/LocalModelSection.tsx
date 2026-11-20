@@ -33,15 +33,15 @@ import { optimizeGarmentImage } from '../services/imageOptimizer';
 import { getAiPhotoConsent } from '../services/accountService';
 
 // Technical details (model name, GPU switch, timings, memory) are shown only
-// in the demo build; customers just see "CLOSIQ AI".
-const DIAGNOSTICS = process.env.EXPO_PUBLIC_CLOSIQ_AI_DEMO === '1';
+// in the demo build; customers just see "HeyHanger.ai".
+const DIAGNOSTICS = process.env.EXPO_PUBLIC_HEYHANGER_AI_DEMO === '1';
 
 /**
- * CLOSIQ V2: garment scans, pairing and styling run on this phone with the
+ * HeyHanger V2: garment scans, pairing and styling run on this phone with the
  * published SmolVLM2-500M model (LiteRT-LM). No API key and no Gemini call.
  * The model is downloaded once (363 MB) and kept in the app's private,
  * non-backed-up storage. Without it, scans fall back to manual entry and
- * outfits use CLOSIQ's own wardrobe rules.
+ * outfits use HeyHanger's own wardrobe rules.
  */
 type Status = Awaited<ReturnType<typeof modelStatus>>;
 const STATUS_LABEL: Record<Status, string> = {
@@ -49,7 +49,7 @@ const STATUS_LABEL: Record<Status, string> = {
   installed: 'On',
   ready: 'On · ready',
   failed: "Couldn't start on this phone",
-  unsupported: 'Needs the CLOSIQ Android app'
+  unsupported: 'Needs the HeyHanger Android app'
 };
 
 function useLocalModelStatus() {
@@ -124,7 +124,7 @@ export function LocalModelSection({ onStatusChange }: { onStatusChange?: () => v
     abort.current = controller;
     setProgress(0);
     await installModel(setProgress, controller.signal);
-    return 'CLOSIQ AI is ready.';
+    return 'HeyHanger.ai is ready.';
   }
 
   async function testPhoto() {
@@ -166,11 +166,11 @@ export function LocalModelSection({ onStatusChange }: { onStatusChange?: () => v
       <View style={s.card}>
         <View style={s.headerRow}>
           <Cpu size={16} color={COLORS.primary} />
-          <Text style={s.title}>CLOSIQ AI</Text>
+          <Text style={s.title}>HeyHanger.ai</Text>
         </View>
         <Text style={s.body}>
-          CLOSIQ AI couldn't start on this phone, so it is paused. Photo scans use manual entry and outfits use
-          CLOSIQ's wardrobe rules. Your wardrobe is not affected.
+          HeyHanger.ai couldn't start on this phone, so it is paused. Photo scans use manual entry and outfits use
+          HeyHanger's wardrobe rules. Your wardrobe is not affected.
         </Text>
         <ActionButton
           label="Try starting it again"
@@ -179,7 +179,7 @@ export function LocalModelSection({ onStatusChange }: { onStatusChange?: () => v
             void run(async () => {
               await retryAfterLoadFailure();
               await initializeModel();
-              return 'CLOSIQ AI is ready.';
+              return 'HeyHanger.ai is ready.';
             })
           }
         />
@@ -190,7 +190,7 @@ export function LocalModelSection({ onStatusChange }: { onStatusChange?: () => v
           onPress={() =>
             void run(async () => {
               await deleteModel();
-              return 'CLOSIQ AI turned off.';
+              return 'HeyHanger.ai turned off.';
             })
           }
         />
@@ -201,10 +201,10 @@ export function LocalModelSection({ onStatusChange }: { onStatusChange?: () => v
     <View style={s.card}>
       <View style={s.headerRow}>
         <Cpu size={16} color={COLORS.primary} />
-        <Text style={s.title}>CLOSIQ AI</Text>
+        <Text style={s.title}>HeyHanger.ai</Text>
       </View>
       <Text style={s.body}>
-        CLOSIQ AI reads your garment photos, pairs pieces and styles outfits from your wardrobe. Turn it on once with a
+        HeyHanger.ai reads your garment photos, pairs pieces and styles outfits from your wardrobe. Turn it on once with a
         363 MB download.{DIAGNOSTICS ? ' Model: ' + model.name + '.' : ''}
       </Text>
       <View style={s.row}>
@@ -226,7 +226,7 @@ export function LocalModelSection({ onStatusChange }: { onStatusChange?: () => v
       {!installed && (
         <ActionButton
           primary
-          label="Turn on CLOSIQ AI"
+          label="Turn on HeyHanger.ai"
           disabled={busy || status === 'unsupported'}
           onPress={() => void run(download)}
         />
@@ -240,7 +240,7 @@ export function LocalModelSection({ onStatusChange }: { onStatusChange?: () => v
             onPress={() =>
               void run(async () => {
                 await initializeModel();
-                return 'CLOSIQ AI is ready.';
+                return 'HeyHanger.ai is ready.';
               })
             }
           />
@@ -272,7 +272,7 @@ export function LocalModelSection({ onStatusChange }: { onStatusChange?: () => v
             label="Turn off and remove"
             disabled={busy}
             onPress={() =>
-              Alert.alert('Turn off CLOSIQ AI?', 'This removes the 363 MB download. Your wardrobe is not affected, and you can turn it on again.', [
+              Alert.alert('Turn off HeyHanger.ai?', 'This removes the 363 MB download. Your wardrobe is not affected, and you can turn it on again.', [
                 { text: 'Keep' },
                 {
                   text: 'Delete',
@@ -280,7 +280,7 @@ export function LocalModelSection({ onStatusChange }: { onStatusChange?: () => v
                   onPress: () =>
                     void run(async () => {
                       await deleteModel();
-                      return 'CLOSIQ AI turned off.';
+                      return 'HeyHanger.ai turned off.';
                     })
                 }
               ])
@@ -328,7 +328,7 @@ export function LocalModelBanner() {
       <TouchableOpacity style={s.banner} activeOpacity={0.85} onPress={() => setOpen(true)}>
         <Download size={18} color={COLORS.primary} />
         <View style={{ flex: 1 }}>
-          <Text style={s.bannerTitle}>Turn on CLOSIQ AI</Text>
+          <Text style={s.bannerTitle}>Turn on HeyHanger.ai</Text>
           <Text style={s.bannerBody}>A one-time 363 MB update for photo scans, pairing and outfit styling.</Text>
         </View>
       </TouchableOpacity>

@@ -111,7 +111,7 @@ export const GarmentEditForm: React.FC<GarmentEditFormProps> = ({ item, collecti
         <TextInput style={styles.input} value={pattern} maxLength={PATTERN_MAX} placeholder="Solid, striped, checked…" placeholderTextColor={COLORS.textMuted} onChangeText={setPattern} />
       </Field>
 
-      <Field label="Fabric" hint="Leave blank if unsure — CLOSIQ never guesses a fabric for you.">
+      <Field label="Fabric" hint="Leave blank if unsure — HeyHanger never guesses a fabric for you.">
         <TextInput style={styles.input} value={fabric} maxLength={40} placeholder="e.g. Cotton, Linen" placeholderTextColor={COLORS.textMuted} onChangeText={setFabric} />
       </Field>
 

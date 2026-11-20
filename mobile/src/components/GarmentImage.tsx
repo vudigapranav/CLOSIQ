@@ -56,7 +56,7 @@ export const GarmentImage: React.FC<GarmentImageProps> = ({
       }
     }
     if (__DEV__) {
-      console.warn('[CLOSIQ] Garment image failed to load:', currentUri, detail);
+      console.warn('[HeyHanger] Garment image failed to load:', currentUri, detail);
     }
     setFailed(true);
   };

@@ -34,7 +34,7 @@ const C = {
   light: '#F3D9A4',
   ivory: '#F7F2E9',
   olive: '#6B5A3D',
-  logoPlate: '#F5F6F2'
+  logoPlate: '#F7F2E9'
 };
 
 type Variant = 'full' | 'lite' | 'reduced';
@@ -165,7 +165,7 @@ export const IntroSplash: React.FC<IntroSplashProps> = ({ onFinish }) => {
           >
             <View style={styles.logoPlate}>
               <Image
-                source={require('../../assets/closiq-logo.png')}
+                source={require('../../assets/heyhanger-logo.png')}
                 style={{ width: logoWidth, height: logoWidth * 0.28 }}
                 resizeMode="contain"
               />

@@ -207,8 +207,8 @@ export const ShopCheckModal: React.FC<ShopCheckModalProps> = ({
         Alert.alert(
           useCamera ? 'Camera access needed' : 'Photo access needed',
           useCamera
-            ? 'Allow camera access so CLOSIQ can look at the piece you are thinking of buying.'
-            : 'Allow photo access so CLOSIQ can look at the piece you are thinking of buying.'
+            ? 'Allow camera access so HeyHanger can look at the piece you are thinking of buying.'
+            : 'Allow photo access so HeyHanger can look at the piece you are thinking of buying.'
         );
         return;
       }
@@ -222,7 +222,7 @@ export const ShopCheckModal: React.FC<ShopCheckModalProps> = ({
       setAddedId(null);
       // Consent gate: AI photo analysis off -> no vision call, describe by hand.
       if (!(await getAiPhotoConsent())) {
-        setScanNotice('AI photo analysis is turned off in Profile. Describe the piece in a few taps and CLOSIQ will still check it against your wardrobe.');
+        setScanNotice('AI photo analysis is turned off in Profile. Describe the piece in a few taps and HeyHanger will still check it against your wardrobe.');
         setStep('describe');
         return;
       }
@@ -238,7 +238,7 @@ export const ShopCheckModal: React.FC<ShopCheckModalProps> = ({
         setDescribed(fromScan(scan.data));
         setStep('result');
       } else {
-        setScanNotice(`${scan.message} Describe the piece in a few taps and CLOSIQ will still check it against your wardrobe.`);
+        setScanNotice(`${scan.message} Describe the piece in a few taps and HeyHanger will still check it against your wardrobe.`);
         setStep('describe');
       }
     } catch (err) {
@@ -264,7 +264,7 @@ export const ShopCheckModal: React.FC<ShopCheckModalProps> = ({
     const family = COLOR_FAMILIES.find((f) => f.value === formFamily);
     const colourName = formColorName.trim() || family?.label.split(' ')[0] || '';
     if (!colourName) {
-      Alert.alert('Pick a colour', 'Choose the closest colour so CLOSIQ can match it.');
+      Alert.alert('Pick a colour', 'Choose the closest colour so HeyHanger can match it.');
       return;
     }
     const cat = CATEGORIES.find((c) => c.key === formCategory)!;
@@ -357,7 +357,7 @@ export const ShopCheckModal: React.FC<ShopCheckModalProps> = ({
                 </View>
                 <Text style={styles.heroTitle}>Will it work with your wardrobe?</Text>
                 <Text style={styles.heroText}>
-                  Spotted something in a shop? Snap it before you buy. CLOSIQ tells you what you already own that goes with it,
+                  Spotted something in a shop? Snap it before you buy. HeyHanger tells you what you already own that goes with it,
                   the outfits it makes, and whether it suits your style.
                 </Text>
               </View>
@@ -378,7 +378,7 @@ export const ShopCheckModal: React.FC<ShopCheckModalProps> = ({
               <View style={styles.howCard}>
                 {[
                   'Point the camera at the piece — hanger or shelf is fine.',
-                  'CLOSIQ reads its type, colour and style.',
+                  'HeyHanger reads its type, colour and style.',
                   'See what YOUR clothes pair with it, before you pay.'
                 ].map((line, i) => (
                   <View key={line} style={styles.howRow}>

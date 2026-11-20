@@ -13,7 +13,7 @@ import { generateOutfitMobile, swapGarmentMobile } from '../services/outfitStyli
 import { resolveStaticImageUrl } from '../services/garmentImages';
 
 /**
- * Demo-only entry (EXPO_PUBLIC_CLOSIQ_AI_DEMO=1, see index.ts): the on-device
+ * Demo-only entry (EXPO_PUBLIC_HEYHANGER_AI_DEMO=1, see index.ts): the on-device
  * AI with no sign-in and no storage, so the model can be shown on an
  * emulator or phone without an account. It calls exactly the services the
  * real screens use; nothing is saved and no account data is read. Normal
@@ -55,7 +55,7 @@ function ScanDemo() {
       const seconds = ((Date.now() - start) / 1000).toFixed(1);
       setResult(
         outcome.ok
-          ? `Scanned by CLOSIQ AI in ${seconds} s\nName: ${outcome.data.name}\nCategory: ${outcome.data.category} · ${outcome.data.subcategory}\nColour: ${outcome.data.color}${outcome.data.secondaryColors?.length ? ' (+ ' + outcome.data.secondaryColors.join(', ') + ')' : ''}\nPattern: ${outcome.data.pattern || '—'} · Formality: ${outcome.data.formality}\nStyle: ${outcome.data.style || '—'}\nPairing: ${outcome.data.pairingNotes || '—'}` + (outcome.raw ? `\n\nModel answers:\n${outcome.raw}` : '')
+          ? `Scanned by HeyHanger.ai in ${seconds} s\nName: ${outcome.data.name}\nCategory: ${outcome.data.category} · ${outcome.data.subcategory}\nColour: ${outcome.data.color}${outcome.data.secondaryColors?.length ? ' (+ ' + outcome.data.secondaryColors.join(', ') + ')' : ''}\nPattern: ${outcome.data.pattern || '—'} · Formality: ${outcome.data.formality}\nStyle: ${outcome.data.style || '—'}\nPairing: ${outcome.data.pairingNotes || '—'}` + (outcome.raw ? `\n\nModel answers:\n${outcome.raw}` : '')
           : `Scan did not finish (${seconds} s): ${outcome.message}` + (outcome.raw ? `\nModel said: ${outcome.raw}` : '')
       );
     } catch (e) {
@@ -90,7 +90,7 @@ function StyleDemo() {
       const seconds = ((Date.now() - start) / 1000).toFixed(1);
       setIds(res.data.garmentIds);
       setSummary(
-        `${(res.mode as string) === 'on_device' ? 'Picked by CLOSIQ AI' : 'Picked by CLOSIQ wardrobe rules'} in ${seconds} s` +
+        `${(res.mode as string) === 'on_device' ? 'Picked by HeyHanger.ai' : 'Picked by HeyHanger wardrobe rules'} in ${seconds} s` +
           (res.notice ? ` (${res.notice})` : '') +
           `\n${res.data.title}\nWhy it works: ${res.data.explanation.summary}`
       );
@@ -117,7 +117,7 @@ function StyleDemo() {
   return (
     <View style={s.card}>
       <Text style={s.title}>2 · Style an outfit</Text>
-      <Text style={s.note}>Sample wardrobe: {SAMPLE_WARDROBE.length} pieces from CLOSIQ's men's catalog.</Text>
+      <Text style={s.note}>Sample wardrobe: {SAMPLE_WARDROBE.length} pieces from HeyHanger's men's catalog.</Text>
       <TextInput style={s.input} value={prompt} onChangeText={setPrompt} accessibilityLabel="Occasion" />
       <Button label="Style an outfit" disabled={busy} onPress={() => void style()} />
       {ids.length > 0 && <Button label="Swap the top" disabled={busy} onPress={() => void swapTop()} />}
@@ -140,15 +140,15 @@ export function AiDemoApp() {
     <SafeAreaProvider>
       <SafeAreaView style={s.screen}>
         <ScrollView contentContainerStyle={{ padding: 18, gap: 4 }}>
-          <Text style={s.heading}>CLOSIQ AI demo</Text>
+          <Text style={s.heading}>HeyHanger.ai demo</Text>
           <Text style={s.note}>
-            Demo build: no sign-in and nothing is saved. CLOSIQ AI only, no Gemini and no API key.
+            Demo build: no sign-in and nothing is saved. HeyHanger.ai only, no Gemini and no API key.
           </Text>
           <LocalModelSection />
           <ScanDemo />
           <StyleDemo />
           <View style={s.card}>
-            <Text style={s.title}>3 · Ask CLOSIQ AI about the wardrobe</Text>
+            <Text style={s.title}>3 · Ask HeyHanger.ai about the wardrobe</Text>
             <StylingChat items={SAMPLE_WARDROBE} />
           </View>
         </ScrollView>

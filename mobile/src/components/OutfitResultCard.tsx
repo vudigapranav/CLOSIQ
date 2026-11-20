@@ -74,7 +74,7 @@ export const OutfitResultCard = React.memo<OutfitResultCardProps>(({
           <View style={styles.modeRow}>
             <Sparkles size={12} color={COLORS.primary} />
             <Text style={styles.modeText}>
-              {mode === 'on_device' ? 'CLOSIQ AI Stylist' : mode === 'gemini' ? 'Gemini AI Stylist' : 'CLOSIQ rule-based stylist'}
+              {mode === 'on_device' ? 'HeyHanger.ai Stylist' : mode === 'gemini' ? 'Gemini AI Stylist' : 'HeyHanger rule-based stylist'}
             </Text>
           </View>
           <Text style={styles.resultTitle}>{title}</Text>
