@@ -262,14 +262,14 @@ export const StylistScreen: React.FC<StylistScreenProps> = ({
       <div style={{ padding: '20px 20px 32px' }}>
         {backLink}
         <div style={{ marginBottom: 20 }}>
-          <h1 className="text-screen-heading">Your AI Stylist</h1>
+          <h1 className="text-screen-heading">Ask HeyHanger.ai</h1>
           <p className="text-body" style={{ marginTop: 2 }}>Tell me where you're going.</p>
         </div>
 
         <EmptyState
           icon={<Sparkles size={28} color="var(--color-primary)" />}
           title="Nothing to style yet."
-          description="Add a few pieces to your Collection and CLOSIQ can start building outfits from what you actually own."
+          description="Add a few pieces to your Collection and HeyHanger can start building outfits from what you actually own."
           action={
             onOpenUpload ? (
               <PrimaryButton icon={<Plus size={18} />} onClick={onOpenUpload}>
@@ -287,7 +287,7 @@ export const StylistScreen: React.FC<StylistScreenProps> = ({
       {/* 1. Header */}
       {backLink}
       <div style={{ marginBottom: 20 }}>
-        <h1 className="text-screen-heading">Your AI Stylist</h1>
+        <h1 className="text-screen-heading">Ask HeyHanger.ai</h1>
         <p className="text-body" style={{ marginTop: 2 }}>Tell me where you're going.</p>
         {weather?.current && (
           <p style={{ marginTop: 6, fontSize: '0.78rem', color: 'var(--color-text-secondary)' }}>
@@ -483,7 +483,7 @@ export const StylistScreen: React.FC<StylistScreenProps> = ({
             marginBottom: 24
           }}
         >
-          {/* "CLOSIQ is thinking" overlay for Generate/Regenerate — the card stays put, just veiled, so it never feels like a blank reload */}
+          {/* "HeyHanger is thinking" overlay for Generate/Regenerate — the card stays put, just veiled, so it never feels like a blank reload */}
           {isGenerating && (
             <div
               className="animate-fade-in"

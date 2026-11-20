@@ -80,7 +80,7 @@ const InsightsSection: React.FC<{ stats: WardrobeAnalytics }> = ({ stats }) => {
     return (
       <div style={{ ...cardStyle, marginBottom: 24 }}>
         <p className="text-body" style={{ fontSize: '0.85rem' }}>
-          Add clothes to your wardrobe and CLOSIQ will show what you wear most, what you have forgotten and how your colours balance.
+          Add clothes to your wardrobe and HeyHanger will show what you wear most, what you have forgotten and how your colours balance.
         </p>
       </div>
     );
@@ -136,7 +136,7 @@ const InsightsSection: React.FC<{ stats: WardrobeAnalytics }> = ({ stats }) => {
         <div style={subHeading}>Pairs you repeat</div>
         {stats.frequentPairs.length === 0 ? (
           <p className="text-caption">
-            {stats.wornLooks === 0 ? 'Mark looks as worn and CLOSIQ will spot the pairs you reach for.' : 'No pair has appeared in more than one worn look yet.'}
+            {stats.wornLooks === 0 ? 'Mark looks as worn and HeyHanger will spot the pairs you reach for.' : 'No pair has appeared in more than one worn look yet.'}
           </p>
         ) : (
           stats.frequentPairs.map((p) => piece(`${p.a.name} + ${p.b.name}`, `${p.count} looks`))
@@ -340,7 +340,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
       {/* Header */}
       <div style={{ marginBottom: 20 }}>
         <h1 className="text-screen-heading">Your Style</h1>
-        <p className="text-body" style={{ marginTop: 2 }}>What CLOSIQ knows about your aesthetic.</p>
+        <p className="text-body" style={{ marginTop: 2 }}>What HeyHanger knows about your aesthetic.</p>
       </div>
 
       {/* Style Archetype Card */}
@@ -771,7 +771,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
       />
 
       {/* 4. Style Preferences — Wardrobe Profile + Layering grouped together */}
-      <SectionHeader title="Style Preferences" subtitle="How CLOSIQ tailors recommendations to you" />
+      <SectionHeader title="Style Preferences" subtitle="How HeyHanger tailors recommendations to you" />
 
       <div
         style={{

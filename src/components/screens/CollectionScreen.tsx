@@ -225,7 +225,7 @@ export const CollectionScreen: React.FC<CollectionScreenProps> = ({
         <EmptyState
           icon={<Shirt size={28} color="var(--color-primary)" />}
           title="Your collection is empty."
-          description="Add your first piece and CLOSIQ will start organizing your wardrobe."
+          description="Add your first piece and HeyHanger will start organizing your wardrobe."
           action={
             <PrimaryButton icon={<Plus size={18} />} onClick={onOpenAddItem}>
               Add Your First Item

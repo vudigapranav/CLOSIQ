@@ -1,6 +1,6 @@
 import React, { useRef, useState } from 'react';
 import { Eye, EyeOff } from 'lucide-react';
-import { ClosiqLogo } from '../ui/ClosiqLogo';
+import { HeyHangerLogo } from '../ui/HeyHangerLogo';
 import { PrimaryButton } from '../ui/PrimaryButton';
 import { signIn, signUp, sendPasswordReset, AuthOutcome } from '../../services/cloud/auth';
 
@@ -62,7 +62,7 @@ export const LoginScreen: React.FC = () => {
       if (!result.ok) setError(result.message || 'Something went wrong.');
       else if (result.message) setInfo(result.message);
     } catch {
-      setError('Couldn’t reach CLOSIQ. Check your connection and try again.');
+      setError('Couldn’t reach HeyHanger. Check your connection and try again.');
     } finally {
       inFlight.current = false;
       setBusy(false);
@@ -87,13 +87,13 @@ export const LoginScreen: React.FC = () => {
     mode === 'signin'
       ? 'Sign in to see your clothes and get outfit ideas.'
       : mode === 'signup'
-      ? 'Same account works on the CLOSIQ phone app.'
+      ? 'Same account works on the HeyHanger phone app.'
       : 'We’ll email you a link to choose a new password.';
 
   return (
     <div className="login-layout">
       <div className="login-hero" aria-hidden="true">
-        <ClosiqLogo width={200} />
+        <HeyHangerLogo width={200} />
         <p className="text-display login-hero__tagline">Style what you already own.</p>
         <p className="text-body login-hero__copy">
           Photograph your clothes, keep track of where everything is kept, and let the AI stylist build outfits from your
@@ -103,7 +103,7 @@ export const LoginScreen: React.FC = () => {
 
       <form className="login-card" onSubmit={handleSubmit} noValidate>
         <div className="login-card__logo">
-          <ClosiqLogo width={150} />
+          <HeyHangerLogo width={150} />
         </div>
         <h1 className="text-screen-heading" style={{ marginBottom: 4 }}>{title}</h1>
         <p className="text-body" style={{ marginBottom: 22 }}>{subtitle}</p>

@@ -152,7 +152,7 @@ export const ShopCheckModal: React.FC<ShopCheckModalProps> = ({
       setAdded(false);
       setAddedId(null);
       if (!isAiPhotoConsentGiven()) {
-        setNotice('AI photo analysis is off (Profile → Privacy & account), so the photo stays on your device. Describe the piece and CLOSIQ will still check it.');
+        setNotice('AI photo analysis is off (Profile → Privacy & account), so the photo stays on your device. Describe the piece and HeyHanger will still check it.');
         setStep('describe');
         return;
       }
@@ -177,7 +177,7 @@ export const ShopCheckModal: React.FC<ShopCheckModalProps> = ({
         // Only a colour guess from the pixels — let the user confirm it.
         setDescribed(next);
         prefillForm(next);
-        setNotice("The AI couldn't read this photo right now. Check the details below and CLOSIQ will still compare it with your wardrobe.");
+        setNotice("The AI couldn't read this photo right now. Check the details below and HeyHanger will still compare it with your wardrobe.");
         setStep('describe');
       } else {
         setNotice(null);
@@ -186,7 +186,7 @@ export const ShopCheckModal: React.FC<ShopCheckModalProps> = ({
       }
     } catch {
       if (runRef.current !== run) return;
-      setNotice("Couldn't load that photo. Describe the piece instead and CLOSIQ will still check it.");
+      setNotice("Couldn't load that photo. Describe the piece instead and HeyHanger will still check it.");
       setStep('describe');
     }
   };
@@ -203,7 +203,7 @@ export const ShopCheckModal: React.FC<ShopCheckModalProps> = ({
     const family = COLOR_FAMILIES.find((f) => f.value === formFamily);
     const colourName = formColorName.trim() || family?.label.split(' ')[0] || '';
     if (!colourName) {
-      setNotice('Pick the closest colour so CLOSIQ can match it.');
+      setNotice('Pick the closest colour so HeyHanger can match it.');
       return;
     }
     const type = formType.trim() || CATEGORIES.find((c) => c.key === formCategory)!.label;
@@ -308,7 +308,7 @@ export const ShopCheckModal: React.FC<ShopCheckModalProps> = ({
               </div>
               <h3 className="text-screen-heading" style={{ fontSize: '1.4rem' }}>Will it work with your wardrobe?</h3>
               <p className="text-body" style={{ marginTop: 8 }}>
-                Spotted something in a shop? Snap it before you buy. CLOSIQ tells you what you already own that goes with it,
+                Spotted something in a shop? Snap it before you buy. HeyHanger tells you what you already own that goes with it,
                 the outfits it makes, and whether it suits your style.
               </p>
             </div>
@@ -330,7 +330,7 @@ export const ShopCheckModal: React.FC<ShopCheckModalProps> = ({
             <div style={{ ...card, marginTop: 24 }}>
               {[
                 'Point the camera at the piece — hanger or shelf is fine.',
-                'CLOSIQ reads its type, colour and style.',
+                'HeyHanger reads its type, colour and style.',
                 'See what YOUR clothes pair with it, before you pay.'
               ].map((line, i) => (
                 <div key={line} style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: i ? 10 : 0 }}>

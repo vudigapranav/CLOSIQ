@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { ArrowRight, ArrowLeft, Shirt, Sparkles, CalendarDays } from 'lucide-react';
 import { PrimaryButton } from '../ui/PrimaryButton';
-import { ClosiqLogo } from '../ui/ClosiqLogo';
+import { HeyHangerLogo } from '../ui/HeyHangerLogo';
 import { WardrobeProfile, LayeringPreference } from '../../types/wardrobe';
 import { STYLE_PREFERENCE_OPTIONS, StylePreference } from '../../data/styleDna';
 
@@ -73,7 +73,7 @@ export const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onComplete }
         <ProgressDots step={step} />
 
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', textAlign: 'center' }}>
-          <ClosiqLogo width={190} />
+          <HeyHangerLogo width={190} />
 
           <h1 className="text-display" style={{ marginTop: 32, fontSize: '2rem' }}>
             Your wardrobe.
@@ -81,7 +81,7 @@ export const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onComplete }
             Understood.
           </h1>
           <p className="text-body" style={{ marginTop: 12, maxWidth: 320 }}>
-            CLOSIQ turns the clothes you already own into outfits you'd actually wear — no shopping required.
+            HeyHanger turns the clothes you already own into outfits you'd actually wear — no shopping required.
           </p>
 
           <div style={{ marginTop: 36, width: '100%', maxWidth: 340, display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -238,7 +238,7 @@ export const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onComplete }
             Who are we styling for?
           </h1>
           <p className="text-body" style={{ marginBottom: 20 }}>
-            This sets which generated wardrobe CLOSIQ shows you.
+            This sets which generated wardrobe HeyHanger shows you.
           </p>
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 12 }}>
@@ -273,7 +273,7 @@ export const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onComplete }
         {/* 2. Layering Preference */}
         <div>
           <h2 className="text-screen-heading" style={{ fontSize: '1.5rem', marginBottom: 4 }}>
-            Tell CLOSIQ how you like to dress.
+            Tell HeyHanger how you like to dress.
           </h2>
           <p className="text-body" style={{ marginBottom: 20 }}>
             Layering preference
@@ -330,7 +330,7 @@ export const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onComplete }
           style={{ opacity: profile ? 1 : 0.5, cursor: profile ? 'pointer' : 'not-allowed' }}
           onClick={() => profile && onComplete({ profile, layering, name: name.trim(), stylePreferences: styles })}
         >
-          Enter CLOSIQ
+          Enter HeyHanger
         </PrimaryButton>
       </div>
     </div>

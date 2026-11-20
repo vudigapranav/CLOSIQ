@@ -75,10 +75,10 @@ const StylistEntry: React.FC<{ onOpen: () => void }> = ({ onOpen }) => (
     </span>
     <span style={{ flex: 1 }}>
       <span style={{ display: 'block', fontSize: '0.68rem', fontWeight: 700, letterSpacing: '0.08em', color: 'var(--color-primary)' }}>
-        AI STYLIST
+        ASK HEYHANGER.AI
       </span>
       <span style={{ display: 'block', fontSize: '0.8rem', lineHeight: 1.4, marginTop: 2 }}>
-        Describe your plan — “date night”, “office party” — and the AI Stylist builds a look from your wardrobe.
+        Describe your plan — “date night”, “office party” — and HeyHanger.ai builds a look from your wardrobe.
       </span>
     </span>
     <ChevronRight size={18} color="var(--color-primary)" />
@@ -264,7 +264,7 @@ export const TodayScreen: React.FC<TodayScreenProps> = ({
         <EmptyState
           icon={<Sparkles size={28} color="var(--color-primary)" />}
           title="Your wardrobe is waiting."
-          description="Add a few pieces and CLOSIQ will start styling you."
+          description="Add a few pieces and HeyHanger will start styling you."
           action={
             <PrimaryButton icon={<Plus size={18} />} onClick={onOpenUpload}>
               Add Your First Item
@@ -345,7 +345,7 @@ export const TodayScreen: React.FC<TodayScreenProps> = ({
       <div style={{ marginBottom: 24, position: 'relative' }}>
         <input
           type="text"
-          placeholder="Tell CLOSIQ what you're dressing for..."
+          placeholder="Tell HeyHanger what you're dressing for..."
           value={customInput}
           onChange={(e) => setCustomInput(e.target.value)}
           onKeyDown={(e) => {

@@ -382,7 +382,7 @@ export const PlannerScreen: React.FC<PlannerScreenProps> = ({
           <EmptyState
             icon={<CalendarDays size={26} color="var(--color-primary)" />}
             title="No upcoming events."
-            description="Add a wedding, interview or trip and CLOSIQ will style it from your own wardrobe."
+            description="Add a wedding, interview or trip and HeyHanger will style it from your own wardrobe."
           />
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>{upcoming.map(renderEvent)}</div>
