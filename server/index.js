@@ -38,19 +38,19 @@ const MIME_TYPES = {
 };
 
 const envCheck = checkServerEnv(process.env);
-for (const warning of envCheck.warnings) console.warn(`[CLOSIQ Server] WARNING: ${warning}`);
+for (const warning of envCheck.warnings) console.warn(`[HeyHanger Server] WARNING: ${warning}`);
 if (envCheck.errors.length > 0) {
-  for (const error of envCheck.errors) console.error(`[CLOSIQ Server] CONFIG ERROR: ${error}`);
+  for (const error of envCheck.errors) console.error(`[HeyHanger Server] CONFIG ERROR: ${error}`);
   if (envCheck.isProduction) {
-    console.error('[CLOSIQ Server] Refusing to start in production with invalid configuration.');
+    console.error('[HeyHanger Server] Refusing to start in production with invalid configuration.');
     process.exit(1);
   }
-  console.error('[CLOSIQ Server] Continuing because NODE_ENV is not "production".');
+  console.error('[HeyHanger Server] Continuing because NODE_ENV is not "production".');
 }
 
 if (!fs.existsSync(DIST_DIR)) {
-  console.error(`[CLOSIQ Server] "dist/" not found at ${DIST_DIR}.`);
-  console.error('[CLOSIQ Server] Run "npm run build" before "npm run start".');
+  console.error(`[HeyHanger Server] "dist/" not found at ${DIST_DIR}.`);
+  console.error('[HeyHanger Server] Run "npm run build" before "npm run start".');
   process.exit(1);
 }
 
@@ -186,7 +186,7 @@ const server = http.createServer(async (req, res) => {
     const handled = await handleApiRequest(req, res);
     if (handled) return;
   } catch (err) {
-    console.error('[CLOSIQ Server] Unexpected API routing error:', err?.message || err);
+    console.error('[HeyHanger Server] Unexpected API routing error:', err?.message || err);
     if (!res.headersSent) {
       res.statusCode = 500;
       res.setHeader('Content-Type', 'application/json');
@@ -208,9 +208,9 @@ server.listen(PORT, () => {
   const keyConfigured = Boolean(
     process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY !== 'your_gemini_api_key_here'
   );
-  console.log(`[CLOSIQ Server] Listening on port ${PORT} (version ${APP_VERSION}${GIT_COMMIT ? `, commit ${GIT_COMMIT}` : ''})`);
+  console.log(`[HeyHanger Server] Listening on port ${PORT} (version ${APP_VERSION}${GIT_COMMIT ? `, commit ${GIT_COMMIT}` : ''})`);
   console.log(
-    `[CLOSIQ Server] Gemini mode: ${keyConfigured ? 'LIVE (GEMINI_API_KEY configured)' : 'DEMO (no GEMINI_API_KEY set — real Gemini endpoints will report demo fallback until one is configured)'}`
+    `[HeyHanger Server] Gemini mode: ${keyConfigured ? 'LIVE (GEMINI_API_KEY configured)' : 'DEMO (no GEMINI_API_KEY set — real Gemini endpoints will report demo fallback until one is configured)'}`
   );
 });
 
@@ -223,14 +223,14 @@ let shuttingDown = false;
 function shutdown(signal) {
   if (shuttingDown) return;
   shuttingDown = true;
-  console.log(`[CLOSIQ Server] ${signal} received — draining in-flight requests (max ${SHUTDOWN_GRACE_MS / 1000}s).`);
+  console.log(`[HeyHanger Server] ${signal} received — draining in-flight requests (max ${SHUTDOWN_GRACE_MS / 1000}s).`);
   server.close(() => {
-    console.log('[CLOSIQ Server] All connections closed. Exiting.');
+    console.log('[HeyHanger Server] All connections closed. Exiting.');
     process.exit(0);
   });
   server.closeIdleConnections?.();
   setTimeout(() => {
-    console.error('[CLOSIQ Server] Grace period elapsed; forcing exit.');
+    console.error('[HeyHanger Server] Grace period elapsed; forcing exit.');
     process.exit(1);
   }, SHUTDOWN_GRACE_MS).unref();
 }

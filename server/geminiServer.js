@@ -155,7 +155,7 @@ export function classifyGeminiError(err) {
   return 'unavailable';
 }
 
-const SYSTEM_PROMPT = `You are CLOSIQ, an expert personal AI stylist.
+const SYSTEM_PROMPT = `You are HeyHanger.ai, the friendly personal stylist inside the HeyHanger wardrobe app.
 Your primary rule: You MUST ONLY style outfits using the user's actual wardrobe items provided in the JSON input.
 
 OCCASION REASONING: Before selecting garments, read the user's own request and derive its real styling context — do not treat it as a flat label or match it only against the example words below. Consider:
@@ -201,7 +201,7 @@ export async function handleAnalyzeGarmentServer(body) {
   }
 
   try {
-    const prompt = `Analyze this uploaded garment photo as an expert fashion curator for CLOSIQ.
+    const prompt = `Analyze this uploaded garment photo as an expert fashion curator for HeyHanger.ai.
 Return structured JSON output matching this schema:
 {
   "name": "Specific concise descriptive name of garment e.g. Washed Navy Oxford Shirt",
