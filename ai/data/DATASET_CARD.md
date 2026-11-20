@@ -1,4 +1,4 @@
-# CLOSIQ fashion pilot, schema 1
+# HeyHanger fashion pilot, schema 1
 
 The repository includes 20 original synthetic outfit-ranking examples in ai/datasets/styling_seed.jsonl. There are zero reviewed garment photographs and no trained checkpoint. These authored examples have not received independent fashion review. The 500–1,000 target needs human-reviewed photos, labels and rights records. No private wardrobe, retail photos, DeepFashion or Fashionpedia assets have been ingested. The repository catalog describes mixed generated/photographed images without per-image permission for model training. Use it for development smoke tests only.
 

@@ -1,4 +1,4 @@
-name: ClosiqPhotoBench
+name: HeyHangerPhotoBench
 options:
   deploymentTarget:
     iOS: '17.0'
@@ -7,14 +7,14 @@ packages:
     url: https://github.com/google-ai-edge/LiteRT-LM
     exactVersion: 0.19.1
 targets:
-  ClosiqPhotoBench:
+  HeyHangerPhotoBench:
     type: application
     platform: iOS
     sources:
       - PhotoBench.swift
-      - ../../../mobile/modules/closiq-vision/ios/VisionRuntime.swift
+      - ../../../mobile/modules/heyhanger-vision/ios/VisionRuntime.swift
     settings:
-      PRODUCT_BUNDLE_IDENTIFIER: com.closiq.photobench
+      PRODUCT_BUNDLE_IDENTIFIER: com.heyhanger.photobench
       GENERATE_INFOPLIST_FILE: YES
       INFOPLIST_KEY_UILaunchScreen_Generation: YES
       SWIFT_VERSION: '5.0'

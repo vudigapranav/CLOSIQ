@@ -1,4 +1,4 @@
-"""CLOSIQ SFT v1 data contract. All image paths are relative to ai/data/images."""
+"""HeyHanger SFT v1 data contract. All image paths are relative to ai/data/images."""
 import hashlib
 import json
 from pathlib import Path
