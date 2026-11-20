@@ -9,10 +9,11 @@ export const model = {
   repo: 'litert-community/SmolVLM2-500M',
   file: 'SmolVLM2-500M.litertlm'
 } as const;
-type Status = 'missing' | 'installed' | 'ready' | 'unsupported';
+type Status = 'missing' | 'installed' | 'ready' | 'failed' | 'unsupported';
 interface NativeVision {
   initializeBackend?(gpu: boolean): Promise<void>;
   memoryKiB?(): Promise<number>;
+  resetLoadFailure?(): Promise<void>;
   status(): Promise<Status>;
   initialize(): Promise<void>;
   install(uri: string): Promise<void>;
@@ -23,7 +24,7 @@ interface NativeVision {
 }
 const native = requireOptionalNativeModule<NativeVision>('ClosiqVision');
 function runtime() {
-  if (!native) throw new Error('Install a CLOSIQ native mobile build to use photo analysis.');
+  if (!native) throw new Error('Photo analysis needs the CLOSIQ Android app.');
   return native;
 }
 export const modelStatus = async (): Promise<Status> => (native ? native.status() : 'unsupported');
@@ -61,6 +62,8 @@ export async function deleteModel() {
   await runtime().remove();
 }
 export const unloadModel = async () => native?.unload();
+/** Allows one more start after a native crash during engine start ("failed"). */
+export const retryAfterLoadFailure = async () => native?.resetLoadFailure?.();
 // The native runtime stops a cancelled conversation and returns whatever text
 // it had produced so far. Each cancel (user, timeout, app backgrounding) moves
 // this epoch, so infer() reports that partial text as an interruption instead
@@ -73,7 +76,7 @@ export const cancelGeneration = async () => {
 };
 export class GenerationCancelled extends Error {
   constructor() {
-    super('Local analysis was interrupted. Try again or enter details manually.');
+    super('The AI scan was interrupted. Try again or enter the details yourself.');
     this.name = 'GenerationCancelled';
   }
 }
@@ -101,7 +104,13 @@ export async function infer(prompt: string, photo?: string) {
       await api.initialize();
       if (expired) throw new Error('Model initialization timed out.');
       if (epoch !== cancelEpoch) throw new GenerationCancelled();
-      const answer = await api.answer(prompt.slice(0, 2400), photo ?? null);
+      let answer: string;
+      try {
+        answer = await api.answer(prompt.slice(0, 2400), photo ?? null);
+      } catch (error) {
+        if (epoch !== cancelEpoch) throw new GenerationCancelled();
+        throw error;
+      }
       if (epoch !== cancelEpoch) throw new GenerationCancelled();
       return answer;
     } finally {
@@ -115,8 +124,11 @@ export async function infer(prompt: string, photo?: string) {
         timer = setTimeout(() => {
           expired = true;
           cancelEpoch++;
+          // Free the JS lock even if the native call never returns; the native
+          // module still refuses a second run while its own lock is held.
+          working = false;
           void api.cancel().catch(() => {});
-          reject(new Error('Local analysis timed out. Try again or enter details manually.'));
+          reject(new Error('The AI took too long. Try again or enter the details yourself.'));
         }, 60000);
       })
     ]);

@@ -34,8 +34,8 @@ export interface VisionAnalysisResult {
  * pairing note or confidence score.
  */
 export type VisionAnalysisOutcome =
-  | { ok: true; data: VisionAnalysisResult }
-  | { ok: false; reason: ApiFailureReason; message: string };
+  | { ok: true; data: VisionAnalysisResult; /** On-phone model answers (diagnostics only). */ raw?: string }
+  | { ok: false; reason: ApiFailureReason; message: string; /** On-phone model text that failed validation (diagnostics only). */ raw?: string };
 
 function str(value: unknown, fallback: string): string {
   return typeof value === 'string' && value.trim() ? value : fallback;

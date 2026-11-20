@@ -125,6 +125,16 @@ export async function signUp(email: string, password: string): Promise<AuthResul
     return { ok: false, session: null, kind, message };
   }
 
+  if (!data.session && data.user && data.user.identities?.length === 0) {
+    // Supabase answers a sign-up for an email that already has an account
+    // with a success-shaped response and an empty identity list, and sends
+    // no email. Saying "check your email" here left people waiting forever.
+    return {
+      ok: true,
+      session: null,
+      message: 'This email already has a CLOSIQ account. Log in with it, or tap "Forgot password?" to reset the password.'
+    };
+  }
   if (!data.session) {
     // Common when the Supabase project has "Confirm email" enabled — the
     // account genuinely was created, there's just no session yet.

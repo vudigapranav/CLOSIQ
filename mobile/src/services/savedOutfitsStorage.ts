@@ -25,7 +25,6 @@ function withFreshImages(outfits: Outfit[]): Promise<Outfit[]> {
     (o, items) => ({ ...o, items: items as Outfit['items'] })
   );
 }
-import type { Tables } from '../types/supabase';
 
 const BASE_STORAGE_KEY = '@closiq_saved_outfits';
 

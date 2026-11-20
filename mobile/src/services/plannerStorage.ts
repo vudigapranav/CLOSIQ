@@ -21,7 +21,6 @@ function withFreshImages(events: PlannerEvent[]): Promise<PlannerEvent[]> {
     (e, items) => (e.outfit ? { ...e, outfit: { ...e.outfit, items: items as Outfit['items'] } } : e)
   );
 }
-import type { Tables } from '../types/supabase';
 
 const BASE_STORAGE_KEY = '@closiq_planner_events';
 
@@ -43,7 +42,6 @@ const BASE_STORAGE_KEY = '@closiq_planner_events';
  * work below has any reason to modify them.
  */
 export * from '../local/plannerDates';
-import { formatLocalDate, formatLocalTime } from '../local/plannerDates';
 /**
  * Sprint M18: `planner_events` (Supabase, RLS-scoped to `user_id =
  * auth.uid()`, live-verified) is now the durable source of truth.

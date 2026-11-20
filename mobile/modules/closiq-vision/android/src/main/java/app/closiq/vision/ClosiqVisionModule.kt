@@ -31,6 +31,12 @@ class ClosiqVisionModule : Module() {
   @Volatile private var discardAfterRun = false
   private val context get() = requireNotNull(appContext.reactContext)
   private val model get() = File(context.noBackupFilesDir, "307bf6d1018edd2c2d0903b92628151bdb5cc2b7.litertlm")
+  // Written before the native engine starts and removed when it returns or
+  // throws. If it is still there, the process died inside the engine (for
+  // example SIGILL on a CPU the runtime's kernels do not support), which no
+  // Kotlin catch can intercept. Status then reports "failed" so the app stops
+  // starting the engine automatically instead of crashing on every scan.
+  private val loading get() = File(context.noBackupFilesDir, "closiq-engine-loading")
 
   private fun localFile(uri: String): File {
     val path = Uri.parse(uri)
@@ -69,15 +75,21 @@ class ClosiqVisionModule : Module() {
     if (engine != null) return
     check(model.isFile) { "Install the base model first." }
     check(android.os.Build.SUPPORTED_ABIS.contains("arm64-v8a")) { "This runtime requires an ARM64 Android phone." }
+    check(!loading.exists()) { "The AI model closed the app while starting on this phone. Scans use manual entry; styling uses wardrobe rules." }
     val backend = if (gpu) Backend.GPU() else Backend.CPU()
+    loading.writeText(if (gpu) "gpu" else "cpu")
     val next = Engine(EngineConfig(modelPath = model.path, backend = backend, visionBackend = backend,
       maxNumTokens = 1024, maxNumImages = 1, cacheDir = context.cacheDir.path))
     try { next.initialize(); engine = next } catch (error: Throwable) { next.close(); throw error }
+    finally { loading.delete() }
   }
 
   override fun definition() = ModuleDefinition {
     Name("ClosiqVision")
-    AsyncFunction("status") { if (engine != null) "ready" else if (model.isFile) "installed" else "missing" }
+    AsyncFunction("status") {
+      if (engine != null) "ready" else if (!model.isFile) "missing" else if (loading.exists()) "failed" else "installed"
+    }
+    AsyncFunction("resetLoadFailure") { loading.delete(); Unit }
     AsyncFunction("memoryKiB") { Debug.getPss().toDouble() }
     AsyncFunction("install") Coroutine { uri: String ->
       withContext(Dispatchers.IO) {
@@ -103,6 +115,7 @@ class ClosiqVisionModule : Module() {
             Os.rename(stage.absolutePath, model.absolutePath)
             engine?.close()
             engine = null
+            loading.delete()
           } finally { stage.delete() }
         }
       }
@@ -126,15 +139,22 @@ class ClosiqVisionModule : Module() {
           }
           checkNotNull(engine) { "Initialize the model first." }.createConversation().use { chat ->
             synchronized(sessionLock) { active = chat }
+            val response = StringBuilder()
+            var capped = false
             try {
-              val response = StringBuilder()
               runBlocking {
                 chat.sendMessageAsync(contents).collect { part ->
                   response.append(part.toString())
-                  if (response.length > 1600) chat.cancelProcess()
+                  // Answers are a few short lines; stop a model that keeps going.
+                  if (!capped && response.length > 700) { capped = true; chat.cancelProcess() }
                 }
               }
               response.toString()
+            } catch (stopped: java.util.concurrent.CancellationException) {
+              // cancelProcess() ends the stream with a CancellationException.
+              // When CLOSIQ stopped it for length, the text so far is the answer;
+              // a user/background cancel is still reported as cancelled.
+              if (capped) response.toString() else throw stopped
             }
             finally { synchronized(sessionLock) { active = null } }
           }
@@ -144,7 +164,7 @@ class ClosiqVisionModule : Module() {
     AsyncFunction("cancel") { cancel() }
     AsyncFunction("unload") { release() }
     AsyncFunction("remove") {
-      exclusive { engine?.close(); engine = null; check(!model.exists() || model.delete()) { "Could not delete model." } }
+      exclusive { engine?.close(); engine = null; loading.delete(); check(!model.exists() || model.delete()) { "Could not delete model." } }
     }
     OnActivityEntersBackground { release() }
     OnCreate { context.registerComponentCallbacks(pressure) }

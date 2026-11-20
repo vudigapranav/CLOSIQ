@@ -1,9 +1,8 @@
 import { GarmentItem, GarmentCategory, LayeringPreference, OutfitScoreFactor, isGarmentAvailable } from '../../../src/types/wardrobe';
-import { OutfitPersonalizationContext, WeatherContext } from './personalizationContext';
+import { OutfitPersonalizationContext } from './personalizationContext';
 import { postApi, describeApiFailure } from './apiRequest';
 import { isFreshCombination, pickLocalOutfit } from '../../../src/services/outfitBrain';
 import { OutfitContext, isCoherentAIOutfit, rankSwapCandidates, scoreOutfit } from '../../../src/services/intelligence/outfitEngine';
-import { WeatherSnapshot } from '../../../src/services/weather/weatherCore';
 
 import {weatherSnapshotFromContext} from '../local/outfitWeather';
 export {weatherSnapshotFromContext};
