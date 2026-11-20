@@ -37,6 +37,11 @@ export async function signUp(email: string, password: string): Promise<AuthOutco
     options: { emailRedirectTo: `${window.location.origin}/email-confirmed.html` }
   });
   if (error) return { ok: false, message: friendlyError(error) };
+  // An email that already has an account gets a success-shaped reply with no
+  // identities and no email from Supabase.
+  if (!data.session && data.user && data.user.identities?.length === 0) {
+    return { ok: true, message: 'This email already has a CLOSIQ account. Sign in with it, or use "Forgot password?" to reset it.' };
+  }
   if (!data.session) {
     return { ok: true, message: 'Account created! Check your email and tap the confirmation link, then sign in here.' };
   }
