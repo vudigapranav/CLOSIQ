@@ -13,7 +13,7 @@ import { ClothingDetailModal } from './components/modals/ClothingDetailModal';
 import { AddItemModal } from './components/modals/AddItemModal';
 import { ShopCheckModal } from './components/modals/ShopCheckModal';
 import { SplashScreen } from './components/ui/SplashScreen';
-import { ClosiqLogo } from './components/ui/ClosiqLogo';
+import { HeyHangerLogo } from './components/ui/HeyHangerLogo';
 import { PrimaryButton } from './components/ui/PrimaryButton';
 import { GarmentItem, GarmentDetailsPatch, Outfit, OutfitRating, WardrobeProfile, LayeringPreference, WeekDay, WeeklyPlanEntry } from './types/wardrobe';
 import { isSameOutfit } from './services/aiStylist';
@@ -107,7 +107,7 @@ export function App() {
     return (
       <div className="app-status">
         {splash}
-        <ClosiqLogo width={170} />
+        <HeyHangerLogo width={170} />
         <h1 className="text-section-heading">Sign-in isn’t set up</h1>
         <p className="text-body" style={{ maxWidth: 420 }}>
           This build has no Supabase URL / anon key. Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY (or
@@ -229,7 +229,7 @@ const SignedInApp: React.FC<SignedInAppProps> = ({ user, isDarkMode, onToggleThe
   const [isAddItemOpen, setIsAddItemOpen] = useState<boolean>(false);
 
   const fail = useCallback((what: string, err: unknown) => {
-    console.warn(`[CLOSIQ cloud] ${what}:`, err);
+    console.warn(`[HeyHanger cloud] ${what}:`, err);
     setNotice(
       err instanceof SchemaNotReadyError ? `${what}. ${err.message}` : `${what}. Check your connection and try again.`
     );
@@ -253,10 +253,10 @@ const SignedInApp: React.FC<SignedInAppProps> = ({ user, isDarkMode, onToggleThe
           setFeedback(ratings);
           setRecentSignatures(recent);
         })
-        .catch((err) => console.warn('[CLOSIQ cloud] Outfit brain load failed:', err));
+        .catch((err) => console.warn('[HeyHanger cloud] Outfit brain load failed:', err));
       setStatus('ready');
     } catch (err) {
-      console.warn('[CLOSIQ cloud] Initial load failed:', err);
+      console.warn('[HeyHanger cloud] Initial load failed:', err);
       setStatus('error');
     }
   }, [userId]);
@@ -370,7 +370,7 @@ const SignedInApp: React.FC<SignedInAppProps> = ({ user, isDarkMode, onToggleThe
     if (ids.length === 0) return;
     const signature = comboSignature(ids);
     setRecentSignatures((prev) => [signature, ...prev.filter((s) => s !== signature)].slice(0, 8));
-    recordShownOutfit(userId, ids).catch((err) => console.warn('[CLOSIQ cloud] Outfit history not saved:', err));
+    recordShownOutfit(userId, ids).catch((err) => console.warn('[HeyHanger cloud] Outfit history not saved:', err));
   };
 
   const removeSaved = async (target: Outfit) => {
@@ -442,7 +442,7 @@ const SignedInApp: React.FC<SignedInAppProps> = ({ user, isDarkMode, onToggleThe
     ]);
     setWardrobeProfile(profile);
     try {
-      // A new account's wardrobe starts empty — CLOSIQ styles what you own.
+      // A new account's wardrobe starts empty — HeyHanger styles what you own.
       const [items, looks] = await Promise.all([loadWardrobe(userId, profile), loadSavedOutfits(userId)]);
       setWardrobe(items);
       setSavedOutfits(looks);
@@ -478,7 +478,7 @@ const SignedInApp: React.FC<SignedInAppProps> = ({ user, isDarkMode, onToggleThe
   if (status === 'loading') {
     return (
       <div className="app-status">
-        <ClosiqLogo width={150} />
+        <HeyHangerLogo width={150} />
         <p className="text-body">Opening your wardrobe…</p>
       </div>
     );
@@ -487,7 +487,7 @@ const SignedInApp: React.FC<SignedInAppProps> = ({ user, isDarkMode, onToggleThe
   if (status === 'error') {
     return (
       <div className="app-status">
-        <ClosiqLogo width={150} />
+        <HeyHangerLogo width={150} />
         <h1 className="text-section-heading">Couldn’t load your wardrobe</h1>
         <p className="text-body">Check your connection. Your clothes are safe in your account.</p>
         <div style={{ display: 'flex', gap: 10 }}>

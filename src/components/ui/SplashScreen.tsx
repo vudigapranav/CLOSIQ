@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { ClosiqLogo } from './ClosiqLogo';
+import { HeyHangerLogo } from './HeyHangerLogo';
 
 interface SplashScreenProps {
   /** Called once the exit transition has fully finished. */
@@ -36,7 +36,7 @@ function pickVariant(): Variant {
  * Launch intro (cinematic since 2026-10-13). Shown on every mount of <App>
  * (initial load and every reload) — never on in-app tab navigation, since
  * those don't remount App. Tap anywhere to skip. Uses only the official
- * logo asset via ClosiqLogo; the doors, light and bars are plain shapes.
+ * logo asset via HeyHangerLogo; the doors, light and bars are plain shapes.
  */
 export const SplashScreen: React.FC<SplashScreenProps> = ({ onFinish }) => {
   const [variant] = useState<Variant>(pickVariant);
@@ -65,7 +65,7 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({ onFinish }) => {
     >
       <div className="intro__stage">
         <div className="intro__logo">
-          <ClosiqLogo width={220} />
+          <HeyHangerLogo width={220} />
         </div>
         <p className="intro__tagline">Style what you already own</p>
         <span className="intro__rule" />

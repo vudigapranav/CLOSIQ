@@ -75,7 +75,7 @@ export const AIRecommendationCard: React.FC<AIRecommendationCardProps> = ({
       <div style={{ padding: 20 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: 'var(--color-primary)', fontSize: '0.78rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 6 }}>
           <Sparkles size={14} />
-          Why CLOSIQ Chose This Outfit
+          Why HeyHanger Chose This Outfit
         </div>
 
         <p className="text-body" style={{ fontSize: '0.86rem', lineHeight: 1.5, marginBottom: 16 }}>

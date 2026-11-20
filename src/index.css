@@ -1,4 +1,4 @@
-/* CLOSIQ Design System & Tokens — Warm Ivory × Taupe Editorial Fashion System */
+/* HeyHanger Design System & Tokens — Warm Ivory × Taupe Editorial Fashion System */
 
 :root {
   color-scheme: light dark;
@@ -563,7 +563,7 @@ html, body {
    seam → almirah doors swing open → logo focus-pull → tagline → rule →
    bars retract. Lite: bars + logo + tagline only. A fixed palette so the
    film reads the same in light and dark mode. No particles, no neon, no
-   spinning logo — the official logo asset only (ClosiqLogo).
+   spinning logo — the official logo asset only (HeyHangerLogo).
    =================================================================== */
 .intro {
   --intro-charcoal: #14110E;

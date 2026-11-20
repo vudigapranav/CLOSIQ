@@ -1,6 +1,6 @@
 import React from 'react';
 import { Sun, Moon } from 'lucide-react';
-import { ClosiqLogo } from './ClosiqLogo';
+import { HeyHangerLogo } from './HeyHangerLogo';
 
 interface AppHeaderProps {
   isDarkMode: boolean;
@@ -23,7 +23,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({ isDarkMode, onToggleTheme 
         transition: 'background-color 0.25s ease'
       }}
     >
-      <ClosiqLogo width={92} style={{ padding: '6px 10px', boxShadow: 'none' }} />
+      <HeyHangerLogo width={92} style={{ padding: '6px 10px', boxShadow: 'none' }} />
 
       <button
         onClick={onToggleTheme}
