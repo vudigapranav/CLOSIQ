@@ -2,6 +2,25 @@
 
 Codex records its changes here, newest first.
 
+## 2026-11-20 — V2 merged into `main` (Claude, owner said "Commit and merge")
+
+- The rebrand was committed on `feature/closiq-v2-local-ai` (nested `CLOSIQ-v2`) in 15 per-folder commits, `cd76e3d` (feature 37) … `58fca8d` (feature 51). Each staged diff was secret-scanned first.
+- The outer `main` was **fast-forwarded** to that branch (`7767584` → `58fca8d`; V2 was branched from `7767584`, so there were no conflicts). **HeyHanger 2.0 (V2) is now `main`.**
+- Before the fast-forward, every line the outer checkout's uncommitted rebrand had added was checked against V2. All were present, or replaced by V2's newer version (`OutfitResultCard` on-device label, README intro paragraph). V2's astra.md already held every outer entry. The outer's own uncommitted edits are kept in `git stash` as `stash@{0}` "pre-merge outer rebrand edits (superseded by feature/closiq-v2-local-ai, 2026-11-20)". Drop it with `git stash drop` once you're satisfied.
+- Checks on merged `main`: typecheck, `oxlint` (exit 0), `npm run build`, `npm run test:server` 16/16, `mobile` `tsc --noEmit`, `npm test` 179/179. Local link check: 0 broken, apart from the 5 README screenshot placeholders that existed before.
+- The 4 linked worktrees under `.claude/worktrees` were not touched.
+- **Not pushed.** `main` is 34 commits ahead of `origin/main`: the 18 earlier V2 commits that were only on `origin/feature/closiq-v2-local-ai`, plus the 16 from this session. The feature branch is 16 ahead of its remote. To publish:
+
+```bash
+git -C /Users/pranav07vudiga/Desktop/Projects/Hackathon/Demux/CLOSIQ push origin main
+```
+
+```bash
+git -C /Users/pranav07vudiga/Desktop/Projects/Hackathon/Demux/CLOSIQ/CLOSIQ-v2 push origin feature/closiq-v2-local-ai
+```
+
+- The nested `CLOSIQ-v2` checkout now matches `main`. It still holds the release APKs in its ignored `builds/` folder, so move them before retiring that folder.
+
 ## 2026-11-20 — HeyHanger rebrand (Claude): CLOSIQ → HeyHanger, assistant HeyHanger.ai, HH logo; V2 is the release
 
 **Checkout:** nested `…/CLOSIQ/CLOSIQ-v2` (V2, branch `feature/closiq-v2-local-ai`). The outer V1 checkout got the same rebrand; its astra.md has the same entry.
