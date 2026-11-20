@@ -207,7 +207,7 @@ export const PlannerScreen: React.FC<PlannerScreenProps> = ({
         setOutfitResult({ mode: res.mode, notice: res.notice, data: res.data });
         await recordRecentOutfit(res.data.garmentIds);
       } else {
-        setPlanError(res.error || 'CLOSIQ couldn’t build a look right now. Try again.');
+        setPlanError(res.error || 'HeyHanger couldn’t build a look right now. Try again.');
       }
     },
     [planningEvent, wardrobe, layeringPreference, profile, planLoading, swapping]
@@ -348,7 +348,7 @@ export const PlannerScreen: React.FC<PlannerScreenProps> = ({
         <View style={styles.emptyCard}>
           <CalendarDays size={32} color={COLORS.primary} style={{ marginBottom: 10 }} />
           <Text style={styles.emptyTitle}>Nothing planned yet.</Text>
-          <Text style={styles.emptyBody}>Add an event and CLOSIQ can help you plan the look.</Text>
+          <Text style={styles.emptyBody}>Add an event and HeyHanger can help you plan the look.</Text>
           <TouchableOpacity style={styles.emptyAddBtn} onPress={() => setShowAddModal(true)}>
             <Plus size={14} color="#FFFFFF" style={{ marginRight: 6 }} />
             <Text style={styles.emptyAddBtnText}>Add Event</Text>
@@ -431,7 +431,7 @@ export const PlannerScreen: React.FC<PlannerScreenProps> = ({
               <Shirt size={32} color={COLORS.primary} style={{ marginBottom: 10 }} />
               <Text style={styles.emptyTitle}>Wardrobe Required</Text>
               <Text style={styles.emptyBody}>
-                Add items to your wardrobe first so CLOSIQ can plan an outfit for this event.
+                Add items to your wardrobe first so HeyHanger can plan an outfit for this event.
               </Text>
               <TouchableOpacity
                 style={styles.emptyAddBtn}
@@ -449,7 +449,7 @@ export const PlannerScreen: React.FC<PlannerScreenProps> = ({
               {!outfitResult && !planLoading && !swapping && !planError && (
                 <View style={styles.generatePrompt}>
                   <Text style={styles.generatePromptText}>
-                    CLOSIQ will style a look from your wardrobe for this event.
+                    HeyHanger will style a look from your wardrobe for this event.
                   </Text>
                   <TouchableOpacity style={styles.generateBtn} activeOpacity={0.85} onPress={() => runGenerate()}>
                     <Text style={styles.generateBtnText}>Generate Outfit</Text>

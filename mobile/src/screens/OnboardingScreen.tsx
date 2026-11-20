@@ -175,7 +175,7 @@ export const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onComplete }
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         {step === STEP.NAME && (
           <View style={styles.stepBlock}>
-            <Text style={styles.question}>What should CLOSIQ call you?</Text>
+            <Text style={styles.question}>What should HeyHanger call you?</Text>
             <Text style={styles.subtext}>Your first name is enough.</Text>
             <TextInput
               style={styles.textInput}
@@ -299,7 +299,7 @@ export const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onComplete }
 
         {step === STEP.TEMPERATURE && (
           <View style={styles.stepBlock}>
-            <Text style={styles.question}>How should CLOSIQ display temperature?</Text>
+            <Text style={styles.question}>How should HeyHanger display temperature?</Text>
             <Text style={styles.subtext}>You can change this later in Profile.</Text>
             <View style={styles.tileRow}>
               {(['celsius', 'fahrenheit'] as TemperatureUnit[]).map((unit) => (
@@ -320,7 +320,7 @@ export const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onComplete }
         {step === STEP.LOCATION && (
           <View style={styles.stepBlock}>
             <MapPin size={28} color={COLORS.primary} style={{ marginBottom: 12 }} />
-            <Text style={styles.question}>Let CLOSIQ use your location?</Text>
+            <Text style={styles.question}>Let HeyHanger use your location?</Text>
             <Text style={styles.subtext}>
               Used to show the weather where you are and improve outfit recommendations. You can continue either way.
             </Text>

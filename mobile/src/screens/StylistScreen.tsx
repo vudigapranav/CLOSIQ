@@ -133,7 +133,7 @@ export const StylistScreen: React.FC<StylistScreenProps> = ({
       });
       await recordRecentOutfit(res.data.garmentIds);
     } else {
-      setErrorMessage(res.error || 'CLOSIQ Stylist could not generate a look right now.');
+      setErrorMessage(res.error || 'HeyHanger.ai could not generate a look right now.');
     }
   };
 
@@ -317,7 +317,7 @@ export const StylistScreen: React.FC<StylistScreenProps> = ({
         </View>
 
         <View style={{ flex: 1 }}>
-          <Text style={styles.screenTitle}>AI Stylist Studio</Text>
+          <Text style={styles.screenTitle}>Ask HeyHanger.ai</Text>
           <Text style={styles.screenSubtitle}>
             Describe any vibe, occasion, or style requirement ({profile.toUpperCase()} Profile)
           </Text>
@@ -330,7 +330,7 @@ export const StylistScreen: React.FC<StylistScreenProps> = ({
           <Shirt size={32} color={COLORS.primary} style={{ marginBottom: 10 }} />
           <Text style={styles.emptyTitle}>Wardrobe Required</Text>
           <Text style={styles.emptyBody}>
-            Upload or catalog your clothing items first so the AI Stylist can build personalized ensembles from what you own.
+            Upload or catalog your clothing items first so HeyHanger.ai can build personalized ensembles from what you own.
           </Text>
           <TouchableOpacity style={styles.emptyAddBtn} onPress={onNavigateToCollection}>
             <Text style={styles.emptyAddBtnText}>Add Items to Wardrobe</Text>
@@ -390,7 +390,7 @@ export const StylistScreen: React.FC<StylistScreenProps> = ({
             <View style={styles.loadingBox}>
               <ActivityIndicator size="large" color={COLORS.primary} style={{ marginBottom: 12 }} />
               <Text style={styles.loadingTitle}>
-                {swapping ? 'Finding a better match...' : 'CLOSIQ AI Stylist working...'}
+                {swapping ? 'Finding a better match...' : 'HeyHanger.ai is styling...'}
               </Text>
               <Text style={styles.loadingSubtitle}>
                 {swapping ? 'Swapping piece from your closet' : 'Formulating ensemble from your active catalog'}

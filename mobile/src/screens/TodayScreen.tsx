@@ -210,7 +210,7 @@ export const TodayScreen: React.FC<TodayScreenProps> = ({
       });
       await recordRecentOutfit(res.data.garmentIds);
     } else {
-      setErrorMessage(res.error || 'CLOSIQ couldn’t build a look right now. Try again.');
+      setErrorMessage(res.error || 'HeyHanger couldn’t build a look right now. Try again.');
     }
   };
 
@@ -389,7 +389,7 @@ export const TodayScreen: React.FC<TodayScreenProps> = ({
       {/* Header Bar */}
       <View style={styles.header}>
         <Image
-          source={require('../../assets/closiq-logo.png')}
+          source={require('../../assets/heyhanger-logo.png')}
           style={styles.logo}
           resizeMode="contain"
         />
@@ -406,7 +406,7 @@ export const TodayScreen: React.FC<TodayScreenProps> = ({
         </Text>
         <Text style={styles.headlineText}>What should I wear?</Text>
         <Text style={styles.subheadlineText}>
-          CLOSIQ knows your closet ({wardrobe.length} items cataloged) and styles tailored outfits.
+          HeyHanger knows your closet ({wardrobe.length} items cataloged) and styles tailored outfits.
         </Text>
       </View>
 
@@ -454,15 +454,15 @@ export const TodayScreen: React.FC<TodayScreenProps> = ({
           activeOpacity={0.8}
           onPress={onOpenStylist}
           accessibilityRole="button"
-          accessibilityLabel="Open AI Stylist"
+          accessibilityLabel="Ask HeyHanger.ai"
         >
           <View style={styles.stylistEntryIcon}>
             <Wand2 size={18} color={COLORS.primary} />
           </View>
           <View style={{ flex: 1 }}>
-            <Text style={styles.stylistEntryLabel}>AI STYLIST</Text>
+            <Text style={styles.stylistEntryLabel}>ASK HEYHANGER.AI</Text>
             <Text style={styles.stylistEntryText}>
-              Describe your plan — “date night”, “office party” — and the AI Stylist builds a look from your wardrobe.
+              Describe your plan — “date night”, “office party” — and HeyHanger.ai builds a look from your wardrobe.
             </Text>
           </View>
           <ChevronRight size={18} color={COLORS.primary} />

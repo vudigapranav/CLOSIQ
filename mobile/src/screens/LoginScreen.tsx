@@ -139,7 +139,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ sessionNotice }) => {
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.brandBlock}>
-          <Image source={require('../../assets/closiq-logo.png')} style={styles.logo} resizeMode="contain" />
+          <Image source={require('../../assets/heyhanger-logo.png')} style={styles.logo} resizeMode="contain" />
           <Text style={styles.tagline}>AI Personal Wardrobe & Stylist</Text>
         </View>
 
@@ -164,7 +164,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ sessionNotice }) => {
             <AlertCircle size={16} color={COLORS.danger} style={{ marginRight: 8 }} />
             <Text style={styles.messageText}>
               {supabaseConfigCheck.message ??
-                "CLOSIQ's account service isn't configured in this build — signing in can't work until it is."}
+                "HeyHanger's account service isn't configured in this build — signing in can't work until it is."}
             </Text>
           </View>
         )}

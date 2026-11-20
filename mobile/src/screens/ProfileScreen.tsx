@@ -138,8 +138,8 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
         </View>
 
         <View style={{ flex: 1 }}>
-          <Text style={styles.userName}>{userProfile.name || 'CLOSIQ Member'}</Text>
-          <Text style={styles.userRole} numberOfLines={1}>{userEmail || 'CLOSIQ Wardrobe Member'}</Text>
+          <Text style={styles.userName}>{userProfile.name || 'HeyHanger Member'}</Text>
+          <Text style={styles.userRole} numberOfLines={1}>{userEmail || 'HeyHanger Wardrobe Member'}</Text>
         </View>
 
         <TouchableOpacity
@@ -338,7 +338,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                 <Text style={styles.savedOutfitOccasion}>{outfit.occasion}{outfit.vibe ? ` • ${outfit.vibe}` : ''}</Text>
 
                 <View style={styles.savedFooter}>
-                  <Text style={styles.savedScore}>{outfit.styleScore > 0 ? `${outfit.styleScore}% Match` : 'CLOSIQ pick'}</Text>
+                  <Text style={styles.savedScore}>{outfit.styleScore > 0 ? `${outfit.styleScore}% Match` : 'HeyHanger pick'}</Text>
                   <Text style={styles.savedWearAction}>Open Look →</Text>
                 </View>
               </TouchableOpacity>
