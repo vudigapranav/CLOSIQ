@@ -2,7 +2,7 @@
  * Host harness for the V2 on-device AI modules. Replaces the three native
  * imports `src/local/model.ts` and the `.native.ts` AI services reach for:
  * expo-file-system (only Paths/File are touched at import time),
- * expo-modules-core (the ClosiqVision native module) and react-native
+ * expo-modules-core (the HeyHangerVision native module) and react-native
  * (AppState). Install BEFORE importing any module under test.
  */
 import Module from 'node:module';

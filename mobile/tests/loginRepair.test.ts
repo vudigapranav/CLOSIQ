@@ -305,7 +305,7 @@ test('signing up with an email that already has an account says so instead of "c
   setSupabase(authDouble({ signUp: () => fake }).client);
   const repeated = await signUp('a@b.com', 'password1');
   assert.equal(repeated.ok, true);
-  assert.match(repeated.message ?? '', /already has a CLOSIQ account/);
+  assert.match(repeated.message ?? '', /already has a HeyHanger account/);
   assert.doesNotMatch(repeated.message ?? '', /check your email/i);
 
   const created = { data: { session: null, user: { id: 'y', identities: [{ id: 'i' }] } }, error: null };

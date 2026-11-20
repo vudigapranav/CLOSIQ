@@ -22,7 +22,7 @@ import Module from 'node:module';
 
 // Deterministic API host for image-resolution assertions (config.ts reads
 // this at import time; each test file runs in its own process).
-export const TEST_API_URL = 'https://api.closiq.test';
+export const TEST_API_URL = 'https://api.heyhanger.test';
 export const TEST_SUPABASE_URL = 'https://proj.supabase.co';
 process.env.EXPO_PUBLIC_API_URL = TEST_API_URL;
 

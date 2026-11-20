@@ -1,6 +1,6 @@
 /**
  * A minimal stand-in for the Supabase JS client, shaped to the exact
- * builder chains the CLOSIQ storage modules use (`.from().select().eq()
+ * builder chains the HeyHanger storage modules use (`.from().select().eq()
  * .order()`, `.insert()`, `.update().eq()`, `.upsert()`, `.delete().eq()`,
  * `.maybeSingle()`, and the storage bucket's upload/sign/remove).
  *

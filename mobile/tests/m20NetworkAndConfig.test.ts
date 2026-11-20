@@ -140,7 +140,7 @@ const { validateReleaseEnv } = require(join(MOBILE_ROOT, 'scripts', 'validate-re
 };
 
 const GOOD = {
-  EXPO_PUBLIC_API_URL: 'https://api.closiq.app',
+  EXPO_PUBLIC_API_URL: 'https://api.heyhanger.test',
   EXPO_PUBLIC_SUPABASE_URL: 'https://abcd.supabase.co',
   EXPO_PUBLIC_SUPABASE_ANON_KEY: 'sb_publishable_abc123'
 };
@@ -160,7 +160,7 @@ test('the release gate rejects LAN, localhost, http, the .invalid placeholder, a
     { ...GOOD, EXPO_PUBLIC_API_URL: 'http://192.168.31.215:3000' },
     { ...GOOD, EXPO_PUBLIC_API_URL: 'https://localhost:3000' },
     { ...GOOD, EXPO_PUBLIC_API_URL: 'https://10.0.0.5' },
-    { ...GOOD, EXPO_PUBLIC_API_URL: 'https://closiq-backend-not-yet-deployed.invalid' },
+    { ...GOOD, EXPO_PUBLIC_API_URL: 'https://heyhanger-backend-not-yet-deployed.invalid' },
     { ...GOOD, EXPO_PUBLIC_SUPABASE_URL: 'https://your-project.supabase.co' },
     { ...GOOD, EXPO_PUBLIC_API_URL: '' }
   ];

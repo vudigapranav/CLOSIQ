@@ -1,4 +1,4 @@
-// CLOSIQ V2: garment scans and outfit picks come from the on-device model,
+// HeyHanger V2: garment scans and outfit picks come from the on-device model,
 // never from Gemini. These tests run the shipping .native.ts services with a
 // controlled stand-in for the native LiteRT-LM module.
 import { installNativeMocks, setNativeVision } from './helpers/nativeV2Mocks';
@@ -105,7 +105,7 @@ test('a photo scan asks the model short questions and derives checked fields', a
   status = 'missing';
   const missing = await analyzeGarmentImageMobile('file:///photo.jpg');
   assert.equal(missing.ok, false);
-  assert.match(!missing.ok ? missing.message : '', /Turn on CLOSIQ AI/);
+  assert.match(!missing.ok ? missing.message : '', /Turn on HeyHanger.ai/);
   assert.doesNotMatch(!missing.ok ? missing.message : '', /local|on-device/i);
   status = 'failed';
   const failed = await analyzeGarmentImageMobile('file:///photo.jpg');
