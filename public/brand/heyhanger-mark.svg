@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  HeyHanger "HH" mark — MASTER (editable vector).
+  Two capital Hs (stems 60, counters 92, gap 56, crossbars 48, cap height 280,
+  corner radius 16)
+  with one subtle hanger cue: a small hook rising from the gap between them.
+  The hook stays secondary (stroke 32) so the silhouette still reads "HH" at 16 px.
+  Colour #6B5A3D (olive-brown, --color-primary) is swapped by
+  scripts/generate-app-icons.mjs for the ivory app-icon, single-colour and reversed variants.
+  Edit here, then run: node scripts/generate-app-icons.mjs
+-->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 372" width="480" height="372">
+  <title>HeyHanger</title>
+  <g fill="#6B5A3D">
+    <g id="h-left">
+      <rect x="0" y="92" width="60" height="280" rx="16"/>
+      <rect x="152" y="92" width="60" height="280" rx="16"/>
+      <rect x="0" y="208" width="212" height="48" rx="10"/>
+    </g>
+    <g id="h-right">
+      <rect x="268" y="92" width="60" height="280" rx="16"/>
+      <rect x="420" y="92" width="60" height="280" rx="16"/>
+      <rect x="268" y="208" width="212" height="48" rx="10"/>
+    </g>
+  </g>
+  <path id="hook" d="M240 74V46A30 30 0 1 0 181.81 56.26" fill="none" stroke="#6B5A3D" stroke-width="32" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

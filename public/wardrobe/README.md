@@ -1,4 +1,4 @@
-# CLOSIQ Wardrobe Asset Pipeline
+# HeyHanger Wardrobe Asset Pipeline
 
 Drop generated/photographed garment images here and they appear in the app automatically — no code changes required.
 

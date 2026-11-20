@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  HeyHanger wordmark — MASTER (editable vector).
+  Original monoline lettering built from straight strokes and circular arcs:
+  one 14-unit stroke, round caps and joins (friendly, matches the HH mark's
+  rounded corners). No font file is involved, so it renders identically everywhere.
+  Cap height 100, x-height 70, descender 30. Colour #2B2723 (charcoal, --color-text-primary)
+  is swapped by scripts/generate-app-icons.mjs for the single-colour and reversed variants.
+  Edit here, then run: node scripts/generate-app-icons.mjs
+-->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 672 131" width="672" height="131">
+  <title>HeyHanger</title>
+  <g fill="none" stroke="#2B2723" stroke-width="14" stroke-linecap="round" stroke-linejoin="round" transform="translate(0 -30)">
+    <path id="wm-H" d="M7 37V123M63 37V123M7 80H63"/>
+    <path id="wm-e" d="M88 95H143A28 28 0 1 0 137.06 112.24"/>
+    <path id="wm-y" d="M165 67L194 123M221 67L179 153"/>
+    <path id="wm-H2" d="M241 37V123M297 37V123M241 80H297"/>
+    <path id="wm-a" d="M377 95A28 28 0 1 0 321 95A28 28 0 1 0 377 95M377 67V123"/>
+    <path id="wm-n" d="M401 67V123M401 95A28 28 0 0 1 457 95V123"/>
+    <path id="wm-g" d="M537 95A28 28 0 1 0 481 95A28 28 0 1 0 537 95M537 67V128A26 26 0 0 1 488.48 141"/>
+    <path id="wm-e2" d="M560 95H615A28 28 0 1 0 609.06 112.24"/>
+    <path id="wm-r" d="M637 67V123M637 95A28 28 0 0 1 665 67"/>
+  </g>
+</svg>

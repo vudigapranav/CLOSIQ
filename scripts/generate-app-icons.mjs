@@ -1,137 +1,240 @@
 /**
- * Generates every CLOSIQ app icon from the OFFICIAL logo
- * public/brand/closiq-logo.png — the brain-Q mark (the user's choice on
- * 2026-11-01, replacing the "Spark hanger" symbol of 2026-10-14).
+ * Generates every HeyHanger brand export from the two editable vector masters:
+ *
+ *   public/brand/heyhanger-mark.svg      the "HH" monogram with the small hanger hook
+ *   public/brand/heyhanger-wordmark.svg  the monoline "HeyHanger" lettering
  *
  *   node scripts/generate-app-icons.mjs
  *
- * The wide wordmark can't be an app icon (Apple/Google need a square), so the
- * icon is the Q with the brain inside, CROPPED from that same artwork — never
- * redrawn. The mark is flat two-tone, so it enlarges cleanly: its ink
- * coverage is upsampled and the edge re-sharpened with a smoothstep, giving
- * crisp anti-aliased edges at 1024 px without changing the shape.
+ * Edit only the two masters; everything below is derived from them, so re-run
+ * this script after any change and commit the outputs. Rendering uses sharp
+ * (librsvg), already a project dependency. No fonts are involved, so the
+ * output is identical on every machine.
  *
- * Writes:
- *   mobile/assets/app-icon.png                  1024, opaque ivory tile (iOS + Expo icon)
- *   mobile/assets/adaptive-icon-foreground.png  1024, transparent, mark in the safe zone (Android)
- *   mobile/assets/adaptive-icon-monochrome.png  1024, white mark (Android 13 themed icons)
- *   public/apple-touch-icon.png                 180  (iPhone "Add to Home Screen")
- *   public/brand/closiq-app-icon-512.png        512  (sharing / manifest)
- *   public/favicon-32.png                       32   (browser tab)
- * Uses sharp (already a project dependency).
+ * Writes (SVG variants, all derived):
+ *   public/brand/heyhanger-mark-mono.svg            charcoal mark (single colour, light surfaces)
+ *   public/brand/heyhanger-mark-reversed.svg        ivory mark (dark surfaces)
+ *   public/brand/heyhanger-lockup.svg               olive mark + charcoal wordmark (light surfaces)
+ *   public/brand/heyhanger-lockup-reversed.svg      gold mark + off-white wordmark (dark surfaces)
+ *   public/brand/heyhanger-lockup-mono.svg          all charcoal
+ *   public/brand/heyhanger-lockup-mono-reversed.svg all off-white
+ *   public/brand/heyhanger-app-icon.svg             1024 square tile (olive-brown, ivory mark)
+ * Writes (PNG exports):
+ *   mobile/assets/app-icon.png                      1024 opaque tile (Expo/iOS icon, legacy Android)
+ *   mobile/assets/adaptive-icon-foreground.png      1024 transparent, ivory mark inside the 66/108 safe zone
+ *   mobile/assets/adaptive-icon-monochrome.png      1024 white mark (Android 13+ themed icons)
+ *   mobile/assets/heyhanger-logo.png                1200x334 transparent lockup (splash, sign-in, Home header)
+ *   public/apple-touch-icon.png                     180  (iPhone "Add to Home Screen")
+ *   public/favicon-32.png                           32   (browser tab)
+ *   public/brand/heyhanger-app-icon-512.png         512  (sharing)
+ *   public/brand/heyhanger-linkedin-square.png      1254x1254 social image
+ *   public/brand/heyhanger-linkedin-3x4.png         1086x1448 social image
+ *   docs/brand/heyhanger-preview.png                review sheet built from the exported files
+ *                                                   (16/32/48 px, circle + rounded-square masks, themed icon)
+ * The adaptive icon's background colour lives in mobile/app.json
+ * (android.adaptiveIcon.backgroundColor) and must stay equal to TILE below.
  */
+import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import sharp from 'sharp';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const LOGO = path.join(ROOT, 'public', 'brand', 'closiq-logo.png');
-const INK = { r: 42, g: 47, b: 53 }; // the logo's own charcoal
-const IVORY = { r: 247, g: 242, b: 233 }; // --color-bg #F7F2E9; also app.json adaptiveIcon.backgroundColor
-const SIZE = 1024;
 const out = (...p) => path.join(ROOT, ...p);
 
-/** Bounding box of the last ink glyph (the Q) in the wordmark. */
-function findQBox(px, w, h) {
-  const isInk = (x, y) => px[y * w + x] < 120;
-  const cols = [];
-  for (let x = 0; x < w; x++) {
-    for (let y = 0; y < h; y++) if (isInk(x, y)) { cols.push(x); break; }
-  }
-  const runs = [];
-  let start = cols[0];
-  let prev = cols[0];
-  for (const x of cols.slice(1)) {
-    if (x !== prev + 1) { runs.push([start, prev]); start = x; }
-    prev = x;
-  }
-  runs.push([start, prev]);
-  const [x0, x1] = runs[runs.length - 1];
-  let y0 = h;
-  let y1 = 0;
-  for (let y = 0; y < h; y++) {
-    for (let x = x0; x <= x1; x++) if (isInk(x, y)) { y0 = Math.min(y0, y); y1 = Math.max(y1, y); break; }
-  }
-  return { x0, y0, x1: x1 + 1, y1: y1 + 1 };
+// Palette (src/index.css tokens).
+const OLIVE = '#6B5A3D'; // --color-primary (light)
+const CHARCOAL = '#2B2723'; // --color-text-primary (light)
+const IVORY = '#F7F2E9'; // --color-bg (light)
+const GOLD = '#C6A876'; // --color-primary (dark)
+const OFF_WHITE = '#F5EFE4'; // --color-text-primary (dark)
+const DARK_BG = '#1C1815'; // --color-bg (dark)
+const TILE = OLIVE; // app icon / adaptive background
+const ICON_MARK = IVORY;
+
+// Colours used inside the masters, swapped for the variants.
+const MASTER_MARK = '#6B5A3D';
+const MASTER_WORD = '#2B2723';
+
+function readMaster(file) {
+  const src = fs.readFileSync(out('public', 'brand', file), 'utf8');
+  const vb = /viewBox="([\d.\s-]+)"/.exec(src);
+  if (!vb) throw new Error(`${file}: missing viewBox`);
+  const [x, y, w, h] = vb[1].trim().split(/\s+/).map(Number);
+  const inner = src.slice(src.indexOf('>', src.indexOf('<svg')) + 1, src.lastIndexOf('</svg>')).replace(/<title>.*?<\/title>/s, '');
+  return { x, y, w, h, inner };
 }
 
-/** 0–255 ink coverage of the Q, from the logo's own background/ink levels. */
-async function qCoverage() {
-  // One 8-bit grey channel per pixel (flatten drops any alpha first).
-  const { data, info } = await sharp(LOGO)
-    .flatten({ background: '#FFFFFF' })
-    .greyscale()
-    .toColourspace('b-w')
-    .raw()
-    .toBuffer({ resolveWithObject: true });
-  if (info.channels !== 1) throw new Error(`expected 1 grey channel, got ${info.channels}`);
-  const box = findQBox(data, info.width, info.height);
-  const pad = 6;
-  const left = box.x0 - pad;
-  const top = box.y0 - pad;
-  const width = box.x1 - box.x0 + pad * 2;
-  const height = box.y1 - box.y0 + pad * 2;
-  const mask = Buffer.alloc(width * height);
-  const BG = 244;
-  const INK_LEVEL = 45;
-  for (let y = 0; y < height; y++) {
-    for (let x = 0; x < width; x++) {
-      const v = data[(top + y) * info.width + (left + x)];
-      mask[y * width + x] = Math.round(Math.max(0, Math.min(1, (BG - v) / (BG - INK_LEVEL))) * 255);
-    }
-  }
-  return { mask, width, height };
+const MARK = readMaster('heyhanger-mark.svg');
+const WORD = readMaster('heyhanger-wordmark.svg');
+if (!MARK.inner.includes(MASTER_MARK)) throw new Error(`heyhanger-mark.svg must use ${MASTER_MARK}`);
+if (!WORD.inner.includes(MASTER_WORD)) throw new Error(`heyhanger-wordmark.svg must use ${MASTER_WORD}`);
+
+const recolour = (inner, from, to) => inner.split(from).join(to);
+const markIn = (fill) => recolour(MARK.inner, MASTER_MARK, fill);
+const wordIn = (stroke) => recolour(WORD.inner, MASTER_WORD, stroke);
+
+/** Places the mark (scaled) with its bounding box centred at (cx, cy). */
+const placeMark = (fill, scale, cx, cy) =>
+  `<g transform="translate(${cx - (MARK.w * scale) / 2} ${cy - (MARK.h * scale) / 2}) scale(${scale}) translate(${-MARK.x} ${-MARK.y})">${markIn(fill)}</g>`;
+
+// ---- Lockup geometry: the HH letters stand on the wordmark baseline and are
+// 1.45x the wordmark cap height; the hook rises above. Wordmark master units:
+// cap height 100, baseline at y = 100, descender to y = 131.
+const LOCK_SCALE = 0.52; // mark units -> wordmark units
+const MARK_CAP = 280; // HH letter height in mark units
+const MARK_LETTER_TOP = 92; // y of the HH letter tops in mark units
+const LOCK_GAP = 58;
+const markW = MARK.w * LOCK_SCALE;
+const markTop = 100 - (MARK_LETTER_TOP + MARK_CAP) * LOCK_SCALE; // negative: hook above cap line
+const LOCK = {
+  x: 0,
+  y: Math.floor(markTop),
+  w: Math.ceil(markW + LOCK_GAP + WORD.w),
+  h: Math.ceil(WORD.h - Math.floor(markTop))
+};
+const lockupInner = (markFill, wordStroke) =>
+  `<g transform="translate(0 ${markTop}) scale(${LOCK_SCALE})">${markIn(markFill)}</g>` +
+  `<g transform="translate(${markW + LOCK_GAP} 0)">${wordIn(wordStroke)}</g>`;
+const lockupSvg = (markFill, wordStroke, comment) =>
+  `<?xml version="1.0" encoding="UTF-8"?>\n<!-- ${comment} Generated by scripts/generate-app-icons.mjs from heyhanger-mark.svg + heyhanger-wordmark.svg; do not edit by hand. -->\n` +
+  `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${LOCK.x} ${LOCK.y} ${LOCK.w} ${LOCK.h}" width="${LOCK.w}" height="${LOCK.h}"><title>HeyHanger</title>${lockupInner(markFill, wordStroke)}</svg>\n`;
+const markSvg = (fill, comment) =>
+  `<?xml version="1.0" encoding="UTF-8"?>\n<!-- ${comment} Generated by scripts/generate-app-icons.mjs from heyhanger-mark.svg; do not edit by hand. -->\n` +
+  `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${MARK.x} ${MARK.y} ${MARK.w} ${MARK.h}" width="${MARK.w}" height="${MARK.h}"><title>HeyHanger</title>${markIn(fill)}</svg>\n`;
+
+// ---- Icon tiles (1024 canvas). Adaptive icons: Android shows the central
+// 72/108 of the canvas and guarantees only a 66/108 circle, so the mark's
+// bounding-box diagonal is kept inside a 0.29 x 1024 radius.
+const SIZE = 1024;
+const halfDiag = Math.hypot(MARK.w, MARK.h) / 2;
+const ADAPTIVE_SCALE = (0.29 * SIZE) / halfDiag;
+const TILE_SCALE = (0.56 * SIZE) / MARK.w; // opaque tile: mark spans 56% of the width
+const FAVICON_SCALE = (0.8 * SIZE) / MARK.w; // tiny sizes: as large as the tile allows
+const cy = SIZE / 2;
+const tileSvg = (scale = TILE_SCALE, radius = 0) =>
+  `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${SIZE} ${SIZE}" width="${SIZE}" height="${SIZE}"><rect width="${SIZE}" height="${SIZE}" rx="${radius}" fill="${TILE}"/>${placeMark(ICON_MARK, scale, SIZE / 2, cy)}</svg>`;
+const layerSvg = (fill) =>
+  `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${SIZE} ${SIZE}" width="${SIZE}" height="${SIZE}">${placeMark(fill, ADAPTIVE_SCALE, SIZE / 2, cy)}</svg>`;
+
+/** Rasterises an SVG string at exactly width x height (vector, not upscaled). */
+const render = (svg, width, height = width) =>
+  sharp(Buffer.from(svg.replace(/width="[\d.]+" height="[\d.]+"/, `width="${width}" height="${height}"`))).png();
+
+const writeText = (rel, text) => fs.writeFileSync(out(...rel.split('/')), text);
+
+// 1. Derived SVG variants.
+writeText('public/brand/heyhanger-mark-mono.svg', markSvg(CHARCOAL, 'HeyHanger mark, single colour (charcoal) for light surfaces.'));
+writeText('public/brand/heyhanger-mark-reversed.svg', markSvg(OFF_WHITE, 'HeyHanger mark, reversed (off-white) for dark surfaces.'));
+writeText('public/brand/heyhanger-lockup.svg', lockupSvg(OLIVE, CHARCOAL, 'HeyHanger lockup for light surfaces.'));
+writeText('public/brand/heyhanger-lockup-reversed.svg', lockupSvg(GOLD, OFF_WHITE, 'HeyHanger lockup for dark surfaces.'));
+writeText('public/brand/heyhanger-lockup-mono.svg', lockupSvg(CHARCOAL, CHARCOAL, 'HeyHanger lockup, single colour (charcoal).'));
+writeText('public/brand/heyhanger-lockup-mono-reversed.svg', lockupSvg(OFF_WHITE, OFF_WHITE, 'HeyHanger lockup, single colour reversed (off-white).'));
+writeText(
+  'public/brand/heyhanger-app-icon.svg',
+  `<?xml version="1.0" encoding="UTF-8"?>\n<!-- HeyHanger app icon tile. Generated by scripts/generate-app-icons.mjs; do not edit by hand. -->\n${tileSvg()}\n`
+);
+
+// 2. App icons.
+await render(tileSvg(), SIZE).flatten({ background: TILE }).toFile(out('mobile', 'assets', 'app-icon.png'));
+await render(layerSvg(ICON_MARK), SIZE).toFile(out('mobile', 'assets', 'adaptive-icon-foreground.png'));
+await render(layerSvg('#FFFFFF'), SIZE).toFile(out('mobile', 'assets', 'adaptive-icon-monochrome.png'));
+await render(tileSvg(), 180).flatten({ background: TILE }).toFile(out('public', 'apple-touch-icon.png'));
+await render(tileSvg(), 512).flatten({ background: TILE }).toFile(out('public', 'brand', 'heyhanger-app-icon-512.png'));
+await render(tileSvg(FAVICON_SCALE, SIZE * 0.22), 32).toFile(out('public', 'favicon-32.png'));
+
+// 3. Lockup PNG for the phone (3.6:1 box the screens already reserve), transparent.
+const LOGO_W = 1200;
+const LOGO_H = 334;
+const lockupBox = (markFill, wordStroke, w, h, bg) => {
+  const s = Math.min((w * 0.94) / LOCK.w, (h * 0.86) / LOCK.h);
+  const tx = (w - LOCK.w * s) / 2;
+  const ty = (h - LOCK.h * s) / 2 - LOCK.y * s;
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${w} ${h}" width="${w}" height="${h}">${bg ? `<rect width="${w}" height="${h}" fill="${bg}"/>` : ''}<g transform="translate(${tx} ${ty}) scale(${s})">${lockupInner(markFill, wordStroke)}</g></svg>`;
+};
+await render(lockupBox(OLIVE, CHARCOAL, LOGO_W, LOGO_H), LOGO_W, LOGO_H).toFile(out('mobile', 'assets', 'heyhanger-logo.png'));
+
+// 4. Social images (lockup centred on ivory, same sizes as before).
+for (const [file, w, h] of [
+  ['heyhanger-linkedin-square.png', 1254, 1254],
+  ['heyhanger-linkedin-3x4.png', 1086, 1448]
+]) {
+  const bw = Math.round(w * 0.78);
+  const bh = Math.round(bw / 3.6);
+  const inner = await render(lockupBox(OLIVE, CHARCOAL, bw, bh, null), bw, bh).toBuffer();
+  const meta = await sharp(inner).metadata();
+  await sharp({ create: { width: w, height: h, channels: 3, background: IVORY } })
+    .composite([{ input: inner, left: Math.round((w - meta.width) / 2), top: Math.round((h - meta.height) / 2) }])
+    .png()
+    .toFile(out('public', 'brand', file));
 }
 
-/** Upsample the coverage to `targetHeight` and re-sharpen the edge (smoothstep 0.4–0.6). */
-async function enlarge(cov, targetHeight) {
-  const targetWidth = Math.round((cov.width * targetHeight) / cov.height);
-  const { data: big, info } = await sharp(cov.mask, { raw: { width: cov.width, height: cov.height, channels: 1 } })
-    .resize(targetWidth, targetHeight, { kernel: 'lanczos3' })
-    .toColourspace('b-w')
-    .raw()
-    .toBuffer({ resolveWithObject: true });
-  if (info.channels !== 1 || info.width !== targetWidth || info.height !== targetHeight) {
-    throw new Error(`unexpected resize output ${info.width}x${info.height}x${info.channels}`);
-  }
-  for (let i = 0; i < big.length; i++) {
-    const t = Math.max(0, Math.min(1, (big[i] / 255 - 0.4) / 0.2));
-    big[i] = Math.round(t * t * (3 - 2 * t) * 255);
-  }
-  return { mask: big, width: targetWidth, height: targetHeight };
+// 5. Review sheet built from the files just written.
+const PREVIEW = out('docs', 'brand', 'heyhanger-preview.png');
+fs.mkdirSync(path.dirname(PREVIEW), { recursive: true });
+const icon = fs.readFileSync(out('mobile', 'assets', 'app-icon.png'));
+const fg = fs.readFileSync(out('mobile', 'assets', 'adaptive-icon-foreground.png'));
+const mono = fs.readFileSync(out('mobile', 'assets', 'adaptive-icon-monochrome.png'));
+const crop = Math.round((SIZE * 18) / 108); // launchers show the central 72/108
+const visible = SIZE - 2 * crop;
+const adaptive = async (layer, bg) =>
+  sharp(await sharp({ create: { width: SIZE, height: SIZE, channels: 4, background: bg } }).composite([{ input: layer }]).png().toBuffer())
+    .extract({ left: crop, top: crop, width: visible, height: visible })
+    .png()
+    .toBuffer();
+const masked = async (buf, size, shape) => {
+  const m =
+    shape === 'circle'
+      ? `<svg width="${size}" height="${size}"><circle cx="${size / 2}" cy="${size / 2}" r="${size / 2}"/></svg>`
+      : `<svg width="${size}" height="${size}"><rect width="${size}" height="${size}" rx="${size * 0.22}"/></svg>`;
+  return sharp(await sharp(buf).resize(size, size, { kernel: 'lanczos3' }).png().toBuffer())
+    .composite([{ input: Buffer.from(m), blend: 'dest-in' }])
+    .png()
+    .toBuffer();
+};
+const full = await adaptive(fg, TILE);
+const themed = await sharp(await adaptive(mono, '#3A4A5C')).png().toBuffer();
+const tiles = [];
+const row = (y) => ({ y, x: 24 });
+let r = row(24);
+const put = (input, w, gapAfter = 24) => {
+  tiles.push({ input, left: r.x, top: r.y });
+  r.x += w + gapAfter;
+};
+// Row 1: launcher masks at 192 px.
+for (const [buf, shape] of [
+  [full, 'circle'],
+  [full, 'square'],
+  [themed, 'circle'],
+  [icon, 'square']
+]) put(await masked(buf, 192, shape), 192);
+// Row 2: small sizes, each also shown 4x nearest-neighbour.
+r = row(248);
+for (const s of [48, 32, 16]) {
+  const small = await sharp(await masked(full, s, 'circle')).png().toBuffer();
+  put(small, s, 12);
+  put(await sharp(small).resize(s * 4, s * 4, { kernel: 'nearest' }).png().toBuffer(), s * 4);
 }
+const fav = fs.readFileSync(out('public', 'favicon-32.png'));
+put(fav, 32, 12);
+put(await sharp(fav).resize(128, 128, { kernel: 'nearest' }).png().toBuffer(), 128);
+const fav16 = await sharp(fav).resize(16, 16, { kernel: 'lanczos3' }).png().toBuffer();
+put(fav16, 16, 12);
+put(await sharp(fav16).resize(64, 64, { kernel: 'nearest' }).png().toBuffer(), 64);
+// Row 3/4: lockups on light and dark.
+const lockLight = await render(lockupBox(OLIVE, CHARCOAL, 760, 211, IVORY), 760, 211).toBuffer();
+const lockDark = await render(lockupBox(GOLD, OFF_WHITE, 760, 211, DARK_BG), 760, 211).toBuffer();
+const monoLight = await render(lockupBox(CHARCOAL, CHARCOAL, 380, 106, '#FFFFFF'), 380, 106).toBuffer();
+const monoDark = await render(lockupBox(OFF_WHITE, OFF_WHITE, 380, 106, '#000000'), 380, 106).toBuffer();
+r = row(480);
+put(lockLight, 760);
+put(monoLight, 380);
+r = row(715);
+put(lockDark, 760);
+put(monoDark, 380);
+await sharp({ create: { width: 1240, height: 950, channels: 3, background: '#D9D4CB' } })
+  .composite(tiles)
+  .png()
+  .toFile(PREVIEW);
 
-/** The mark in `fill`, centred on a SIZE×SIZE tile (transparent when no background). */
-async function place(mark, fill, background) {
-  const rgba = Buffer.alloc(mark.width * mark.height * 4);
-  for (let i = 0; i < mark.width * mark.height; i++) {
-    rgba[i * 4] = fill.r;
-    rgba[i * 4 + 1] = fill.g;
-    rgba[i * 4 + 2] = fill.b;
-    rgba[i * 4 + 3] = mark.mask[i];
-  }
-  const layer = await sharp(rgba, { raw: { width: mark.width, height: mark.height, channels: 4 } }).png().toBuffer();
-  return sharp({
-    create: { width: SIZE, height: SIZE, channels: 4, background: background ? { ...background, alpha: 1 } : { r: 0, g: 0, b: 0, alpha: 0 } }
-  }).composite([{ input: layer, left: Math.round((SIZE - mark.width) / 2), top: Math.round((SIZE - mark.height) / 2) }]);
-}
-
-const coverage = await qCoverage();
-
-// iOS / Expo icon: opaque (Apple rejects transparency), mark at ~60% of the
-// tile so it survives the rounded corners.
-const iconPng = await (await place(await enlarge(coverage, 620), INK, IVORY)).flatten({ background: IVORY }).png().toBuffer();
-await sharp(iconPng).toFile(out('mobile', 'assets', 'app-icon.png'));
-
-// Android adaptive: keep the mark inside the ~66% safe zone; the launcher
-// supplies the ivory background colour and the mask shape.
-const fg = await enlarge(coverage, 470);
-await (await place(fg, INK, null)).png().toFile(out('mobile', 'assets', 'adaptive-icon-foreground.png'));
-await (await place(fg, { r: 255, g: 255, b: 255 }, null)).png().toFile(out('mobile', 'assets', 'adaptive-icon-monochrome.png'));
-
-// Web.
-await sharp(iconPng).resize(180, 180, { kernel: 'lanczos3' }).png().toFile(out('public', 'apple-touch-icon.png'));
-await sharp(iconPng).resize(512, 512, { kernel: 'lanczos3' }).png().toFile(out('public', 'brand', 'closiq-app-icon-512.png'));
-await sharp(iconPng).resize(32, 32, { kernel: 'lanczos3' }).png().toFile(out('public', 'favicon-32.png'));
-
-console.log('App icons written from the brain-Q of public/brand/closiq-logo.png');
+console.log('HeyHanger brand exports written from public/brand/heyhanger-mark.svg + heyhanger-wordmark.svg');
