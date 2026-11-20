@@ -22,9 +22,9 @@ interface NativeVision {
   unload(): Promise<void>;
   remove(): Promise<void>;
 }
-const native = requireOptionalNativeModule<NativeVision>('ClosiqVision');
+const native = requireOptionalNativeModule<NativeVision>('HeyHangerVision');
 function runtime() {
-  if (!native) throw new Error('Photo analysis needs the CLOSIQ Android app.');
+  if (!native) throw new Error('Photo analysis needs the HeyHanger Android app.');
   return native;
 }
 export const modelStatus = async (): Promise<Status> => (native ? native.status() : 'unsupported');
@@ -35,7 +35,7 @@ export async function installModel(progress: (percent: number) => void, signal: 
   if (Paths.availableDiskSpace < model.bytes * 2 + 64 * 1024 * 1024)
     throw new Error('Free at least 800 MB before installing.');
   working = true;
-  const stage = new File(Paths.cache, 'closiq-model.partial');
+  const stage = new File(Paths.cache, 'heyhanger-model.partial');
   try {
     if (stage.exists) stage.delete();
     await File.downloadFileAsync(

@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "CLOSIQ",
+    "name": "HeyHanger",
     "slug": "closiq",
     "version": "2.0.0",
     "orientation": "portrait",
@@ -18,7 +18,7 @@
     "android": {
       "package": "com.closiq.app",
       "adaptiveIcon": {
-        "backgroundColor": "#F7F2E9",
+        "backgroundColor": "#6B5A3D",
         "foregroundImage": "./assets/adaptive-icon-foreground.png",
         "monochromeImage": "./assets/adaptive-icon-monochrome.png"
       }
@@ -30,7 +30,7 @@
       [
         "expo-splash-screen",
         {
-          "image": "./assets/closiq-logo.png",
+          "image": "./assets/heyhanger-logo.png",
           "resizeMode": "contain",
           "backgroundColor": "#F7F2E9"
         }
@@ -38,15 +38,15 @@
       [
         "expo-image-picker",
         {
-          "cameraPermission": "CLOSIQ uses your camera to capture photos of clothing you own.",
-          "photosPermission": "CLOSIQ uses your photo library to catalog clothing you already own.",
+          "cameraPermission": "HeyHanger uses your camera to capture photos of clothing you own.",
+          "photosPermission": "HeyHanger uses your photo library to catalog clothing you already own.",
           "microphonePermission": false
         }
       ],
       [
         "expo-location",
         {
-          "locationWhenInUsePermission": "CLOSIQ uses your location to provide local weather and improve outfit recommendations."
+          "locationWhenInUsePermission": "HeyHanger uses your location to provide local weather and improve outfit recommendations."
         }
       ],
       "@react-native-community/datetimepicker",

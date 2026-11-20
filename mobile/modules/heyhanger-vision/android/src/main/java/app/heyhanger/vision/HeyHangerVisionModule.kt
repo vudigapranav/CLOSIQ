@@ -1,4 +1,4 @@
-package app.closiq.vision
+package app.heyhanger.vision
 
 import android.content.ComponentCallbacks2
 import android.content.res.Configuration
@@ -23,7 +23,7 @@ import kotlinx.coroutines.withContext
 import java.util.concurrent.locks.ReentrantLock
 
 
-class ClosiqVisionModule : Module() {
+class HeyHangerVisionModule : Module() {
   private val lock = ReentrantLock()
   private val sessionLock = Any()
   private var active: Conversation? = null
@@ -36,7 +36,7 @@ class ClosiqVisionModule : Module() {
   // example SIGILL on a CPU the runtime's kernels do not support), which no
   // Kotlin catch can intercept. Status then reports "failed" so the app stops
   // starting the engine automatically instead of crashing on every scan.
-  private val loading get() = File(context.noBackupFilesDir, "closiq-engine-loading")
+  private val loading get() = File(context.noBackupFilesDir, "heyhanger-engine-loading")
 
   private fun localFile(uri: String): File {
     val path = Uri.parse(uri)
@@ -85,7 +85,7 @@ class ClosiqVisionModule : Module() {
   }
 
   override fun definition() = ModuleDefinition {
-    Name("ClosiqVision")
+    Name("HeyHangerVision")
     AsyncFunction("status") {
       if (engine != null) "ready" else if (!model.isFile) "missing" else if (loading.exists()) "failed" else "installed"
     }
@@ -96,7 +96,7 @@ class ClosiqVisionModule : Module() {
         exclusive {
           val input = localFile(uri)
           require(input.length() == 363085824L) { "Incorrect model size." }
-          val stage = File(model.parentFile, "closiq-model.partial")
+          val stage = File(model.parentFile, "heyhanger-model.partial")
           try {
             val digest = MessageDigest.getInstance("SHA-256")
             input.inputStream().buffered().use { source ->
@@ -152,7 +152,7 @@ class ClosiqVisionModule : Module() {
               response.toString()
             } catch (stopped: java.util.concurrent.CancellationException) {
               // cancelProcess() ends the stream with a CancellationException.
-              // When CLOSIQ stopped it for length, the text so far is the answer;
+              // When HeyHanger stopped it for length, the text so far is the answer;
               // a user/background cancel is still reported as cancelled.
               if (capped) response.toString() else throw stopped
             }

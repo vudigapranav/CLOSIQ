@@ -1,5 +1,5 @@
 /**
- * Android build compatibility for CLOSIQ V2 (2026-11-19).
+ * Android build compatibility for HeyHanger V2 (2026-11-19).
  *
  * Two host/toolchain problems are fixed here so `npx expo prebuild` followed by
  * a plain `./gradlew assembleRelease` works:
@@ -11,7 +11,7 @@
  *      "NDK not configured. Preferred NDK version is '27.0.12077973'"
  *    or "Failed to find Build Tools revision 35.0.0".
  *    Only redirected when the preferred component is missing.
- *    `CLOSIQ_NDK_VERSION` / `CLOSIQ_BUILD_TOOLS_VERSION` force a value.
+ *    `HEYHANGER_NDK_VERSION` / `HEYHANGER_BUILD_TOOLS_VERSION` force a value.
  *
  * 2. Kotlin metadata of the on-device model runtime. The Kotlin LiteRT-LM
  *    artifact is published with Kotlin 2.4 metadata and a kotlin-stdlib 2.4.0
@@ -20,7 +20,7 @@
  *    incompatible version of Kotlin"). The 2.4 stdlib wins dependency
  *    resolution for the whole app anyway (it is what ships in the APK), so the
  *    compiler is told to accept that newer metadata in the modules that see
- *    it (closiq-vision itself, plus :expo and :app). Remove this once the
+ *    it (heyhanger-vision itself, plus :expo and :app). Remove this once the
  *    project builds with Kotlin 2.4+.
  *
  * Nothing here changes app behaviour or the JavaScript bundle.
@@ -29,7 +29,10 @@ const fs = require('fs');
 const path = require('path');
 const { withProjectBuildGradle } = require('@expo/config-plugins');
 
-const MARKER = '// closiq:android-build-compat';
+const MARKER = '// heyhanger:android-build-compat';
+// Projects generated before the 2026-11-20 rebrand carry the old marker; treat it
+// the same so a prebuild without --clean never writes the block twice.
+const LEGACY_MARKER = '// closiq:android-build-compat';
 
 function compare(a, b) {
   const left = a.split('.').map(Number);
@@ -74,7 +77,7 @@ function pick(available, wanted, forced) {
 module.exports = function withAndroidBuildCompat(config, props = {}) {
   return withProjectBuildGradle(config, (cfg) => {
     if (cfg.modResults.language !== 'groovy') return cfg;
-    if (cfg.modResults.contents.includes(MARKER)) return cfg;
+    if (cfg.modResults.contents.includes(MARKER) || cfg.modResults.contents.includes(LEGACY_MARKER)) return cfg;
     const anchor = 'apply plugin: "expo-root-project"';
     if (!cfg.modResults.contents.includes(anchor)) return cfg;
 
@@ -85,7 +88,7 @@ module.exports = function withAndroidBuildCompat(config, props = {}) {
         pick(
           installed(path.join(sdk, 'ndk'), 'source.properties'),
           preferredNdk(projectRoot),
-          process.env.CLOSIQ_NDK_VERSION
+          process.env.HEYHANGER_NDK_VERSION
         )
       : undefined;
     const buildTools = sdk
@@ -93,7 +96,7 @@ module.exports = function withAndroidBuildCompat(config, props = {}) {
         pick(
           installed(path.join(sdk, 'build-tools')),
           '35.0.0',
-          process.env.CLOSIQ_BUILD_TOOLS_VERSION
+          process.env.HEYHANGER_BUILD_TOOLS_VERSION
         )
       : undefined;
 
@@ -113,12 +116,12 @@ module.exports = function withAndroidBuildCompat(config, props = {}) {
     if (ndk) {
       lines.push(
         'subprojects { subproject ->',
-        `  def closiqNdk = '${ndk}'`,
+        `  def heyhangerNdk = '${ndk}'`,
         "  subproject.plugins.withId('com.android.library') {",
-        "    subproject.extensions.findByName('android')?.ndkVersion = closiqNdk",
+        "    subproject.extensions.findByName('android')?.ndkVersion = heyhangerNdk",
         '  }',
         "  subproject.plugins.withId('com.android.application') {",
-        "    subproject.extensions.findByName('android')?.ndkVersion = closiqNdk",
+        "    subproject.extensions.findByName('android')?.ndkVersion = heyhangerNdk",
         '  }',
         '}'
       );
@@ -128,18 +131,18 @@ module.exports = function withAndroidBuildCompat(config, props = {}) {
       // would fall back to the AGP default, which is not installed here.
       lines.push(
         'subprojects { subproject ->',
-        `  def closiqBuildTools = '${buildTools}'`,
+        `  def heyhangerBuildTools = '${buildTools}'`,
         "  subproject.plugins.withId('com.android.library') {",
-        "    subproject.extensions.findByName('android')?.buildToolsVersion = closiqBuildTools",
+        "    subproject.extensions.findByName('android')?.buildToolsVersion = heyhangerBuildTools",
         '  }',
         "  subproject.plugins.withId('com.android.application') {",
-        "    subproject.extensions.findByName('android')?.buildToolsVersion = closiqBuildTools",
+        "    subproject.extensions.findByName('android')?.buildToolsVersion = heyhangerBuildTools",
         '  }',
         '}'
       );
     }
     // Accept the Kotlin 2.4 metadata that the on-device model runtime carries,
-    // only where it reaches the compile classpath. `closiq-vision` sets the flag
+    // only where it reaches the compile classpath. `heyhanger-vision` sets the flag
     // in its own build.gradle; `expo` (the autolinking aggregator) and `app`
     // depend on it and see kotlin-stdlib 2.4.0. Verified 2026-11-19: without
     // the flag `:expo:compileReleaseKotlin` fails; every other module compiles.
@@ -157,7 +160,7 @@ module.exports = function withAndroidBuildCompat(config, props = {}) {
 
     cfg.modResults.contents = cfg.modResults.contents.replace(anchor, lines.join('\n'));
     console.log(
-      `[closiq] Android build compat — ndk: ${ndk ?? 'preferred installed'}, buildTools: ${
+      `[heyhanger] Android build compat — ndk: ${ndk ?? 'preferred installed'}, buildTools: ${
         buildTools ?? 'preferred installed'
       }, kotlin metadata check: relaxed for :expo and :app (LiteRT-LM)`
     );

@@ -1,9 +1,9 @@
 Pod::Spec.new do |s|
-  s.name = 'ClosiqVision'
+  s.name = 'HeyHangerVision'
   s.version = '0.1.0'
-  s.summary = 'Local CLOSIQ vision inference'
+  s.summary = 'Local HeyHanger vision inference'
   s.description = s.summary
-  s.author = 'CLOSIQ'
+  s.author = 'HeyHanger'
   s.homepage = 'https://github.com/vudigapranav/CLOSIQ'
   s.license = { :type => 'MIT' }
   s.source = { :git => s.homepage + '.git' }

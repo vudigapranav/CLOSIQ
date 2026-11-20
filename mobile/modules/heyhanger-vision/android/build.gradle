@@ -2,10 +2,10 @@ plugins {
   id 'com.android.library'
   id 'expo-module-gradle-plugin'
 }
-group = 'app.closiq.vision'
+group = 'app.heyhanger.vision'
 version = '2.0.0'
 android {
-  namespace 'app.closiq.vision'
+  namespace 'app.heyhanger.vision'
   defaultConfig {
     versionCode 1
     versionName '2.0.0'

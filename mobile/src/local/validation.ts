@@ -89,7 +89,7 @@ function formalityOf(v: unknown) {
 // Short-question scan. The published 500M base model answers one simple
 // question well ("The garment is a light blue button-down shirt.") but does
 // not fill multi-field forms reliably, so the scan asks short questions and
-// CLOSIQ derives the structured fields from the answers.
+// HeyHanger derives the structured fields from the answers.
 
 /** "Sure! The garment is a light blue button-down shirt." -> "light blue button-down shirt" */
 export function shortAnswer(text: string, maxWords = 8): string {

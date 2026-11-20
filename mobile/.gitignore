@@ -44,4 +44,4 @@ yarn-error.*
 /.gradle-home/
 
 # Local module build output
-/modules/closiq-vision/android/build/
+/modules/heyhanger-vision/android/build/

@@ -24,7 +24,7 @@ actor VisionRuntime {
 
     private func destination() throws -> URL {
         var folder = try manager.url(for: .applicationSupportDirectory, in: .userDomainMask,
-                                     appropriateFor: nil, create: true).appendingPathComponent("CLOSIQModels")
+                                     appropriateFor: nil, create: true).appendingPathComponent("HeyHangerModels")
         try manager.createDirectory(at: folder, withIntermediateDirectories: true)
         var values = URLResourceValues()
         values.isExcludedFromBackup = true
